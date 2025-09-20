@@ -25,20 +25,62 @@ const app = createApp({
         const initMap = async () => {
             await nextTick();
             
-            if (mapContainer.value) {
+            // Try to find the map container by ID first
+            let container = mapContainer.value;
+            if (!container) {
+                container = document.getElementById('map-container');
+            }
+            
+            if (container) {
+                console.log('Initializing map with container:', container);
+                
+                // Ensure the container has proper dimensions
+                container.style.width = '100%';
+                container.style.height = '100%';
+                container.style.minHeight = '100vh';
+                
                 // Initialize map centered on Mindanao, Philippines
-                map.value = L.map(mapContainer.value).setView([7.5, 124.5], 7);
+                map.value = L.map(container, {
+                    zoomControl: true,
+                    attributionControl: true
+                }).setView([7.5, 124.5], 7);
+                
+                console.log('Map instance created:', map.value);
                 
                 // Add OpenStreetMap tiles
-                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                    attribution: '© OpenStreetMap contributors'
+                const osmLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                    attribution: '© OpenStreetMap contributors',
+                    maxZoom: 19
                 }).addTo(map.value);
+                
+                console.log('OSM layer added:', osmLayer);
 
                 // Add satellite overlay for weather visualization
-                L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+                const satelliteLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
                     attribution: '© Esri',
-                    opacity: 0.3
+                    opacity: 0.3,
+                    maxZoom: 19
                 }).addTo(map.value);
+                
+                console.log('Satellite layer added:', satelliteLayer);
+                
+                // Force map to resize after initialization
+                setTimeout(() => {
+                    if (map.value) {
+                        map.value.invalidateSize();
+                        console.log('Map invalidated and resized');
+                    }
+                }, 100);
+            } else {
+                console.error('Map container not found! Trying alternative approach...');
+                // Try alternative approach with direct DOM manipulation
+                setTimeout(() => {
+                    const altContainer = document.querySelector('[data-map-container]');
+                    if (altContainer) {
+                        console.log('Found alternative container:', altContainer);
+                        initMap();
+                    }
+                }, 500);
             }
         };
 
@@ -99,10 +141,34 @@ const app = createApp({
         onMounted(async () => {
             console.log('WeatherDashboard mounted');
             try {
-                await initMap();
-                console.log('Map initialized');
-                await fetchWeatherData();
-                console.log('Weather data fetched');
+                // Wait for DOM to be fully ready
+                await new Promise(resolve => setTimeout(resolve, 500));
+                
+                // Try multiple times to initialize map
+                let attempts = 0;
+                const maxAttempts = 5;
+                
+                const tryInitMap = async () => {
+                    attempts++;
+                    console.log(`Map initialization attempt ${attempts}/${maxAttempts}`);
+                    
+                    await initMap();
+                    
+                    if (!map.value && attempts < maxAttempts) {
+                        console.log('Map not initialized, retrying...');
+                        await new Promise(resolve => setTimeout(resolve, 1000));
+                        await tryInitMap();
+                    } else if (map.value) {
+                        console.log('Map successfully initialized!');
+                        await fetchWeatherData();
+                        console.log('Weather data fetched');
+                    } else {
+                        console.error('Failed to initialize map after all attempts');
+                    }
+                };
+                
+                await tryInitMap();
+                
             } catch (error) {
                 console.error('Error in onMounted:', error);
             }
@@ -220,17 +286,42 @@ const app = createApp({
             h('div', {
                 style: {
                     position: 'relative',
-                    width: '100%',
-                    height: '100%'
+                    width: '100vw',
+                    height: '100vh',
+                    overflow: 'hidden'
                 }
             }, [
                 h('div', {
                     ref: this.mapContainer,
+                    id: 'map-container',
+                    'data-map-container': true,
                     style: {
                         width: '100%',
-                        height: '100%'
+                        height: '100%',
+                        minHeight: '100vh',
+                        position: 'absolute',
+                        top: 0,
+                        left: 0,
+                        zIndex: 1,
+                        background: '#2c3e50'
                     }
                 }),
+                
+                // Loading indicator
+                h('div', {
+                    style: {
+                        position: 'absolute',
+                        top: '50%',
+                        left: '50%',
+                        transform: 'translate(-50%, -50%)',
+                        color: 'white',
+                        fontSize: '18px',
+                        zIndex: 1000,
+                        background: 'rgba(0, 0, 0, 0.7)',
+                        padding: '20px',
+                        borderRadius: '10px'
+                    }
+                }, '🗺️ Loading Interactive Map...'),
                 
                 // Weather Overlay
                 this.currentWeather ? h('div', {
