@@ -11,8 +11,17 @@ use App\Http\Controllers\ActivityController;
 use App\Http\Controllers\Auth\AuthController;
 
 Route::get('/', function () {
-    return redirect('/dashboard');
+    return redirect('/weather-test');
 });
+
+// Test route for weather dashboard (no auth required)
+Route::get('/weather-test', function () {
+    return view('dashboard');
+});
+
+// Weather API endpoints (no auth required for testing)
+Route::get('/api/weather/current', [WeatherController::class, 'getCurrentWeather']);
+Route::get('/api/weather/forecast', [WeatherController::class, 'getForecast']);
 
 // Test route for weather service
 Route::get('/test-weather', function () {
@@ -38,9 +47,6 @@ Route::middleware('auth')->group(function () {
     Route::patch('/alerts/{alert:alert_id}/resolve', [AlertController::class, 'resolve'])->name('alerts.resolve');
     Route::delete('/alerts/{alert:alert_id}', [AlertController::class, 'destroy'])->name('alerts.destroy');
     
-    // Weather API endpoints
-    Route::get('/api/weather/current', [WeatherController::class, 'getCurrentWeather']);
-    Route::get('/api/weather/forecast', [WeatherController::class, 'getForecast']);
     
     // Activity management
     Route::resource('activities', ActivityController::class);
