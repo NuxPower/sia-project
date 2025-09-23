@@ -4,26 +4,6 @@
     <div style="position: fixed; top: 10px; left: 10px; background: red; color: white; padding: 10px; z-index: 9999;">
       Vue Component Loaded!
     </div>
-    <!-- Sidebar Navigation -->
-    <div class="sidebar">
-      <div class="sidebar-icons">
-        <div class="icon-item" @click="setActiveView('dashboard')">
-          <i class="fas fa-th"></i>
-        </div>
-        <div class="icon-item" @click="setActiveView('map')">
-          <i class="fas fa-map"></i>
-        </div>
-        <div class="icon-item" @click="setActiveView('calendar')">
-          <i class="fas fa-calendar"></i>
-        </div>
-        <div class="icon-item" @click="setActiveView('alerts')">
-          <i class="fas fa-bell"></i>
-        </div>
-        <div class="icon-item" @click="setActiveView('settings')">
-          <i class="fas fa-cog"></i>
-        </div>
-      </div>
-    </div>
 
     <!-- Search Bar -->
     <div class="search-bar">
@@ -208,39 +188,6 @@ export default {
   overflow: hidden;
 }
 
-.sidebar {
-  position: fixed;
-  left: 20px;
-  top: 50%;
-  transform: translateY(-50%);
-  z-index: 1000;
-}
-
-.sidebar-icons {
-  display: flex;
-  flex-direction: column;
-  gap: 15px;
-}
-
-.icon-item {
-  width: 50px;
-  height: 50px;
-  background: rgba(0, 0, 0, 0.7);
-  border-radius: 12px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  transition: all 0.3s ease;
-  color: white;
-  font-size: 18px;
-}
-
-.icon-item:hover {
-  background: rgba(0, 0, 0, 0.9);
-  transform: scale(1.1);
-}
-
 .search-bar {
   position: fixed;
   top: 20px;
@@ -377,15 +324,6 @@ export default {
 
 /* Responsive design */
 @media (max-width: 768px) {
-  .sidebar {
-    left: 10px;
-  }
-  
-  .icon-item {
-    width: 40px;
-    height: 40px;
-    font-size: 16px;
-  }
   
   .search-bar {
     top: 10px;

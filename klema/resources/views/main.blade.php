@@ -36,42 +36,6 @@
     </div>
 
     <div class="relative z-10 flex min-h-screen">
-        <!-- Sidebar -->
-        <nav class="w-20 bg-slate-800/80 backdrop-blur-md border-r border-slate-700/50 flex flex-col items-center py-6 space-y-8">
-            <!-- Logo -->
-            <div class="flex items-center justify-center w-12 h-12 bg-blue-600 rounded-xl shadow-lg">
-                <i class="fas fa-seedling text-white text-lg"></i>
-            </div>
-
-            <!-- Navigation Items -->
-            <div class="flex flex-col space-y-4">
-                <a href="{{ route('dashboard') }}" 
-                   class="nav-item flex items-center justify-center w-12 h-12 rounded-xl transition-all duration-200 hover:bg-blue-600/20 {{ request()->routeIs('dashboard') ? 'sidebar-active' : '' }}">
-                    <i class="fas fa-th-large text-slate-300 text-lg"></i>
-                </a>
-                
-                <a href="#" 
-                   class="nav-item flex items-center justify-center w-12 h-12 rounded-xl transition-all duration-200 hover:bg-blue-600/20">
-                    <i class="fas fa-map text-slate-300 text-lg"></i>
-                </a>
-                
-                <a href="{{ route('calendar') }}" 
-                   class="nav-item flex items-center justify-center w-12 h-12 rounded-xl transition-all duration-200 hover:bg-blue-600/20 {{ request()->routeIs('calendar') ? 'sidebar-active' : '' }}">
-                    <i class="fas fa-calendar text-slate-300 text-lg"></i>
-                </a>
-                
-                <a href="#" 
-                   class="nav-item flex items-center justify-center w-12 h-12 rounded-xl transition-all duration-200 hover:bg-blue-600/20">
-                    <i class="fas fa-bell text-slate-300 text-lg"></i>
-                </a>
-                
-                <a href="#" 
-                   class="nav-item flex items-center justify-center w-12 h-12 rounded-xl transition-all duration-200 hover:bg-blue-600/20">
-                    <i class="fas fa-cog text-slate-300 text-lg"></i>
-                </a>
-            </div>
-        </nav>
-
         <!-- Main Content -->
         <main class="flex-1 min-h-screen">
             @yield('content')

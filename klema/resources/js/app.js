@@ -11,7 +11,7 @@ L.Icon.Default.mergeOptions({
     shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
 });
 
-// Create the full weather dashboard
+// Create the weather dashboard without navbars
 const app = createApp({
     setup() {
         const mapContainer = ref(null);
@@ -22,11 +22,10 @@ const app = createApp({
         const activeView = ref('dashboard');
         const mapLoading = ref(true);
 
-        // Initialize map
+        // Initialize map with enhanced weather layers
         const initMap = async () => {
             await nextTick();
 
-            // Try to find the map container by ID first
             let container = mapContainer.value;
             if (!container) {
                 container = document.getElementById('map-container');
@@ -35,7 +34,6 @@ const app = createApp({
             if (container) {
                 console.log('Initializing map with container:', container);
 
-                // Ensure the container has proper dimensions
                 container.style.width = '100%';
                 container.style.height = '100%';
                 container.style.minHeight = '100vh';
@@ -48,255 +46,334 @@ const app = createApp({
 
                 console.log('Map instance created:', map.value);
 
-                // Add OpenStreetMap tiles
+                // Base layers
                 const osmLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
                     attribution: '© OpenStreetMap contributors',
                     maxZoom: 19
                 }).addTo(map.value);
 
-                console.log('OSM layer added:', osmLayer);
-
-                // Add satellite overlay for weather visualization
                 const satelliteLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
                     attribution: '© Esri',
-                    opacity: 0.3,
+                    opacity: 0.8,
                     maxZoom: 19
-                }).addTo(map.value);
+                });
 
-                console.log('Satellite layer added:', satelliteLayer);
-
-                // Create OpenWeatherMap satellite layer for realistic cloud view
-                const satelliteReal = L.tileLayer(
-                    'https://tile.openweathermap.org/map/sat/{z}/{x}/{y}.png?appid=42fd1052b23ee1f0ad1fe09ac2357b41',
-                    { 
-                        attribution: '© OpenWeatherMap', 
-                        maxZoom: 12,
-                        opacity: 0.9
-                    }
-                );
-
-                // Create NASA True Color satellite layer
-                const nasaTrueColor = L.tileLayer(
-                    'https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/VIIRS_SNPP_CorrectedReflectance_TrueColor/default/{time}/{tileMatrixSet}/{z}/{y}/{x}.jpg',
+                // Enhanced OpenWeatherMap layers with better visibility
+                const cloudsLayer = L.tileLayer(
+                    'https://tile.openweathermap.org/map/clouds_new/{z}/{x}/{y}.png?appid=42fd1052b23ee1f0ad1fe09ac2357b41',
                     {
-                        attribution: 'Imagery © NASA EOSDIS GIBS',
-                        tileMatrixSet: 'GoogleMapsCompatible_Level9',
-                        time: 'default', // Or "default" for most recent
-                        maxZoom: 9
+                        attribution: '© OpenWeatherMap - Real Cloud Data',
+                        opacity: 0.8,
+                        maxZoom: 12,
+                        className: 'enhanced-clouds-layer'
                     }
                 );
 
-                // Create NASA Natural Color layer
-                const nasaNaturalColor = L.tileLayer(
+                const precipitationLayer = L.tileLayer(
+                    'https://tile.openweathermap.org/map/precipitation_new/{z}/{x}/{y}.png?appid=42fd1052b23ee1f0ad1fe09ac2357b41',
+                    {
+                        attribution: '© OpenWeatherMap - Real Precipitation Data',
+                        opacity: 0.9,
+                        maxZoom: 12,
+                        className: 'enhanced-precipitation-layer'
+                    }
+                );
+
+                const temperatureLayer = L.tileLayer(
+                    'https://tile.openweathermap.org/map/temp_new/{z}/{x}/{y}.png?appid=42fd1052b23ee1f0ad1fe09ac2357b41',
+                    {
+                        attribution: '© OpenWeatherMap - Real Temperature Data',
+                        opacity: 0.7,
+                        maxZoom: 12,
+                        className: 'enhanced-temperature-layer'
+                    }
+                );
+
+                const windLayer = L.tileLayer(
+                    'https://tile.openweathermap.org/map/wind_new/{z}/{x}/{y}.png?appid=42fd1052b23ee1f0ad1fe09ac2357b41',
+                    {
+                        attribution: '© OpenWeatherMap - Real Wind Data',
+                        opacity: 0.6,
+                        maxZoom: 12,
+                        className: 'enhanced-wind-layer'
+                    }
+                );
+
+                // Pressure layer
+                const pressureLayer = L.tileLayer(
+                    'https://tile.openweathermap.org/map/pressure_new/{z}/{x}/{y}.png?appid=42fd1052b23ee1f0ad1fe09ac2357b41',
+                    {
+                        attribution: '© OpenWeatherMap - Pressure Data',
+                        opacity: 0.6,
+                        maxZoom: 12,
+                        className: 'enhanced-pressure-layer'
+                    }
+                );
+
+                // NASA satellite layers
+                const nasaTrueColor = L.tileLayer(
                     'https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/VIIRS_SNPP_CorrectedReflectance_TrueColor/default/default/GoogleMapsCompatible_Level9/{z}/{y}/{x}.jpg',
                     {
                         attribution: 'Imagery © NASA EOSDIS GIBS',
-                        maxZoom: 9
-                    }
-                );
-
-                // Create NASA Cloud Fraction layer for weather analysis
-                const nasaCloudFraction = L.tileLayer(
-                    'https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/VIIRS_SNPP_CloudFraction/default/default/GoogleMapsCompatible_Level9/{z}/{y}/{x}.png',
-                    {
-                        attribution: 'Cloud Data © NASA EOSDIS GIBS',
                         maxZoom: 9,
-                        opacity: 0.8,
-                        className: 'nasa-cloud-fraction'
+                        opacity: 0.9
                     }
                 );
 
                 // Create base layers object
                 const baseLayers = {
-                    "OpenStreetMap": osmLayer,
-                    "Satellite": satelliteLayer,
-                    "Realistic Satellite": satelliteReal,
-                    "NASA True Color": nasaTrueColor,
-                    "NASA Natural Color": nasaNaturalColor
+                    "🗺️ Street Map": osmLayer,
+                    "🛰️ Satellite View": satelliteLayer,
+                    "🌍 NASA True Color": nasaTrueColor
                 };
 
-                // Create overlay layers object
+                // Create overlay layers object with enhanced visibility
                 const overlayLayers = {
-                    "NASA Cloud Fraction": nasaCloudFraction
+                    "☁️ Live Clouds": cloudsLayer,
+                    "🌧️ Live Precipitation": precipitationLayer,
+                    "🌡️ Live Temperature": temperatureLayer,
+                    "💨 Live Wind": windLayer,
+                    "🌪️ Pressure Systems": pressureLayer
                 };
 
-                // Real OpenWeatherMap cloud layer
-                const cloudsReal = L.tileLayer(
-                    'https://tile.openweathermap.org/map/clouds_new/{z}/{x}/{y}.png?appid=42fd1052b23ee1f0ad1fe09ac2357b41',
-                    { 
-                        attribution: '© OpenWeatherMap', 
-                        opacity: 0.7,
-                        maxZoom: 12,
-                        className: 'clouds-real'
-                    }
-                );
-                overlayLayers["Real Clouds"] = cloudsReal;
+                console.log('Enhanced weather overlay layers created');
 
-                // Precipitation layer from OpenWeatherMap
-                const precipitationReal = L.tileLayer(
-                    'https://tile.openweathermap.org/map/precipitation_new/{z}/{x}/{y}.png?appid=42fd1052b23ee1f0ad1fe09ac2357b41',
-                    { 
-                        attribution: '© OpenWeatherMap', 
-                        opacity: 0.7,
-                        maxZoom: 12,
-                        className: 'precipitation-real'
-                    }
-                );
-                overlayLayers["Real Precipitation"] = precipitationReal;
-
-                // Temperature layer from OpenWeatherMap
-                const temperatureReal = L.tileLayer(
-                    'https://tile.openweathermap.org/map/temp_new/{z}/{x}/{y}.png?appid=42fd1052b23ee1f0ad1fe09ac2357b41',
-                    { 
-                        attribution: '© OpenWeatherMap', 
-                        opacity: 0.7,
-                        maxZoom: 12,
-                        className: 'temperature-real'
-                    }
-                );
-                overlayLayers["Real Temperature"] = temperatureReal;
-
-                // Fallback simulated clouds overlay
-                const clouds = L.tileLayer(
-                    'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
-                    { 
-                        attribution: 'Clouds Simulation', 
-                        opacity: 0.4,
-                        className: 'clouds-overlay',
-                        style: 'filter: brightness(1.2) contrast(0.8);'
-                    }
-                );
-                overlayLayers["Clouds (Simulated)"] = clouds;
-
-                // Precipitation overlay (blue tinted layer)
-                const precipitation = L.tileLayer(
-                    'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
-                    { 
-                        attribution: 'Precipitation Simulation', 
-                        opacity: 0.3,
-                        className: 'precipitation-overlay'
-                    }
-                );
-                overlayLayers["Precipitation"] = precipitation;
-
-                // Temperature overlay (red/yellow tinted layer)
-                const temperature = L.tileLayer(
-                    'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
-                    { 
-                        attribution: 'Temperature Simulation', 
-                        opacity: 0.3,
-                        className: 'temperature-overlay'
-                    }
-                );
-                overlayLayers["Temperature"] = temperature;
-
-                // Wind overlay (animated pattern)
-                const wind = L.tileLayer(
-                    'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
-                    { 
-                        attribution: 'Wind Simulation', 
-                        opacity: 0.2,
-                        className: 'wind-overlay'
-                    }
-                );
-                overlayLayers["Wind"] = wind;
-
-                console.log('Weather overlay layers created successfully');
-
-                // Add layer control to switch between them - positioned center right
+                // Add enhanced layer control
                 const layerControl = L.control.layers(baseLayers, overlayLayers, {
                     position: 'topright',
-                    collapsed: true // Make it collapsible
+                    collapsed: true
                 }).addTo(map.value);
 
-                // Move the layer control to center right position and make it expandable
+                // Replace the layer control styling section in your initMap function with this:
+
+                // Style the layer control for better visibility
                 setTimeout(() => {
                     const layerControlElement = document.querySelector('.leaflet-control-layers');
                     const layerControlToggle = document.querySelector('.leaflet-control-layers-toggle');
-                    
+                    const layersForm = document.querySelector('.leaflet-control-layers-list');
+
                     if (layerControlElement && layerControlToggle) {
-                        // Position the control
+                        // Enhanced positioning and styling for the main container
                         layerControlElement.style.position = 'fixed';
                         layerControlElement.style.top = '50%';
                         layerControlElement.style.right = '20px';
                         layerControlElement.style.transform = 'translateY(-50%)';
                         layerControlElement.style.zIndex = '1000';
-                        
-                        // Style the toggle button to be a square initially
-                        layerControlToggle.style.width = '50px';
-                        layerControlToggle.style.height = '50px';
-                        layerControlToggle.style.borderRadius = '12px';
-                        layerControlToggle.style.background = 'rgba(0, 0, 0, 0.8)';
-                        layerControlToggle.style.border = '2px solid rgba(255, 255, 255, 0.3)';
+
+                        // Enhanced toggle button design
+                        layerControlToggle.style.width = '60px';
+                        layerControlToggle.style.height = '60px';
+                        layerControlToggle.style.borderRadius = '16px';
+                        layerControlToggle.style.background = 'rgba(0, 0, 0, 0.9)';
+                        layerControlToggle.style.border = '2px solid rgba(59, 130, 246, 0.5)';
                         layerControlToggle.style.display = 'flex';
                         layerControlToggle.style.alignItems = 'center';
                         layerControlToggle.style.justifyContent = 'center';
-                        layerControlToggle.style.fontSize = '20px';
+                        layerControlToggle.style.fontSize = '24px';
                         layerControlToggle.style.color = 'white';
                         layerControlToggle.style.cursor = 'pointer';
                         layerControlToggle.style.transition = 'all 0.3s ease';
-                        layerControlToggle.style.boxShadow = '0 4px 15px rgba(0, 0, 0, 0.3)';
-                        layerControlToggle.style.backdropFilter = 'blur(10px)';
-                        
-                        // Add hover effect
-                        layerControlToggle.addEventListener('mouseenter', () => {
-                            layerControlToggle.style.background = 'rgba(0, 0, 0, 0.9)';
-                            layerControlToggle.style.transform = 'scale(1.1)';
-                            layerControlToggle.style.boxShadow = '0 6px 20px rgba(0, 0, 0, 0.4)';
-                        });
-                        
-                        layerControlToggle.addEventListener('mouseleave', () => {
-                            layerControlToggle.style.background = 'rgba(0, 0, 0, 0.8)';
-                            layerControlToggle.style.transform = 'scale(1)';
-                            layerControlToggle.style.boxShadow = '0 4px 15px rgba(0, 0, 0, 0.3)';
-                        });
-                        
-                        // Add a layers icon to the toggle button
-                        layerControlToggle.innerHTML = '🗺️';
-                        
-                        console.log('Layer control repositioned to center right with pop-out functionality');
-                    }
-                }, 100);
-                
-                console.log('Layer control added to map');
+                        layerControlToggle.style.boxShadow = '0 8px 32px rgba(0, 0, 0, 0.4)';
+                        layerControlToggle.style.backdropFilter = 'blur(15px)';
 
-                // Force map to resize after initialization
+                        // Enhanced hover effects
+                        layerControlToggle.addEventListener('mouseenter', () => {
+                            layerControlToggle.style.background = 'rgba(59, 130, 246, 0.3)';
+                            layerControlToggle.style.borderColor = '#3b82f6';
+                            layerControlToggle.style.transform = 'scale(1.1)';
+                            layerControlToggle.style.boxShadow = '0 12px 40px rgba(59, 130, 246, 0.4)';
+                        });
+
+                        layerControlToggle.addEventListener('mouseleave', () => {
+                            layerControlToggle.style.background = 'rgba(0, 0, 0, 0.9)';
+                            layerControlToggle.style.borderColor = 'rgba(59, 130, 246, 0.5)';
+                            layerControlToggle.style.transform = 'scale(1)';
+                            layerControlToggle.style.boxShadow = '0 8px 32px rgba(0, 0, 0, 0.4)';
+                        });
+
+                        layerControlToggle.innerHTML = '🗺️';
+
+                        // Style the expanded layer control with proper dimensions
+                        if (layersForm) {
+                            layersForm.style.background = 'rgba(0, 0, 0, 0.95)';
+                            layersForm.style.borderRadius = '12px';
+                            layersForm.style.border = '2px solid rgba(59, 130, 246, 0.3)';
+                            layersForm.style.backdropFilter = 'blur(15px)';
+                            layersForm.style.padding = '20px';
+                            layersForm.style.minWidth = '300px';
+                            layersForm.style.maxWidth = 'none';
+                            layersForm.style.width = 'auto';
+                            layersForm.style.height = 'auto';
+                            layersForm.style.maxHeight = 'none';
+                            layersForm.style.color = 'white';
+                            layersForm.style.fontSize = '14px';
+                            layersForm.style.boxShadow = '0 8px 32px rgba(0, 0, 0, 0.4)';
+                            layersForm.style.overflow = 'visible';
+                            layersForm.style.whiteSpace = 'nowrap';
+                        }
+
+                        // Also style the main control container
+                        if (layerControlElement) {
+                            layerControlElement.style.maxHeight = 'none';
+                            layerControlElement.style.height = 'auto';
+                            layerControlElement.style.overflow = 'visible';
+                        }
+
+                        console.log('Enhanced layer control positioned and styled');
+                    }
+                }, 200);
+
+                // Add enhanced CSS for better layer control visibility
+                const style = document.createElement('style');
+                style.textContent = `
+    .enhanced-clouds-layer {
+        filter: contrast(1.4) brightness(1.2) saturate(1.3);
+        mix-blend-mode: overlay;
+    }
+    
+    .enhanced-precipitation-layer {
+        filter: contrast(1.6) brightness(1.1) saturate(1.5) hue-rotate(220deg);
+        mix-blend-mode: multiply;
+    }
+    
+    .enhanced-temperature-layer {
+        filter: contrast(1.3) brightness(1.2) saturate(1.4);
+        mix-blend-mode: overlay;
+    }
+    
+    .enhanced-wind-layer {
+        filter: contrast(1.5) brightness(1.3) saturate(1.2) hue-rotate(180deg);
+        mix-blend-mode: soft-light;
+    }
+    
+    .enhanced-pressure-layer {
+        filter: contrast(1.4) brightness(1.1) saturate(1.3) hue-rotate(90deg);
+        mix-blend-mode: overlay;
+    }
+    
+    /* Enhanced layer control styling */
+    .leaflet-control-layers {
+        box-shadow: none !important;
+        border: none !important;
+        background: transparent !important;
+        max-height: none !important;
+        height: auto !important;
+        overflow: visible !important;
+    }
+    
+    .leaflet-control-layers-expanded {
+        padding: 0 !important;
+        background: transparent !important;
+        max-height: none !important;
+        height: auto !important;
+        overflow: visible !important;
+    }
+    
+    .leaflet-control-layers-list {
+        margin: 0 !important;
+        position: relative;
+        max-height: none !important;
+        height: auto !important;
+        overflow: visible !important;
+    }
+    
+    .leaflet-control-layers label {
+        color: white !important;
+        font-weight: 500 !important;
+        padding: 8px 0 !important;
+        display: flex !important;
+        align-items: center !important;
+        white-space: nowrap !important;
+        overflow: visible !important;
+        text-overflow: clip !important;
+        cursor: pointer !important;
+        transition: all 0.2s ease !important;
+        border-radius: 6px !important;
+        margin: 2px 0 !important;
+    }
+    
+    .leaflet-control-layers label:hover {
+        background: rgba(59, 130, 246, 0.2) !important;
+        padding-left: 4px !important;
+    }
+    
+    .leaflet-control-layers input[type="checkbox"],
+    .leaflet-control-layers input[type="radio"] {
+        margin-right: 12px !important;
+        transform: scale(1.3) !important;
+        accent-color: #3b82f6 !important;
+        cursor: pointer !important;
+    }
+    
+    .leaflet-control-layers-separator {
+        border-top: 1px solid rgba(59, 130, 246, 0.4) !important;
+        margin: 15px 0 !important;
+        opacity: 0.6 !important;
+    }
+    
+    /* Base layers section */
+    .leaflet-control-layers-base label {
+        font-size: 14px !important;
+        line-height: 1.4 !important;
+    }
+    
+    /* Overlay layers section */
+    .leaflet-control-layers-overlays label {
+        font-size: 13px !important;
+        line-height: 1.4 !important;
+    }
+    
+    /* Fix for text cutting off */
+    .leaflet-control-layers-expanded .leaflet-control-layers-list {
+        width: auto !important;
+        min-width: 300px !important;
+        max-width: none !important;
+        max-height: none !important;
+        height: auto !important;
+        overflow: visible !important;
+    }
+    
+    /* Force all layer control elements to be fully visible */
+    .leaflet-control-layers * {
+        max-height: none !important;
+        height: auto !important;
+        overflow: visible !important;
+    }
+    
+    /* Ensure proper spacing and visibility */
+    .leaflet-control-layers-base,
+    .leaflet-control-layers-overlays {
+        margin: 0 !important;
+        padding: 0 !important;
+    }
+`;
+                document.head.appendChild(style);
+
+                // Force map resize
                 setTimeout(() => {
                     if (map.value) {
                         map.value.invalidateSize();
                         console.log('Map invalidated and resized');
-                        mapLoading.value = false; // Hide loading indicator
+                        mapLoading.value = false;
                     }
                 }, 100);
             } else {
-                console.error('Map container not found! Trying alternative approach...');
-                // Try alternative approach with direct DOM manipulation
-                setTimeout(() => {
-                    const altContainer = document.querySelector('[data-map-container]');
-                    if (altContainer) {
-                        console.log('Found alternative container:', altContainer);
-                        initMap();
-                    }
-                }, 500);
+                console.error('Map container not found!');
             }
         };
 
         // Fetch weather data from Laravel API
         const fetchWeatherData = async (location = 'Maramag,PH') => {
             try {
-                // Fetch current weather from Laravel API
                 const currentResponse = await fetch(`/api/weather/current?location=${encodeURIComponent(location)}`);
                 currentWeather.value = await currentResponse.json();
 
-                // Fetch forecast from Laravel API
                 const forecastResponse = await fetch(`/api/weather/forecast?location=${encodeURIComponent(location)}&days=7`);
                 forecast.value = await forecastResponse.json();
 
-                // Update map center if location changed
                 if (map.value && currentWeather.value.coord) {
                     map.value.setView([currentWeather.value.coord.lat, currentWeather.value.coord.lon], 10);
                 }
-
             } catch (error) {
                 console.error('Error fetching weather data:', error);
             }
@@ -338,10 +415,8 @@ const app = createApp({
         onMounted(async () => {
             console.log('WeatherDashboard mounted');
             try {
-                // Wait for DOM to be fully ready
                 await new Promise(resolve => setTimeout(resolve, 500));
 
-                // Try multiple times to initialize map
                 let attempts = 0;
                 const maxAttempts = 5;
 
@@ -365,11 +440,17 @@ const app = createApp({
                 };
 
                 await tryInitMap();
-
             } catch (error) {
                 console.error('Error in onMounted:', error);
             }
         });
+
+        // Expose methods to global scope for navbar integration
+        window.vueApp = {
+            setActiveView,
+            searchWeather,
+            searchLocation
+        };
 
         return {
             mapContainer,
@@ -391,54 +472,10 @@ const app = createApp({
                 position: 'relative',
                 width: '100vw',
                 height: '100vh',
-                background: '#1a1a1a',
+                background: 'linear-gradient(135deg, #0f172a, #1e293b)',
                 overflow: 'hidden'
             }
         }, [
-            // Sidebar Navigation
-            h('div', {
-                style: {
-                    position: 'fixed',
-                    left: '20px',
-                    top: '50%',
-                    transform: 'translateY(-50%)',
-                    zIndex: 1000
-                }
-            }, [
-                h('div', {
-                    style: {
-                        display: 'flex',
-                        flexDirection: 'column',
-                        gap: '15px'
-                    }
-                }, [
-                    ['dashboard', 'fas fa-th'],
-                    ['map', 'fas fa-map'],
-                    ['calendar', 'fas fa-calendar'],
-                    ['alerts', 'fas fa-bell'],
-                    ['settings', 'fas fa-cog']
-                ].map(([view, icon]) =>
-                    h('div', {
-                        style: {
-                            width: '50px',
-                            height: '50px',
-                            background: 'rgba(0, 0, 0, 0.7)',
-                            borderRadius: '12px',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            cursor: 'pointer',
-                            transition: 'all 0.3s ease',
-                            color: 'white',
-                            fontSize: '18px'
-                        },
-                        onClick: () => this.setActiveView(view)
-                    }, [
-                        h('i', { class: icon })
-                    ])
-                ))
-            ]),
-
             // Search Bar
             h('div', {
                 style: {
@@ -480,7 +517,7 @@ const app = createApp({
                 ])
             ]),
 
-            // Main Map Area
+            // Main Map Area (full screen, no navbars)
             h('div', {
                 style: {
                     position: 'relative',
@@ -505,7 +542,7 @@ const app = createApp({
                     }
                 }),
 
-                // Loading indicator (only show when loading)
+                // Loading indicator
                 this.mapLoading ? h('div', {
                     style: {
                         position: 'absolute',
@@ -513,29 +550,45 @@ const app = createApp({
                         left: '50%',
                         transform: 'translate(-50%, -50%)',
                         color: 'white',
-                        fontSize: '18px',
+                        fontSize: '20px',
                         zIndex: 1000,
-                        background: 'rgba(0, 0, 0, 0.7)',
-                        padding: '20px',
-                        borderRadius: '10px'
+                        background: 'rgba(0, 0, 0, 0.9)',
+                        padding: '30px 40px',
+                        borderRadius: '16px',
+                        border: '2px solid rgba(59, 130, 246, 0.3)',
+                        backdropFilter: 'blur(15px)',
+                        textAlign: 'center',
+                        boxShadow: '0 8px 32px rgba(0, 0, 0, 0.4)'
                     }
-                }, '🗺️ Loading Interactive Map...') : null
+                }, [
+                    h('div', { style: { fontSize: '48px', marginBottom: '15px' } }, '🗺️'),
+                    h('div', 'Loading Interactive Weather Map...'),
+                    h('div', {
+                        style: {
+                            fontSize: '14px',
+                            color: '#9ca3af',
+                            marginTop: '10px'
+                        }
+                    }, 'Enhanced weather layers loading...')
+                ]) : null
             ]),
 
-            // 7-Day Forecast
+            // Enhanced 7-Day Forecast Bar - Compact Version
             h('div', {
                 style: {
                     position: 'fixed',
-                    bottom: '20px',
+                    bottom: '15px',
                     left: '50%',
                     transform: 'translateX(-50%)',
                     display: 'flex',
-                    background: 'rgba(0, 0, 0, 0.8)',
-                    borderRadius: '16px',
-                    padding: '16px',
-                    gap: '20px',
+                    background: 'rgba(0, 0, 0, 0.9)',
+                    borderRadius: '15px',
+                    padding: '12px 16px',
+                    gap: '18px',
                     zIndex: 1000,
-                    backdropFilter: 'blur(10px)'
+                    backdropFilter: 'blur(15px)',
+                    border: '2px solid rgba(59, 130, 246, 0.3)',
+                    boxShadow: '0 6px 24px rgba(0, 0, 0, 0.4)'
                 }
             }, this.forecast.map(day =>
                 h('div', {
@@ -544,14 +597,27 @@ const app = createApp({
                         flexDirection: 'column',
                         alignItems: 'center',
                         color: 'white',
-                        minWidth: '80px'
+                        minWidth: '65px',
+                        padding: '8px',
+                        borderRadius: '10px',
+                        background: 'rgba(255, 255, 255, 0.05)',
+                        transition: 'all 0.3s ease'
                     }
                 }, [
                     h('div', {
-                        style: { fontSize: '12px', marginBottom: '8px', fontWeight: 'bold' }
+                        style: {
+                            fontSize: '11px',
+                            marginBottom: '6px',
+                            fontWeight: 'bold',
+                            color: '#9ca3af'
+                        }
                     }, day.day),
                     h('div', {
-                        style: { fontSize: '20px', marginBottom: '8px' }
+                        style: {
+                            fontSize: '18px',
+                            marginBottom: '6px',
+                            filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.5))'
+                        }
                     }, [
                         h('i', { class: this.getWeatherIcon(day.condition) })
                     ]),
@@ -560,14 +626,17 @@ const app = createApp({
                             display: 'flex',
                             flexDirection: 'column',
                             alignItems: 'center',
-                            fontSize: '11px'
+                            fontSize: '10px'
                         }
                     }, [
                         h('span', {
-                            style: { fontWeight: 'bold' }
+                            style: {
+                                fontWeight: 'bold',
+                                color: '#ffffff'
+                            }
                         }, `H: ${day.temp_max}°`),
                         h('span', {
-                            style: { color: '#ccc' }
+                            style: { color: '#9ca3af' }
                         }, `L: ${day.temp_min}°`)
                     ])
                 ])
@@ -587,7 +656,6 @@ document.addEventListener('DOMContentLoaded', function () {
         try {
             app.mount('#app');
             console.log('Vue app mounted successfully');
-            console.log('App element innerHTML after mount:', appElement.innerHTML);
         } catch (error) {
             console.error('Error mounting Vue app:', error);
         }
