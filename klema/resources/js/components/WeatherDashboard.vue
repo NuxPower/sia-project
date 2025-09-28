@@ -50,6 +50,14 @@
         </div>
       </div>
     </div>
+
+    <!-- Loading indicator -->
+    <div v-if="isLoading" class="loading-overlay">
+      <div class="loading-spinner">
+        <i class="fas fa-spinner fa-spin"></i>
+        <span>Loading weather data...</span>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -75,6 +83,8 @@ export default {
     const forecast = ref([]);
     const searchLocation = ref('Maramag, Northern Mindanao');
     const activeView = ref('dashboard');
+    const currentMarker = ref(null);
+    const isLoading = ref(false);
 
     // Initialize map
     const initMap = async () => {
@@ -94,27 +104,134 @@ export default {
           attribution: '© Esri',
           opacity: 0.3
         }).addTo(map.value);
+
+        // Add click event listener to the map
+        map.value.on('click', onMapClick);
       }
     };
 
-    // Fetch weather data from Laravel API
+    // Handle map click events
+    const onMapClick = async (e) => {
+      const { lat, lng } = e.latlng;
+      
+      // Remove existing marker
+      if (currentMarker.value) {
+        map.value.removeLayer(currentMarker.value);
+      }
+      
+      // Add new marker at clicked location
+      currentMarker.value = L.marker([lat, lng]).addTo(map.value);
+      
+      // Fetch weather data for the clicked coordinates
+      await fetchWeatherDataByCoordinates(lat, lng);
+    };
+
+    // Fetch weather data using coordinates (reverse geocoding)
+    const fetchWeatherDataByCoordinates = async (lat, lng) => {
+      isLoading.value = true;
+      try {
+        // Fetch current weather using coordinates
+        const currentResponse = await fetch(`/api/weather/current?lat=${lat}&lon=${lng}`);
+        if (!currentResponse.ok) throw new Error('Failed to fetch current weather');
+        
+        const weatherData = await currentResponse.json();
+        currentWeather.value = weatherData;
+        
+        // Fetch forecast using coordinates
+        const forecastResponse = await fetch(`/api/weather/forecast?lat=${lat}&lon=${lng}&days=7`);
+        if (!forecastResponse.ok) throw new Error('Failed to fetch forecast');
+        
+        const forecastData = await forecastResponse.json();
+        forecast.value = forecastData;
+        
+        // Update search location input with the location name
+        if (weatherData.name) {
+          searchLocation.value = `${weatherData.name}, ${weatherData.sys.country}`;
+        }
+        
+        // Update marker popup with weather info
+        if (currentMarker.value) {
+          const popupContent = `
+            <div style="text-align: center; min-width: 200px;">
+              <h3>${weatherData.name}</h3>
+              <div style="font-size: 24px; font-weight: bold; margin: 10px 0;">
+                ${Math.round(weatherData.main.temp)}°C
+              </div>
+              <div style="text-transform: capitalize; margin-bottom: 10px;">
+                ${weatherData.weather[0].description}
+              </div>
+              <div style="font-size: 12px; color: #666;">
+                Humidity: ${weatherData.main.humidity}%<br>
+                Wind: ${weatherData.wind.speed} m/s
+              </div>
+            </div>
+          `;
+          currentMarker.value.bindPopup(popupContent).openPopup();
+        }
+        
+      } catch (error) {
+        console.error('Error fetching weather data by coordinates:', error);
+        // Show error message to user
+        alert('Failed to fetch weather data for this location. Please try again.');
+      } finally {
+        isLoading.value = false;
+      }
+    };
+
+    // Fetch weather data from Laravel API (existing function, enhanced)
     const fetchWeatherData = async (location = 'Maramag,PH') => {
+      isLoading.value = true;
       try {
         // Fetch current weather from Laravel API
         const currentResponse = await fetch(`/api/weather/current?location=${encodeURIComponent(location)}`);
-        currentWeather.value = await currentResponse.json();
+        if (!currentResponse.ok) throw new Error('Failed to fetch current weather');
+        
+        const weatherData = await currentResponse.json();
+        currentWeather.value = weatherData;
         
         // Fetch forecast from Laravel API
         const forecastResponse = await fetch(`/api/weather/forecast?location=${encodeURIComponent(location)}&days=7`);
-        forecast.value = await forecastResponse.json();
+        if (!forecastResponse.ok) throw new Error('Failed to fetch forecast');
         
-        // Update map center if location changed
-        if (map.value && currentWeather.value.coord) {
-          map.value.setView([currentWeather.value.coord.lat, currentWeather.value.coord.lon], 10);
+        const forecastData = await forecastResponse.json();
+        forecast.value = forecastData;
+        
+        // Update map center and marker if location changed
+        if (map.value && weatherData.coord) {
+          map.value.setView([weatherData.coord.lat, weatherData.coord.lon], 10);
+          
+          // Remove existing marker
+          if (currentMarker.value) {
+            map.value.removeLayer(currentMarker.value);
+          }
+          
+          // Add new marker at the searched location
+          currentMarker.value = L.marker([weatherData.coord.lat, weatherData.coord.lon]).addTo(map.value);
+          
+          // Add popup to marker
+          const popupContent = `
+            <div style="text-align: center; min-width: 200px;">
+              <h3>${weatherData.name}</h3>
+              <div style="font-size: 24px; font-weight: bold; margin: 10px 0;">
+                ${Math.round(weatherData.main.temp)}°C
+              </div>
+              <div style="text-transform: capitalize; margin-bottom: 10px;">
+                ${weatherData.weather[0].description}
+              </div>
+              <div style="font-size: 12px; color: #666;">
+                Humidity: ${weatherData.main.humidity}%<br>
+                Wind: ${weatherData.wind.speed} m/s
+              </div>
+            </div>
+          `;
+          currentMarker.value.bindPopup(popupContent);
         }
         
       } catch (error) {
         console.error('Error fetching weather data:', error);
+        alert('Failed to fetch weather data. Please check the location and try again.');
+      } finally {
+        isLoading.value = false;
       }
     };
 
@@ -169,11 +286,15 @@ export default {
       forecast,
       searchLocation,
       activeView,
+      currentMarker,
+      isLoading,
       initMap,
       fetchWeatherData,
+      fetchWeatherDataByCoordinates,
       searchWeather,
       getWeatherIcon,
-      setActiveView
+      setActiveView,
+      onMapClick
     };
   }
 };
@@ -232,6 +353,7 @@ export default {
 #map {
   width: 100%;
   height: 100%;
+  cursor: crosshair;
 }
 
 .weather-overlay {
@@ -320,6 +442,38 @@ export default {
 
 .low {
   color: #ccc;
+}
+
+.loading-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 10000;
+}
+
+.loading-spinner {
+  background: rgba(0, 0, 0, 0.8);
+  border-radius: 12px;
+  padding: 20px;
+  color: white;
+  text-align: center;
+  backdrop-filter: blur(10px);
+}
+
+.loading-spinner i {
+  font-size: 24px;
+  margin-bottom: 10px;
+  display: block;
+}
+
+.loading-spinner span {
+  font-size: 14px;
 }
 
 /* Responsive design */

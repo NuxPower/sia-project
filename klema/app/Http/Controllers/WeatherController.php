@@ -16,26 +16,52 @@ class WeatherController extends Controller
 
     public function getCurrentWeather(Request $request)
     {
-        $location = $request->get('location', 'Maramag,PH');
+        // Check if coordinates are provided
+        $lat = $request->get('lat');
+        $lon = $request->get('lon');
+        $location = $request->get('location');
         
         try {
-            $weather = $this->weatherService->getCurrentWeather($location);
+            if ($lat && $lon) {
+                // Use coordinates
+                $weather = $this->weatherService->getCurrentWeatherByCoordinates($lat, $lon);
+            } else if ($location) {
+                // Use location name
+                $weather = $this->weatherService->getCurrentWeather($location);
+            } else {
+                return response()->json(['error' => 'Either location or lat/lon coordinates are required'], 400);
+            }
+            
             return response()->json($weather);
         } catch (\Exception $e) {
-            return response()->json(['error' => 'Failed to fetch weather data'], 500);
+            \Log::error('Weather API error: ' . $e->getMessage());
+            return response()->json(['error' => 'Failed to fetch weather data: ' . $e->getMessage()], 500);
         }
     }
 
     public function getForecast(Request $request)
     {
-        $location = $request->get('location', 'Maramag,PH');
+        // Check if coordinates are provided
+        $lat = $request->get('lat');
+        $lon = $request->get('lon');
+        $location = $request->get('location');
         $days = $request->get('days', 7);
         
         try {
-            $forecast = $this->weatherService->getForecast($location, $days);
+            if ($lat && $lon) {
+                // Use coordinates
+                $forecast = $this->weatherService->getForecastByCoordinates($lat, $lon, $days);
+            } else if ($location) {
+                // Use location name
+                $forecast = $this->weatherService->getForecast($location, $days);
+            } else {
+                return response()->json(['error' => 'Either location or lat/lon coordinates are required'], 400);
+            }
+            
             return response()->json($forecast);
         } catch (\Exception $e) {
-            return response()->json(['error' => 'Failed to fetch forecast data'], 500);
+            \Log::error('Forecast API error: ' . $e->getMessage());
+            return response()->json(['error' => 'Failed to fetch forecast data: ' . $e->getMessage()], 500);
         }
     }
 }

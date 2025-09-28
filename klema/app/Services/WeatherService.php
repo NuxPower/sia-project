@@ -28,7 +28,7 @@ class WeatherService
         return Cache::remember($cacheKey, 600, function () use ($location) {
             // If no API key, return mock data immediately
             if (!$this->apiKey) {
-                return $this->getMockCurrentWeather();
+                return $this->getMockCurrentWeather($location);
             }
 
             try {
@@ -47,7 +47,38 @@ class WeatherService
             }
 
             // Return mock data if API fails
-            return $this->getMockCurrentWeather();
+            return $this->getMockCurrentWeather($location);
+        });
+    }
+
+    public function getCurrentWeatherByCoordinates($lat, $lon)
+    {
+        $cacheKey = "weather_current_coords_{$lat}_{$lon}";
+        
+        return Cache::remember($cacheKey, 600, function () use ($lat, $lon) {
+            // If no API key, return mock data with coordinates
+            if (!$this->apiKey) {
+                return $this->getMockCurrentWeatherByCoords($lat, $lon);
+            }
+
+            try {
+                // Use coordinates for OpenWeatherMap API
+                $response = Http::weather()->get("{$this->baseUrl}/weather", [
+                    'lat' => $lat,
+                    'lon' => $lon,
+                    'appid' => $this->apiKey,
+                    'units' => 'metric'
+                ]);
+
+                if ($response->successful()) {
+                    return $response->json();
+                }
+            } catch (\Exception $e) {
+                \Log::warning('Weather API request by coordinates failed: ' . $e->getMessage());
+            }
+
+            // Return mock data if API fails
+            return $this->getMockCurrentWeatherByCoords($lat, $lon);
         });
     }
 
@@ -58,7 +89,7 @@ class WeatherService
         return Cache::remember($cacheKey, 3600, function () use ($location, $days) {
             // If no API key, return mock data immediately
             if (!$this->apiKey) {
-                return $this->getMockForecast();
+                return $this->getMockForecast($location);
             }
 
             try {
@@ -79,7 +110,40 @@ class WeatherService
             }
 
             // Return mock data if API fails
-            return $this->getMockForecast();
+            return $this->getMockForecast($location);
+        });
+    }
+
+    public function getForecastByCoordinates($lat, $lon, $days = 7)
+    {
+        $cacheKey = "weather_forecast_coords_{$lat}_{$lon}_{$days}";
+        
+        return Cache::remember($cacheKey, 3600, function () use ($lat, $lon, $days) {
+            // If no API key, return mock data with coordinates
+            if (!$this->apiKey) {
+                return $this->getMockForecastByCoords($lat, $lon);
+            }
+
+            try {
+                // Use coordinates for OpenWeatherMap API
+                $response = Http::weather()->get("{$this->baseUrl}/forecast", [
+                    'lat' => $lat,
+                    'lon' => $lon,
+                    'appid' => $this->apiKey,
+                    'units' => 'metric',
+                    'cnt' => $days * 8 // 8 forecasts per day (3-hour intervals)
+                ]);
+
+                if ($response->successful()) {
+                    $data = $response->json();
+                    return $this->processForecastData($data);
+                }
+            } catch (\Exception $e) {
+                \Log::warning('Weather Forecast API request by coordinates failed: ' . $e->getMessage());
+            }
+
+            // Return mock data if API fails
+            return $this->getMockForecastByCoords($lat, $lon);
         });
     }
 
@@ -134,8 +198,11 @@ class WeatherService
         ];
     }
 
-    private function getMockCurrentWeather()
+    private function getMockCurrentWeather($location = null)
     {
+        // Generate different mock data based on location or use default
+        $locationName = $this->extractLocationName($location) ?: 'Maramag';
+        
         return [
             'weather' => [
                 ['main' => 'Rain', 'description' => 'Heavy Rain', 'icon' => '10d']
@@ -145,7 +212,8 @@ class WeatherService
                 'feels_like' => 31,
                 'humidity' => 85,
                 'temp_min' => 24,
-                'temp_max' => 28
+                'temp_max' => 28,
+                'pressure' => 1012
             ],
             'wind' => [
                 'speed' => 7.9
@@ -154,13 +222,65 @@ class WeatherService
             'dt' => time(),
             'sys' => [
                 'sunrise' => strtotime('4:50 AM'),
-                'sunset' => strtotime('6:45 PM')
+                'sunset' => strtotime('6:45 PM'),
+                'country' => 'PH'
             ],
-            'name' => 'Maramag'
+            'coord' => [
+                'lat' => 7.7708,
+                'lon' => 125.0061
+            ],
+            'name' => $locationName
         ];
     }
 
-    private function getMockForecast()
+    private function getMockCurrentWeatherByCoords($lat, $lon)
+    {
+        // Generate location-specific mock data based on coordinates
+        $mockLocation = $this->getMockLocationFromCoords($lat, $lon);
+        
+        return [
+            'weather' => [
+                ['main' => $mockLocation['condition'], 'description' => $mockLocation['description'], 'icon' => $mockLocation['icon']]
+            ],
+            'main' => [
+                'temp' => $mockLocation['temp'],
+                'feels_like' => $mockLocation['temp'] + 3,
+                'humidity' => $mockLocation['humidity'],
+                'temp_min' => $mockLocation['temp'] - 4,
+                'temp_max' => $mockLocation['temp'] + 2,
+                'pressure' => $mockLocation['pressure']
+            ],
+            'wind' => [
+                'speed' => $mockLocation['wind_speed']
+            ],
+            'visibility' => 10000,
+            'dt' => time(),
+            'sys' => [
+                'sunrise' => strtotime('5:00 AM'),
+                'sunset' => strtotime('6:30 PM'),
+                'country' => $mockLocation['country']
+            ],
+            'coord' => [
+                'lat' => (float) $lat,
+                'lon' => (float) $lon
+            ],
+            'name' => $mockLocation['name']
+        ];
+    }
+
+    private function getMockForecast($location = null)
+    {
+        $locationName = $this->extractLocationName($location) ?: 'Maramag';
+        return $this->generateMockForecast($locationName);
+    }
+
+    private function getMockForecastByCoords($lat, $lon)
+    {
+        $mockLocation = $this->getMockLocationFromCoords($lat, $lon);
+        return $this->generateMockForecast($mockLocation['name']);
+    }
+
+    private function generateMockForecast($locationName)
     {
         $days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
         $conditions = [
@@ -186,6 +306,82 @@ class WeatherService
         }
 
         return $forecast;
+    }
+
+    private function getMockLocationFromCoords($lat, $lon)
+    {
+        // Generate different mock data based on coordinates
+        // This simulates different locations
+        
+        $lat = (float) $lat;
+        $lon = (float) $lon;
+        
+        // Manila area
+        if ($lat >= 14.0 && $lat <= 15.0 && $lon >= 120.0 && $lon <= 121.5) {
+            return [
+                'name' => 'Manila',
+                'country' => 'PH',
+                'temp' => 32,
+                'humidity' => 75,
+                'pressure' => 1010,
+                'wind_speed' => 5.2,
+                'condition' => 'Clouds',
+                'description' => 'Partly cloudy',
+                'icon' => '03d'
+            ];
+        }
+        
+        // Cebu area
+        if ($lat >= 10.0 && $lat <= 11.0 && $lon >= 123.0 && $lon <= 124.5) {
+            return [
+                'name' => 'Cebu City',
+                'country' => 'PH',
+                'temp' => 30,
+                'humidity' => 80,
+                'pressure' => 1011,
+                'wind_speed' => 4.8,
+                'condition' => 'Clear',
+                'description' => 'Clear sky',
+                'icon' => '01d'
+            ];
+        }
+        
+        // Davao area
+        if ($lat >= 6.5 && $lat <= 7.5 && $lon >= 125.0 && $lon <= 126.0) {
+            return [
+                'name' => 'Davao City',
+                'country' => 'PH',
+                'temp' => 29,
+                'humidity' => 85,
+                'pressure' => 1013,
+                'wind_speed' => 3.5,
+                'condition' => 'Rain',
+                'description' => 'Light rain',
+                'icon' => '10d'
+            ];
+        }
+        
+        // Default for other coordinates
+        return [
+            'name' => 'Unknown Location',
+            'country' => 'PH',
+            'temp' => 28,
+            'humidity' => 82,
+            'pressure' => 1012,
+            'wind_speed' => 4.0,
+            'condition' => 'Clouds',
+            'description' => 'Scattered clouds',
+            'icon' => '03d'
+        ];
+    }
+
+    private function extractLocationName($location)
+    {
+        if (!$location) return null;
+        
+        // Extract just the city name from location strings like "Manila, PH" or "Cebu City, Cebu, PH"
+        $parts = explode(',', $location);
+        return trim($parts[0]);
     }
 
     private function getMockHistoricalWeather($date)
