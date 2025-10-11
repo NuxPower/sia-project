@@ -1,303 +1,114 @@
 <template>
   <div class="weather-dashboard">
-    <!-- Debug info -->
-    <div style="position: fixed; top: 10px; left: 10px; background: red; color: white; padding: 10px; z-index: 9999;">
-      Vue Component Loaded!
-    </div>
-
-    <!-- Search Bar -->
-    <div class="search-bar">
-      <div class="search-input">
-        <i class="fas fa-search"></i>
-        <input 
-          type="text" 
-          v-model="searchLocation" 
-          @keyup.enter="searchWeather"
-          placeholder="Search location..."
-        />
-      </div>
-    </div>
-
-    <!-- Main Map Area -->
-    <div class="map-container">
-      <div id="map" ref="mapContainer"></div>
-      
-      <!-- Weather Overlay -->
-      <div class="weather-overlay" v-if="currentWeather">
-        <div class="weather-info">
-          <div class="location">{{ currentWeather.name }}, {{ currentWeather.sys.country }}</div>
-          <div class="temperature">{{ Math.round(currentWeather.main.temp) }}°C</div>
-          <div class="condition">{{ currentWeather.weather[0].description }}</div>
-          <div class="details">
-            <span>Humidity: {{ currentWeather.main.humidity }}%</span>
-            <span>Wind: {{ currentWeather.wind.speed }} m/s</span>
-            <span>Pressure: {{ currentWeather.main.pressure }} mb</span>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- 7-Day Forecast -->
-    <div class="forecast-bar">
-      <div class="forecast-item" v-for="(day, index) in forecast" :key="index">
-        <div class="day">{{ day.day }}</div>
-        <div class="weather-icon">
-          <i :class="getWeatherIcon(day.condition)"></i>
-        </div>
-        <div class="temps">
-          <span class="high">H: {{ day.temp_max }}°</span>
-          <span class="low">L: {{ day.temp_min }}°</span>
-        </div>
-      </div>
-    </div>
-
-    <!-- Loading indicator -->
-    <div v-if="isLoading" class="loading-overlay">
-      <div class="loading-spinner">
-        <i class="fas fa-spinner fa-spin"></i>
-        <span>Loading weather data...</span>
-      </div>
-    </div>
+    <SearchBar 
+      v-model="searchLocation"
+      @search="searchWeather"
+      :is-loading="isLoadingWeather"
+    />
+    
+    <ClickInstruction />
+    
+    <WeatherMap
+      ref="weatherMapRef"
+      :is-loading="mapLoading"
+      @map-click="handleMapClick"
+      @map-ready="handleMapReady"
+    />
+    
+    <LoadingIndicator
+      v-if="isLoadingWeather"
+      message="Fetching weather data..."
+      subtitle="Loading forecast for pinned location"
+    />
+    
+    <WeatherTimeline
+      :forecast="forecast"
+      :get-day-label="getDayLabel"
+      :get-weather-icon="getWeatherIcon"
+    />
+    
+    <TimelineLegend />
   </div>
 </template>
 
-<script>
-import { ref, onMounted, nextTick } from 'vue';
-import L from 'leaflet';
-import 'leaflet/dist/leaflet.css';
+<script setup>
+import { ref, onMounted } from 'vue';
+import SearchBar from './SearchBar.vue';
+import ClickInstruction from './ClickInstruction.vue';
+import WeatherMap from './WeatherMap.vue';
+import LoadingIndicator from './LoadingIndicator.vue';
+import WeatherTimeline from './WeatherTimeline.vue';
+import TimelineLegend from './TimelineLegend.vue';
+import { useWeatherAPI } from '../composables/useWeatherAPI';
+import { useWeatherUtils } from '../composables/useWeatherUtils';
 
-// Fix Leaflet default icons
-delete L.Icon.Default.prototype._getIconUrl;
-L.Icon.Default.mergeOptions({
-  iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon-2x.png',
-  iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png',
-  shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
-});
+const weatherMapRef = ref(null);
+const searchLocation = ref('Maramag, Northern Mindanao');
+const forecast = ref([]);
+const mapLoading = ref(true);
+const isLoadingWeather = ref(false);
 
-export default {
-  name: 'WeatherDashboard',
-  setup() {
-    const mapContainer = ref(null);
-    const map = ref(null);
-    const currentWeather = ref(null);
-    const forecast = ref([]);
-    const searchLocation = ref('Maramag, Northern Mindanao');
-    const activeView = ref('dashboard');
-    const currentMarker = ref(null);
-    const isLoading = ref(false);
+const { 
+  fetchWeatherByLocation, 
+  fetchWeatherByCoordinates,
+  createWeatherTimeline 
+} = useWeatherAPI();
 
-    // Initialize map
-    const initMap = async () => {
-      await nextTick();
-      
-      if (mapContainer.value) {
-        // Initialize map centered on Mindanao, Philippines
-        map.value = L.map(mapContainer.value).setView([7.5, 124.5], 7);
-        
-        // Add OpenStreetMap tiles
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-          attribution: '© OpenStreetMap contributors'
-        }).addTo(map.value);
+const { getDayLabel, getWeatherIcon } = useWeatherUtils();
 
-        // Add satellite overlay for weather visualization
-        L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
-          attribution: '© Esri',
-          opacity: 0.3
-        }).addTo(map.value);
-
-        // Add click event listener to the map
-        map.value.on('click', onMapClick);
-      }
-    };
-
-    // Handle map click events
-    const onMapClick = async (e) => {
-      const { lat, lng } = e.latlng;
-      
-      // Remove existing marker
-      if (currentMarker.value) {
-        map.value.removeLayer(currentMarker.value);
-      }
-      
-      // Add new marker at clicked location
-      currentMarker.value = L.marker([lat, lng]).addTo(map.value);
-      
-      // Fetch weather data for the clicked coordinates
-      await fetchWeatherDataByCoordinates(lat, lng);
-    };
-
-    // Fetch weather data using coordinates (reverse geocoding)
-    const fetchWeatherDataByCoordinates = async (lat, lng) => {
-      isLoading.value = true;
-      try {
-        // Fetch current weather using coordinates
-        const currentResponse = await fetch(`/api/weather/current?lat=${lat}&lon=${lng}`);
-        if (!currentResponse.ok) throw new Error('Failed to fetch current weather');
-        
-        const weatherData = await currentResponse.json();
-        currentWeather.value = weatherData;
-        
-        // Fetch forecast using coordinates
-        const forecastResponse = await fetch(`/api/weather/forecast?lat=${lat}&lon=${lng}&days=7`);
-        if (!forecastResponse.ok) throw new Error('Failed to fetch forecast');
-        
-        const forecastData = await forecastResponse.json();
-        forecast.value = forecastData;
-        
-        // Update search location input with the location name
-        if (weatherData.name) {
-          searchLocation.value = `${weatherData.name}, ${weatherData.sys.country}`;
-        }
-        
-        // Update marker popup with weather info
-        if (currentMarker.value) {
-          const popupContent = `
-            <div style="text-align: center; min-width: 200px;">
-              <h3>${weatherData.name}</h3>
-              <div style="font-size: 24px; font-weight: bold; margin: 10px 0;">
-                ${Math.round(weatherData.main.temp)}°C
-              </div>
-              <div style="text-transform: capitalize; margin-bottom: 10px;">
-                ${weatherData.weather[0].description}
-              </div>
-              <div style="font-size: 12px; color: #666;">
-                Humidity: ${weatherData.main.humidity}%<br>
-                Wind: ${weatherData.wind.speed} m/s
-              </div>
-            </div>
-          `;
-          currentMarker.value.bindPopup(popupContent).openPopup();
-        }
-        
-      } catch (error) {
-        console.error('Error fetching weather data by coordinates:', error);
-        // Show error message to user
-        alert('Failed to fetch weather data for this location. Please try again.');
-      } finally {
-        isLoading.value = false;
-      }
-    };
-
-    // Fetch weather data from Laravel API (existing function, enhanced)
-    const fetchWeatherData = async (location = 'Maramag,PH') => {
-      isLoading.value = true;
-      try {
-        // Fetch current weather from Laravel API
-        const currentResponse = await fetch(`/api/weather/current?location=${encodeURIComponent(location)}`);
-        if (!currentResponse.ok) throw new Error('Failed to fetch current weather');
-        
-        const weatherData = await currentResponse.json();
-        currentWeather.value = weatherData;
-        
-        // Fetch forecast from Laravel API
-        const forecastResponse = await fetch(`/api/weather/forecast?location=${encodeURIComponent(location)}&days=7`);
-        if (!forecastResponse.ok) throw new Error('Failed to fetch forecast');
-        
-        const forecastData = await forecastResponse.json();
-        forecast.value = forecastData;
-        
-        // Update map center and marker if location changed
-        if (map.value && weatherData.coord) {
-          map.value.setView([weatherData.coord.lat, weatherData.coord.lon], 10);
-          
-          // Remove existing marker
-          if (currentMarker.value) {
-            map.value.removeLayer(currentMarker.value);
-          }
-          
-          // Add new marker at the searched location
-          currentMarker.value = L.marker([weatherData.coord.lat, weatherData.coord.lon]).addTo(map.value);
-          
-          // Add popup to marker
-          const popupContent = `
-            <div style="text-align: center; min-width: 200px;">
-              <h3>${weatherData.name}</h3>
-              <div style="font-size: 24px; font-weight: bold; margin: 10px 0;">
-                ${Math.round(weatherData.main.temp)}°C
-              </div>
-              <div style="text-transform: capitalize; margin-bottom: 10px;">
-                ${weatherData.weather[0].description}
-              </div>
-              <div style="font-size: 12px; color: #666;">
-                Humidity: ${weatherData.main.humidity}%<br>
-                Wind: ${weatherData.wind.speed} m/s
-              </div>
-            </div>
-          `;
-          currentMarker.value.bindPopup(popupContent);
-        }
-        
-      } catch (error) {
-        console.error('Error fetching weather data:', error);
-        alert('Failed to fetch weather data. Please check the location and try again.');
-      } finally {
-        isLoading.value = false;
-      }
-    };
-
-    // Search for weather by location
-    const searchWeather = () => {
-      if (searchLocation.value.trim()) {
-        fetchWeatherData(searchLocation.value);
-      }
-    };
-
-    // Get weather icon class
-    const getWeatherIcon = (condition) => {
-      const iconMap = {
-        'Clear': 'fas fa-sun',
-        'Clouds': 'fas fa-cloud',
-        'Rain': 'fas fa-cloud-rain',
-        'Drizzle': 'fas fa-cloud-drizzle',
-        'Thunderstorm': 'fas fa-bolt',
-        'Snow': 'fas fa-snowflake',
-        'Mist': 'fas fa-smog',
-        'Fog': 'fas fa-smog',
-        'Haze': 'fas fa-smog',
-        'Dust': 'fas fa-smog',
-        'Sand': 'fas fa-smog',
-        'Ash': 'fas fa-smog',
-        'Squall': 'fas fa-wind',
-        'Tornado': 'fas fa-tornado'
-      };
-      return iconMap[condition] || 'fas fa-cloud';
-    };
-
-    // Set active view
-    const setActiveView = (view) => {
-      activeView.value = view;
-    };
-
-    onMounted(async () => {
-      console.log('WeatherDashboard mounted');
-      try {
-        await initMap();
-        console.log('Map initialized');
-        await fetchWeatherData();
-        console.log('Weather data fetched');
-      } catch (error) {
-        console.error('Error in onMounted:', error);
-      }
-    });
-
-    return {
-      mapContainer,
-      currentWeather,
-      forecast,
-      searchLocation,
-      activeView,
-      currentMarker,
-      isLoading,
-      initMap,
-      fetchWeatherData,
-      fetchWeatherDataByCoordinates,
-      searchWeather,
-      getWeatherIcon,
-      setActiveView,
-      onMapClick
-    };
+const handleMapClick = async ({ lat, lng }) => {
+  isLoadingWeather.value = true;
+  try {
+    const { current, history, forecastData } = await fetchWeatherByCoordinates(lat, lng);
+    const timeline = createWeatherTimeline(history, current, forecastData);
+    forecast.value = timeline;
+    
+    if (current.name) {
+      searchLocation.value = `${current.name}, ${current.sys.country}`;
+    }
+    
+    weatherMapRef.value?.updateMarker(lat, lng, current);
+  } catch (error) {
+    console.error('Error fetching weather:', error);
+    alert('Failed to fetch weather data. Please try again.');
+  } finally {
+    isLoadingWeather.value = false;
   }
 };
+
+const searchWeather = async () => {
+  if (!searchLocation.value.trim()) return;
+  
+  isLoadingWeather.value = true;
+  try {
+    const { current, history, forecastData } = await fetchWeatherByLocation(searchLocation.value);
+    const timeline = createWeatherTimeline(history, current, forecastData);
+    forecast.value = timeline;
+    
+    if (current.coord) {
+      weatherMapRef.value?.moveToLocation(current.coord.lat, current.coord.lon);
+      weatherMapRef.value?.updateMarker(current.coord.lat, current.coord.lon, current);
+    }
+  } catch (error) {
+    console.error('Error searching weather:', error);
+    alert('Failed to fetch weather data. Please try again.');
+  } finally {
+    isLoadingWeather.value = false;
+  }
+};
+
+const handleMapReady = () => {
+  mapLoading.value = false;
+  searchWeather();
+};
+
+onMounted(() => {
+  // Expose to global scope if needed for navbar integration
+  window.vueApp = {
+    searchWeather,
+    searchLocation
+  };
+});
 </script>
 
 <style scoped>
@@ -305,206 +116,7 @@ export default {
   position: relative;
   width: 100vw;
   height: 100vh;
-  background: #1a1a1a;
+  background: linear-gradient(135deg, #0f172a, #1e293b);
   overflow: hidden;
-}
-
-.search-bar {
-  position: fixed;
-  top: 20px;
-  right: 20px;
-  z-index: 1000;
-}
-
-.search-input {
-  display: flex;
-  align-items: center;
-  background: rgba(0, 0, 0, 0.7);
-  border-radius: 12px;
-  padding: 12px 16px;
-  color: white;
-  min-width: 300px;
-}
-
-.search-input i {
-  margin-right: 10px;
-  color: #ccc;
-}
-
-.search-input input {
-  background: none;
-  border: none;
-  color: white;
-  outline: none;
-  flex: 1;
-  font-size: 14px;
-}
-
-.search-input input::placeholder {
-  color: #ccc;
-}
-
-.map-container {
-  position: relative;
-  width: 100%;
-  height: 100%;
-}
-
-#map {
-  width: 100%;
-  height: 100%;
-  cursor: crosshair;
-}
-
-.weather-overlay {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  background: rgba(0, 0, 0, 0.8);
-  border-radius: 16px;
-  padding: 20px;
-  color: white;
-  text-align: center;
-  z-index: 1000;
-  backdrop-filter: blur(10px);
-}
-
-.location {
-  font-size: 18px;
-  font-weight: bold;
-  margin-bottom: 10px;
-}
-
-.temperature {
-  font-size: 48px;
-  font-weight: bold;
-  margin-bottom: 10px;
-}
-
-.condition {
-  font-size: 16px;
-  margin-bottom: 15px;
-  text-transform: capitalize;
-}
-
-.details {
-  display: flex;
-  flex-direction: column;
-  gap: 5px;
-  font-size: 14px;
-  color: #ccc;
-}
-
-.forecast-bar {
-  position: fixed;
-  bottom: 20px;
-  left: 50%;
-  transform: translateX(-50%);
-  display: flex;
-  background: rgba(0, 0, 0, 0.8);
-  border-radius: 16px;
-  padding: 16px;
-  gap: 20px;
-  z-index: 1000;
-  backdrop-filter: blur(10px);
-}
-
-.forecast-item {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  color: white;
-  min-width: 80px;
-}
-
-.day {
-  font-size: 12px;
-  margin-bottom: 8px;
-  font-weight: bold;
-}
-
-.weather-icon {
-  font-size: 20px;
-  margin-bottom: 8px;
-}
-
-.temps {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  font-size: 11px;
-}
-
-.high {
-  font-weight: bold;
-}
-
-.low {
-  color: #ccc;
-}
-
-.loading-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background: rgba(0, 0, 0, 0.5);
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  z-index: 10000;
-}
-
-.loading-spinner {
-  background: rgba(0, 0, 0, 0.8);
-  border-radius: 12px;
-  padding: 20px;
-  color: white;
-  text-align: center;
-  backdrop-filter: blur(10px);
-}
-
-.loading-spinner i {
-  font-size: 24px;
-  margin-bottom: 10px;
-  display: block;
-}
-
-.loading-spinner span {
-  font-size: 14px;
-}
-
-/* Responsive design */
-@media (max-width: 768px) {
-  
-  .search-bar {
-    top: 10px;
-    right: 10px;
-  }
-  
-  .search-input {
-    min-width: 250px;
-    padding: 10px 12px;
-  }
-  
-  .forecast-bar {
-    bottom: 10px;
-    padding: 12px;
-    gap: 15px;
-  }
-  
-  .forecast-item {
-    min-width: 60px;
-  }
-  
-  .weather-overlay {
-    padding: 15px;
-  }
-  
-  .temperature {
-    font-size: 36px;
-  }
 }
 </style>
