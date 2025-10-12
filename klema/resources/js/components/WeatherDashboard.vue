@@ -1,37 +1,62 @@
 <template>
   <div class="weather-dashboard">
-    <SearchBar 
-      v-model="searchLocation"
-      @search="searchWeather"
-      :is-loading="isLoadingWeather"
-    />
-    
-    <ClickInstruction />
-    
-    <WeatherLayerControls 
-      @toggle-layer="handleLayerToggle"
-    />
-    
-    <WeatherMap
-      ref="weatherMapRef"
-      :is-loading="mapLoading"
-      @map-click="handleMapClick"
-      @map-ready="handleMapReady"
-    />
-    
-    <LoadingIndicator
-      v-if="isLoadingWeather"
-      message="Fetching weather data..."
-      subtitle="Loading forecast for pinned location"
-    />
-    
-    <WeatherTimeline
+    <!-- Map View (default) -->
+    <template v-if="activeView === 'map'">
+      <SearchBar 
+        v-model="searchLocation"
+        @search="searchWeather"
+        :is-loading="isLoadingWeather"
+      />
+      
+      <ClickInstruction />
+      
+      <WeatherLayerControls 
+        @toggle-layer="handleLayerToggle"
+      />
+      
+      <WeatherMap
+        ref="weatherMapRef"
+        :is-loading="mapLoading"
+        @map-click="handleMapClick"
+        @map-ready="handleMapReady"
+      />
+      
+      <LoadingIndicator
+        v-if="isLoadingWeather"
+        message="Fetching weather data..."
+        subtitle="Loading forecast for pinned location"
+      />
+      
+      <WeatherTimeline
+        :forecast="forecast"
+        :get-day-label="getDayLabel"
+        :get-weather-icon="getWeatherIcon"
+      />
+      
+      <TimelineLegend />
+    </template>
+
+    <!-- Dashboard View -->
+    <DashboardView 
+      v-else-if="activeView === 'dashboard'"
+      :current-weather="currentWeather"
       :forecast="forecast"
       :get-day-label="getDayLabel"
       :get-weather-icon="getWeatherIcon"
     />
-    
-    <TimelineLegend />
+
+    <!-- Calendar View -->
+    <CalendarView 
+      v-else-if="activeView === 'calendar'"
+      :forecast="forecast"
+      :get-weather-icon="getWeatherIcon"
+    />
+
+    <!-- Alerts View -->
+    <AlertsView v-else-if="activeView === 'alerts'" />
+
+    <!-- Settings View -->
+    <SettingsView v-else-if="activeView === 'settings'" />
   </div>
 </template>
 
@@ -44,14 +69,20 @@ import WeatherMap from './WeatherMap.vue';
 import LoadingIndicator from './LoadingIndicator.vue';
 import WeatherTimeline from './WeatherTimeline.vue';
 import TimelineLegend from './TimelineLegend.vue';
+import DashboardView from './Views/DashboardView.vue';
+import CalendarView from './Views/CalendarView.vue';
+import AlertsView from './Views/AlertsView.vue';
+import SettingsView from './Views/SettingsView.vue';
 import { useWeatherAPI } from '../composables/useWeatherAPI';
 import { useWeatherUtils } from '../composables/useWeatherUtils';
 
 const weatherMapRef = ref(null);
 const searchLocation = ref('Maramag, Northern Mindanao');
 const forecast = ref([]);
+const currentWeather = ref(null);
 const mapLoading = ref(true);
 const isLoadingWeather = ref(false);
+const activeView = ref('dashboard'); // Default to dashboard view
 
 const { 
   fetchWeatherByLocation, 
@@ -61,6 +92,11 @@ const {
 
 const { getDayLabel, getWeatherIcon } = useWeatherUtils();
 
+const setActiveView = (view) => {
+  activeView.value = view;
+  console.log('View changed to:', view);
+};
+
 const handleLayerToggle = ({ layerId, active }) => {
   weatherMapRef.value?.toggleWeatherLayer(layerId, active);
 };
@@ -69,6 +105,7 @@ const handleMapClick = async ({ lat, lng }) => {
   isLoadingWeather.value = true;
   try {
     const { current, history, forecastData } = await fetchWeatherByCoordinates(lat, lng);
+    currentWeather.value = current;
     const timeline = createWeatherTimeline(history, current, forecastData);
     forecast.value = timeline;
     
@@ -91,6 +128,7 @@ const searchWeather = async () => {
   isLoadingWeather.value = true;
   try {
     const { current, history, forecastData } = await fetchWeatherByLocation(searchLocation.value);
+    currentWeather.value = current;
     const timeline = createWeatherTimeline(history, current, forecastData);
     forecast.value = timeline;
     
@@ -112,8 +150,9 @@ const handleMapReady = () => {
 };
 
 onMounted(() => {
-  // Expose to global scope if needed for navbar integration
+  // Expose to global scope for navbar integration
   window.vueApp = {
+    setActiveView,
     searchWeather,
     searchLocation
   };
