@@ -28,7 +28,7 @@ export function createMapLayers() {
       `https://tile.openweathermap.org/map/clouds_new/{z}/{x}/{y}.png?appid=${OPENWEATHER_API_KEY}`,
       {
         attribution: '© OpenWeatherMap - Real Cloud Data',
-        opacity: 0.8,
+        opacity: 0.95,
         maxZoom: 12,
         className: 'enhanced-clouds-layer'
       }
@@ -37,7 +37,7 @@ export function createMapLayers() {
       `https://tile.openweathermap.org/map/precipitation_new/{z}/{x}/{y}.png?appid=${OPENWEATHER_API_KEY}`,
       {
         attribution: '© OpenWeatherMap - Real Precipitation Data',
-        opacity: 0.9,
+        opacity: 0.95,
         maxZoom: 12,
         className: 'enhanced-precipitation-layer'
       }
@@ -46,7 +46,7 @@ export function createMapLayers() {
       `https://tile.openweathermap.org/map/temp_new/{z}/{x}/{y}.png?appid=${OPENWEATHER_API_KEY}`,
       {
         attribution: '© OpenWeatherMap - Real Temperature Data',
-        opacity: 0.7,
+        opacity: 0.85,
         maxZoom: 12,
         className: 'enhanced-temperature-layer'
       }
@@ -55,7 +55,7 @@ export function createMapLayers() {
       `https://tile.openweathermap.org/map/wind_new/{z}/{x}/{y}.png?appid=${OPENWEATHER_API_KEY}`,
       {
         attribution: '© OpenWeatherMap - Real Wind Data',
-        opacity: 0.6,
+        opacity: 0.85,
         maxZoom: 12,
         className: 'enhanced-wind-layer'
       }
@@ -64,7 +64,7 @@ export function createMapLayers() {
       `https://tile.openweathermap.org/map/pressure_new/{z}/{x}/{y}.png?appid=${OPENWEATHER_API_KEY}`,
       {
         attribution: '© OpenWeatherMap - Pressure Data',
-        opacity: 0.6,
+        opacity: 0.85,
         maxZoom: 12,
         className: 'enhanced-pressure-layer'
       }

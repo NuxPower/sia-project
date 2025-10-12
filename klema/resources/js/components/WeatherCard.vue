@@ -41,7 +41,18 @@ const cardClass = computed(() => ({
 
 const formatDate = (date) => {
   if (!date) return '';
-  return new Date(date).toLocaleDateString('en-PH', { 
+  
+  // Parse date string as local date to avoid timezone issues
+  // Split "2025-10-12" into year, month, day
+  const parts = date.split('-');
+  const year = parseInt(parts[0], 10);
+  const month = parseInt(parts[1], 10);
+  const day = parseInt(parts[2], 10);
+  
+  // Create date in local timezone (month is 0-indexed)
+  const dateObj = new Date(year, month - 1, day);
+  
+  return dateObj.toLocaleDateString('en-PH', { 
     month: 'short', 
     day: 'numeric' 
   });

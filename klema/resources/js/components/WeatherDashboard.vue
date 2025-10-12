@@ -8,6 +8,10 @@
     
     <ClickInstruction />
     
+    <WeatherLayerControls 
+      @toggle-layer="handleLayerToggle"
+    />
+    
     <WeatherMap
       ref="weatherMapRef"
       :is-loading="mapLoading"
@@ -35,6 +39,7 @@
 import { ref, onMounted } from 'vue';
 import SearchBar from './SearchBar.vue';
 import ClickInstruction from './ClickInstruction.vue';
+import WeatherLayerControls from './WeatherLayerControls.vue';
 import WeatherMap from './WeatherMap.vue';
 import LoadingIndicator from './LoadingIndicator.vue';
 import WeatherTimeline from './WeatherTimeline.vue';
@@ -55,6 +60,10 @@ const {
 } = useWeatherAPI();
 
 const { getDayLabel, getWeatherIcon } = useWeatherUtils();
+
+const handleLayerToggle = ({ layerId, active }) => {
+  weatherMapRef.value?.toggleWeatherLayer(layerId, active);
+};
 
 const handleMapClick = async ({ lat, lng }) => {
   isLoadingWeather.value = true;

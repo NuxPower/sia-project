@@ -3,8 +3,6 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-
-    <!-- CSRF Token -->
     <meta name="csrf-token" content="{{ csrf_token() }}">
 
     <title>{{ config('app.name', 'KLEMA') }}</title>
@@ -68,50 +66,6 @@
             box-shadow: 0 0 30px rgba(59, 130, 246, 0.5);
         }
         
-        .search-container {
-            position: fixed;
-            top: 20px;
-            right: 20px;
-            z-index: 1000;
-        }
-        
-        .search-box {
-            display: flex;
-            align-items: center;
-            background: rgba(0, 0, 0, 0.8);
-            border: 2px solid rgba(255, 255, 255, 0.2);
-            border-radius: 16px;
-            padding: 16px 20px;
-            color: white;
-            min-width: 320px;
-            backdrop-filter: blur(15px);
-            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
-            transition: all 0.3s ease;
-        }
-        
-        .search-box:hover {
-            border-color: rgba(59, 130, 246, 0.5);
-            box-shadow: 0 12px 40px rgba(59, 130, 246, 0.3);
-        }
-        
-        .search-box i {
-            margin-right: 12px;
-            color: #9ca3af;
-        }
-        
-        .search-box input {
-            background: none;
-            border: none;
-            color: white;
-            outline: none;
-            flex: 1;
-            font-size: 16px;
-        }
-        
-        .search-box input::placeholder {
-            color: #9ca3af;
-        }
-        
         .logout-button {
             position: fixed;
             bottom: 30px;
@@ -169,7 +123,6 @@
         <i class="fas fa-sign-out-alt"></i>
     </a>
     
-    <!-- Hidden logout form -->
     <form id="logout-form" action="{{ route('logout') }}" method="POST" style="display: none;">
         @csrf
     </form>
@@ -180,21 +133,19 @@
     </div>
 
     <script>
-        // Navigation functionality
         function setActiveView(view) {
-            // Remove active class from all icons
             document.querySelectorAll('.navbar-icon').forEach(icon => {
                 icon.classList.remove('active');
             });
             
-            // Add active class to clicked icon
             event.currentTarget.classList.add('active');
             
-            // Trigger view change in Vue app if available
             if (window.vueApp && window.vueApp.setActiveView) {
                 window.vueApp.setActiveView(view);
             }
             
-            console.log('Active view set to:', view);
+            console.log('Active view:', view);
         }
     </script>
+</body>
+</html>

@@ -28,6 +28,8 @@ const emit = defineEmits(['map-click', 'map-ready']);
 const mapContainer = ref(null);
 const map = ref(null);
 const currentMarker = ref(null);
+const weatherLayers = ref({});
+const layerControl = ref(null);
 
 const initMap = async () => {
   await nextTick();
@@ -49,11 +51,14 @@ const initMap = async () => {
   
   const { baseLayers, overlayLayers } = createMapLayers();
   
+  // Store overlay layers for programmatic control
+  weatherLayers.value = overlayLayers;
+  
   // Add default base layer
   baseLayers['🗺️ Street Map'].addTo(map.value);
   
-  // Add layer control
-  L.control.layers(baseLayers, overlayLayers, {
+  // Add layer control (now hidden since we have custom controls)
+  layerControl.value = L.control.layers(baseLayers, overlayLayers, {
     position: 'topright',
     collapsed: true
   }).addTo(map.value);
@@ -67,6 +72,29 @@ const initMap = async () => {
       emit('map-ready');
     }
   }, 100);
+};
+
+const toggleWeatherLayer = (layerId, active) => {
+  if (!map.value) return;
+  
+  const layerMap = {
+    'clouds': '☁️ Live Clouds',
+    'precipitation': '🌧️ Live Precipitation',
+    'temperature': '🌡️ Live Temperature',
+    'wind': '💨 Live Wind',
+    'pressure': '🌪️ Pressure Systems'
+  };
+  
+  const layerName = layerMap[layerId];
+  const layer = weatherLayers.value[layerName];
+  
+  if (layer) {
+    if (active) {
+      map.value.addLayer(layer);
+    } else {
+      map.value.removeLayer(layer);
+    }
+  }
 };
 
 const moveToLocation = (lat, lon, zoom = 10) => {
@@ -115,7 +143,8 @@ onMounted(async () => {
 
 defineExpose({
   moveToLocation,
-  updateMarker
+  updateMarker,
+  toggleWeatherLayer
 });
 </script>
 
