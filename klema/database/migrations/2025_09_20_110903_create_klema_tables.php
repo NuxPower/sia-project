@@ -21,8 +21,8 @@ return new class extends Migration
             $table->timestamps();
         });
 
-        // Add geometry column for PostgreSQL
-        DB::statement('ALTER TABLE farms ADD COLUMN boundary geometry(Polygon, 4326);');
+        // Add geometry column for PostgreSQL (requires PostGIS extension)
+        // DB::statement('ALTER TABLE farms ADD COLUMN boundary geometry(Polygon, 4326);');
 
         // WEATHER DATA
         Schema::create('weather_data', function (Blueprint $table) {

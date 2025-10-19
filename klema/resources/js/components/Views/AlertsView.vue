@@ -5,7 +5,7 @@
         <i class="fas fa-bell"></i>
         Weather Alerts & Notifications
       </h2>
-      <button class="add-alert-button" @click="showAddAlert = !showAddAlert">
+      <button class="add-alert-button" @click="showCreateModal = true">
         <i class="fas fa-plus"></i>
         New Alert
       </button>
@@ -14,10 +14,30 @@
     <!-- Active Alerts -->
     <div class="alerts-section">
       <h3>Active Alerts</h3>
-      <div v-if="activeAlerts.length === 0" class="no-alerts">
+      
+      <!-- Loading State -->
+      <div v-if="loading" class="loading-state">
+        <i class="fas fa-spinner fa-spin"></i>
+        <p>Loading alerts...</p>
+      </div>
+      
+      <!-- Error State -->
+      <div v-else-if="error" class="error-state">
+        <i class="fas fa-exclamation-triangle"></i>
+        <p>{{ error }}</p>
+        <button @click="fetchActiveAlerts()" class="retry-button">
+          <i class="fas fa-redo"></i>
+          Retry
+        </button>
+      </div>
+      
+      <!-- No Alerts State -->
+      <div v-else-if="activeAlerts.length === 0" class="no-alerts">
         <i class="fas fa-check-circle"></i>
         <p>No active weather alerts at this time</p>
       </div>
+      
+      <!-- Alerts List -->
       <div v-else class="alerts-list">
         <div 
           v-for="alert in activeAlerts" 
@@ -31,14 +51,25 @@
           <div class="alert-content">
             <h4>{{ alert.title }}</h4>
             <p>{{ alert.description }}</p>
-            <div class="alert-time">
-              <i class="fas fa-clock"></i>
-              {{ alert.time }}
+            <div class="alert-meta">
+              <div class="alert-farm">
+                <i class="fas fa-map-marker-alt"></i>
+                {{ alert.farmName }}
+              </div>
+              <div class="alert-time">
+                <i class="fas fa-clock"></i>
+                {{ alert.time }}
+              </div>
             </div>
           </div>
-          <button class="dismiss-button" @click="dismissAlert(alert.id)">
-            <i class="fas fa-times"></i>
-          </button>
+          <div class="alert-actions">
+            <button class="dismiss-button" @click="dismissAlert(alert.id)" title="Mark as resolved">
+              <i class="fas fa-check"></i>
+            </button>
+            <button class="delete-button" @click="deleteAlertHandler(alert.id)" title="Delete alert">
+              <i class="fas fa-trash"></i>
+            </button>
+          </div>
         </div>
       </div>
     </div>
@@ -46,7 +77,21 @@
     <!-- Forecast Warnings -->
     <div class="warnings-section">
       <h3>Forecast Warnings</h3>
-      <div class="warnings-grid">
+      
+      <!-- Loading State -->
+      <div v-if="loading && forecastWarnings.length === 0" class="loading-state">
+        <i class="fas fa-spinner fa-spin"></i>
+        <p>Loading forecast warnings...</p>
+      </div>
+      
+      <!-- No Warnings State -->
+      <div v-else-if="forecastWarnings.length === 0" class="no-alerts">
+        <i class="fas fa-sun"></i>
+        <p>No forecast warnings at this time</p>
+      </div>
+      
+      <!-- Warnings Grid -->
+      <div v-else class="warnings-grid">
         <div 
           v-for="warning in forecastWarnings" 
           :key="warning.id"
@@ -65,94 +110,152 @@
     <!-- Notification Settings -->
     <div class="settings-section">
       <h3>Notification Preferences</h3>
-      <div class="settings-list">
-        <div class="setting-item">
+      
+      <!-- Loading State -->
+      <div v-if="settingsLoading" class="loading-state">
+        <i class="fas fa-spinner fa-spin"></i>
+        <p>Loading notification settings...</p>
+      </div>
+      
+      <!-- Settings List -->
+      <div v-else class="settings-list">
+        <div 
+          v-for="(value, settingName) in notificationSettings" 
+          :key="settingName"
+          class="setting-item"
+        >
           <div class="setting-info">
-            <i class="fas fa-cloud-rain"></i>
-            <span>Heavy Rain Alerts</span>
+            <i :class="getSettingInfo(settingName).icon"></i>
+            <div class="setting-text">
+              <span class="setting-label">{{ getSettingInfo(settingName).label }}</span>
+              <p class="setting-description">{{ getSettingInfo(settingName).description }}</p>
+            </div>
           </div>
           <label class="switch">
-            <input type="checkbox" checked>
-            <span class="slider"></span>
-          </label>
-        </div>
-        <div class="setting-item">
-          <div class="setting-info">
-            <i class="fas fa-wind"></i>
-            <span>Strong Wind Warnings</span>
-          </div>
-          <label class="switch">
-            <input type="checkbox" checked>
-            <span class="slider"></span>
-          </label>
-        </div>
-        <div class="setting-item">
-          <div class="setting-info">
-            <i class="fas fa-temperature-high"></i>
-            <span>Temperature Extremes</span>
-          </div>
-          <label class="switch">
-            <input type="checkbox">
-            <span class="slider"></span>
-          </label>
-        </div>
-        <div class="setting-item">
-          <div class="setting-info">
-            <i class="fas fa-bolt"></i>
-            <span>Storm Alerts</span>
-          </div>
-          <label class="switch">
-            <input type="checkbox" checked>
+            <input 
+              type="checkbox" 
+              :checked="value"
+              @change="updateNotificationSetting(settingName, $event.target.checked)"
+            >
             <span class="slider"></span>
           </label>
         </div>
       </div>
+      
+      <!-- Save Status -->
+      <div v-if="settingsError" class="error-state">
+        <i class="fas fa-exclamation-triangle"></i>
+        {{ settingsError }}
+      </div>
+      
+      <div v-if="settingsSaved" class="success-state">
+        <i class="fas fa-check-circle"></i>
+        Settings saved successfully!
+      </div>
     </div>
+
+    <!-- Create Alert Modal -->
+    <CreateAlertModal 
+      :show="showCreateModal" 
+      @close="showCreateModal = false"
+      @alert-created="handleAlertCreated"
+    />
   </div>
 </template>
 
 <script setup>
-import { ref } from 'vue';
+import { ref, onMounted, computed } from 'vue';
+import { useAlerts } from '../../composables/useAlerts';
+import { useNotificationSettings } from '../../composables/useNotificationSettings';
+import CreateAlertModal from '../CreateAlertModal.vue';
 
-const showAddAlert = ref(false);
+const { 
+  alerts, 
+  forecastWarnings, 
+  loading, 
+  error, 
+  fetchActiveAlerts, 
+  fetchForecastWarnings, 
+  resolveAlert, 
+  deleteAlert,
+  getAlertTypeInfo,
+  formatAlertTime
+} = useAlerts();
 
-const activeAlerts = ref([
-  {
-    id: 1,
-    title: 'Heavy Rain Warning',
-    description: 'Heavy rainfall expected in the next 3-6 hours. Secure outdoor equipment and livestock.',
-    time: '2 hours ago',
-    icon: 'fas fa-cloud-showers-heavy',
-    severity: 'warning'
+const { 
+  settings: notificationSettings,
+  loading: settingsLoading,
+  error: settingsError,
+  loadSettings,
+  updateSetting,
+  getSettingInfo
+} = useNotificationSettings();
+
+const showCreateModal = ref(false);
+const settingsSaved = ref(false);
+
+// Computed property to get active alerts with formatted data
+const activeAlerts = computed(() => {
+  return alerts.value.map(alert => {
+    const typeInfo = getAlertTypeInfo(alert.alert_type);
+    return {
+      id: alert.alert_id,
+      title: typeInfo.label,
+      description: alert.message,
+      time: formatAlertTime(alert.issued_at),
+      icon: typeInfo.icon,
+      severity: typeInfo.color,
+      farmName: alert.farm?.farm_name || 'Unknown Farm',
+      alertType: alert.alert_type
+    };
+  });
+});
+
+// Load data when component mounts
+onMounted(async () => {
+  await Promise.all([
+    fetchActiveAlerts(),
+    fetchForecastWarnings(),
+    loadSettings()
+  ]);
+});
+
+const dismissAlert = async (alertId) => {
+  try {
+    await resolveAlert(alertId);
+  } catch (err) {
+    console.error('Failed to dismiss alert:', err);
   }
-]);
+};
 
-const forecastWarnings = ref([
-  {
-    id: 1,
-    day: 'Tomorrow',
-    message: 'High wind speeds expected',
-    value: '45 km/h',
-    icon: 'fas fa-wind'
-  },
-  {
-    id: 2,
-    day: 'Wednesday',
-    message: 'Heavy precipitation',
-    value: '85mm',
-    icon: 'fas fa-cloud-rain'
-  },
-  {
-    id: 3,
-    day: 'Friday',
-    message: 'Temperature drop',
-    value: '18°C',
-    icon: 'fas fa-temperature-low'
+const deleteAlertHandler = async (alertId) => {
+  if (confirm('Are you sure you want to delete this alert?')) {
+    try {
+      await deleteAlert(alertId);
+    } catch (err) {
+      console.error('Failed to delete alert:', err);
+    }
   }
-]);
+};
 
-const dismissAlert = (id) => {
-  activeAlerts.value = activeAlerts.value.filter(alert => alert.id !== id);
+const handleAlertCreated = (newAlert) => {
+  // The alert will be automatically added to the list by the composable
+  // You could also show a success message here
+  console.log('Alert created:', newAlert);
+};
+
+const updateNotificationSetting = async (settingName, value) => {
+  try {
+    await updateSetting(settingName, value);
+    settingsSaved.value = true;
+    
+    // Hide success message after 3 seconds
+    setTimeout(() => {
+      settingsSaved.value = false;
+    }, 3000);
+  } catch (err) {
+    console.error('Failed to update notification setting:', err);
+  }
 };
 </script>
 
@@ -227,17 +330,47 @@ const dismissAlert = (id) => {
   margin-bottom: 20px;
 }
 
-.no-alerts {
+.loading-state, .error-state, .no-alerts {
   text-align: center;
   padding: 40px;
   color: #9ca3af;
 }
 
-.no-alerts i {
+.loading-state i, .error-state i, .no-alerts i {
   font-size: 48px;
-  color: #22c55e;
   margin-bottom: 15px;
   display: block;
+}
+
+.loading-state i {
+  color: #3b82f6;
+}
+
+.error-state i {
+  color: #ef4444;
+}
+
+.no-alerts i {
+  color: #22c55e;
+}
+
+.retry-button {
+  background: rgba(239, 68, 68, 0.2);
+  border: 1px solid rgba(239, 68, 68, 0.4);
+  color: white;
+  padding: 8px 16px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  margin-top: 15px;
+}
+
+.retry-button:hover {
+  background: rgba(239, 68, 68, 0.4);
 }
 
 .alerts-list {
@@ -293,7 +426,14 @@ const dismissAlert = (id) => {
   line-height: 1.5;
 }
 
-.alert-time {
+.alert-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  margin-top: 10px;
+}
+
+.alert-farm, .alert-time {
   color: #9ca3af;
   font-size: 13px;
   display: flex;
@@ -301,7 +441,14 @@ const dismissAlert = (id) => {
   gap: 5px;
 }
 
-.dismiss-button {
+.alert-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.dismiss-button, .delete-button {
   background: rgba(239, 68, 68, 0.2);
   border: 1px solid rgba(239, 68, 68, 0.3);
   color: white;
@@ -310,10 +457,22 @@ const dismissAlert = (id) => {
   border-radius: 8px;
   cursor: pointer;
   transition: all 0.3s ease;
-  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.dismiss-button {
+  background: rgba(34, 197, 94, 0.2);
+  border-color: rgba(34, 197, 94, 0.3);
 }
 
 .dismiss-button:hover {
+  background: rgba(34, 197, 94, 0.4);
+  transform: scale(1.1);
+}
+
+.delete-button:hover {
   background: rgba(239, 68, 68, 0.4);
   transform: scale(1.1);
 }
@@ -389,16 +548,50 @@ const dismissAlert = (id) => {
 
 .setting-info {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 12px;
   color: white;
-  font-size: 15px;
+  flex: 1;
 }
 
 .setting-info i {
   font-size: 20px;
   color: #60a5fa;
   width: 24px;
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.setting-text {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.setting-label {
+  font-size: 15px;
+  font-weight: 600;
+  color: white;
+}
+
+.setting-description {
+  font-size: 13px;
+  color: #9ca3af;
+  margin: 0;
+  line-height: 1.4;
+}
+
+.success-state {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 16px;
+  background: rgba(34, 197, 94, 0.2);
+  border: 1px solid rgba(34, 197, 94, 0.3);
+  color: #86efac;
+  border-radius: 8px;
+  margin-top: 15px;
+  font-size: 14px;
 }
 
 .switch {

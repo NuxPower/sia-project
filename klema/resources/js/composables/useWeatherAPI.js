@@ -47,15 +47,24 @@ export function useWeatherAPI() {
     const timeline = [];
     const today = new Date();
     
+    // Helper function to format date in local timezone (avoiding UTC conversion issues)
+    const formatLocalDate = (date) => {
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const day = String(date.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
+    };
+    
     // Add historical data (3 days)
     for (let i = 3; i >= 1; i--) {
       const date = new Date(today);
       date.setDate(date.getDate() - i);
       
-      const historyDay = historyData.find(h => h.date === date.toISOString().split('T')[0]);
+      const dateStr = formatLocalDate(date);
+      const historyDay = historyData.find(h => h.date === dateStr);
       
       timeline.push({
-        date: date.toISOString().split('T')[0],
+        date: dateStr,
         day: date.toLocaleDateString('en-US', { weekday: 'short' }),
         temp_max: historyDay?.temp_max || Math.floor(currentWeather.main.temp + Math.random() * 4 - 2),
         temp_min: historyDay?.temp_min || Math.floor(currentWeather.main.temp - 5 + Math.random() * 3),
@@ -66,8 +75,9 @@ export function useWeatherAPI() {
     }
     
     // Add today
+    const todayStr = formatLocalDate(today);
     timeline.push({
-      date: today.toISOString().split('T')[0],
+      date: todayStr,
       day: 'Today',
       temp_max: Math.round(currentWeather.main.temp_max || currentWeather.main.temp + 2),
       temp_min: Math.round(currentWeather.main.temp_min || currentWeather.main.temp - 3),
@@ -82,10 +92,11 @@ export function useWeatherAPI() {
       const date = new Date(today);
       date.setDate(date.getDate() + i + 1);
       
+      const dateStr = formatLocalDate(date);
       const forecastDay = futureDays[i];
       
       timeline.push({
-        date: date.toISOString().split('T')[0],
+        date: dateStr,
         day: i === 0 ? 'Tomorrow' : date.toLocaleDateString('en-US', { weekday: 'short' }),
         temp_max: forecastDay?.temp_max || Math.floor(currentWeather.main.temp + Math.random() * 6 - 3),
         temp_min: forecastDay?.temp_min || Math.floor(currentWeather.main.temp - 4 + Math.random() * 3),

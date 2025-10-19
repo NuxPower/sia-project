@@ -57,6 +57,16 @@
 
     <!-- Settings View -->
     <SettingsView v-else-if="activeView === 'settings'" />
+    
+    <!-- Global Alert Notifications -->
+    <GlobalAlertNotification />
+    
+    <!-- Test Alert Button (temporary) -->
+    <div class="test-alert-button">
+      <button @click="handleTestAlert" class="test-button" title="Test Global Alert">
+        <i class="fas fa-bell"></i>
+      </button>
+    </div>
   </div>
 </template>
 
@@ -73,8 +83,10 @@ import DashboardView from './Views/DashboardView.vue';
 import CalendarView from './Views/CalendarView.vue';
 import AlertsView from './Views/AlertsView.vue';
 import SettingsView from './Views/SettingsView.vue';
+import GlobalAlertNotification from './GlobalAlertNotification.vue';
 import { useWeatherAPI } from '../composables/useWeatherAPI';
 import { useWeatherUtils } from '../composables/useWeatherUtils';
+import { useGlobalAlerts } from '../composables/useGlobalAlerts';
 
 const weatherMapRef = ref(null);
 const searchLocation = ref('Maramag, Northern Mindanao');
@@ -91,6 +103,45 @@ const {
 } = useWeatherAPI();
 
 const { getDayLabel, getWeatherIcon } = useWeatherUtils();
+const { showTestAlert, showWeatherAlert, showIrrigationAlert, showHarvestAlert, checkWeatherConditions } = useGlobalAlerts();
+
+// Test function to check real weather alerts
+const handleTestAlert = () => {
+  console.log('Test button clicked!');
+  
+  // Check current weather data for real alerts
+  if (currentWeather.value) {
+    console.log('Checking current weather for alerts:', currentWeather.value);
+    const weatherData = { 
+      current: currentWeather.value, 
+      history: [], 
+      forecast: forecast.value 
+    };
+    const hasAlerts = checkWeatherConditions(weatherData);
+    
+    if (!hasAlerts) {
+      // If no real alerts triggered, show "No warnings" message with detailed weather info
+      const { showInfo } = useGlobalAlerts();
+      const temp = Math.round(currentWeather.value.main.temp);
+      const windSpeed = Math.round((currentWeather.value.wind?.speed || 0) * 3.6);
+      const humidity = currentWeather.value.main.humidity || 0;
+      
+      showInfo(
+        'Weather Status', 
+        `No warnings for now. Current: ${currentWeather.value.weather[0].description} at ${temp}°C, Wind: ${windSpeed} km/h, Humidity: ${humidity}%`,
+        { duration: 8000 }
+      );
+    }
+  } else {
+    // If no weather data available, show info message
+    const { showInfo } = useGlobalAlerts();
+    showInfo(
+      'Weather Status', 
+      'No weather data available. Please search for a location first.',
+      { duration: 5000 }
+    );
+  }
+};
 
 const setActiveView = (view) => {
   activeView.value = view;
@@ -114,6 +165,10 @@ const handleMapClick = async ({ lat, lng }) => {
     }
     
     weatherMapRef.value?.updateMarker(lat, lng, current);
+    
+    // Check for weather alerts with real data
+    const weatherData = { current, history, forecast: forecastData };
+    checkWeatherConditions(weatherData);
   } catch (error) {
     console.error('Error fetching weather:', error);
     alert('Failed to fetch weather data. Please try again.');
@@ -136,6 +191,10 @@ const searchWeather = async () => {
       weatherMapRef.value?.moveToLocation(current.coord.lat, current.coord.lon);
       weatherMapRef.value?.updateMarker(current.coord.lat, current.coord.lon, current);
     }
+    
+    // Check for weather alerts with real data
+    const weatherData = { current, history, forecast: forecastData };
+    checkWeatherConditions(weatherData);
   } catch (error) {
     console.error('Error searching weather:', error);
     alert('Failed to fetch weather data. Please try again.');
@@ -166,5 +225,65 @@ onMounted(() => {
   height: 100vh;
   background: linear-gradient(135deg, #0f172a, #1e293b);
   overflow: hidden;
+}
+
+/* Test Alert Button */
+.test-alert-button {
+  position: fixed;
+  bottom: 100px;
+  left: 20px;
+  z-index: 10000;
+}
+
+.test-button {
+  width: 60px;
+  height: 60px;
+  background: rgba(239, 68, 68, 0.8);
+  border: 2px solid rgba(239, 68, 68, 0.3);
+  border-radius: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  color: white;
+  font-size: 20px;
+  backdrop-filter: blur(15px);
+  box-shadow: 0 8px 32px rgba(239, 68, 68, 0.3);
+  animation: pulse 2s infinite;
+}
+
+.test-button:hover {
+  background: rgba(239, 68, 68, 1);
+  border-color: rgba(239, 68, 68, 0.6);
+  transform: scale(1.1);
+  box-shadow: 0 12px 40px rgba(239, 68, 68, 0.5);
+  animation: none;
+}
+
+@keyframes pulse {
+  0% {
+    box-shadow: 0 8px 32px rgba(239, 68, 68, 0.3);
+  }
+  50% {
+    box-shadow: 0 8px 32px rgba(239, 68, 68, 0.6);
+  }
+  100% {
+    box-shadow: 0 8px 32px rgba(239, 68, 68, 0.3);
+  }
+}
+
+/* Mobile responsive */
+@media (max-width: 768px) {
+  .test-alert-button {
+    bottom: 80px;
+    left: 10px;
+  }
+  
+  .test-button {
+    width: 50px;
+    height: 50px;
+    font-size: 18px;
+  }
 }
 </style>
