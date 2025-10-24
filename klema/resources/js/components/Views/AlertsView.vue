@@ -76,7 +76,13 @@
 
     <!-- Forecast Warnings -->
     <div class="warnings-section">
-      <h3>Forecast Warnings</h3>
+      <div class="warnings-header">
+        <h3>Forecast Warnings</h3>
+        <button @click="loadWeatherData" class="refresh-button" title="Refresh forecast warnings">
+          <i class="fas fa-sync-alt"></i>
+          Refresh
+        </button>
+      </div>
       
       <!-- Loading State -->
       <div v-if="loading && forecastWarnings.length === 0" class="loading-state">
@@ -96,13 +102,18 @@
           v-for="warning in forecastWarnings" 
           :key="warning.id"
           class="warning-card"
+          :class="warning.severity"
         >
           <div class="warning-header">
             <i :class="warning.icon"></i>
-            <span>{{ warning.day }}</span>
+            <span class="warning-day">{{ warning.day }}</span>
+            <span class="warning-type">{{ warning.type }}</span>
           </div>
           <p class="warning-text">{{ warning.message }}</p>
           <div class="warning-value">{{ warning.value }}</div>
+          <div class="warning-severity-badge" :class="warning.severity">
+            {{ warning.severity.toUpperCase() }}
+          </div>
         </div>
       </div>
     </div>
@@ -168,6 +179,7 @@ import { ref, onMounted, computed } from 'vue';
 import { useAlerts } from '../../composables/useAlerts';
 import { useNotificationSettings } from '../../composables/useNotificationSettings';
 import CreateAlertModal from '../CreateAlertModal.vue';
+import { useWeatherAPI } from '../../composables/useWeatherAPI';
 
 const { 
   alerts, 
@@ -194,6 +206,35 @@ const {
 const showCreateModal = ref(false);
 const settingsSaved = ref(false);
 
+// Weather data for forecast warnings
+const { fetchWeatherByLocation } = useWeatherAPI();
+const currentWeather = ref(null);
+const forecast = ref([]);
+
+// Load weather data for forecast warnings - REAL API DATA
+const loadWeatherData = async () => {
+  try {
+    // Use default location - this will fetch REAL data from OpenWeatherMap API
+    const location = 'Butuan, Caraga, PH';
+    console.log('Loading REAL weather data for forecast warnings from API...');
+    
+    const { current, forecastData } = await fetchWeatherByLocation(location);
+    console.log('Real weather data loaded:', { current, forecastData });
+    
+    currentWeather.value = current;
+    forecast.value = forecastData;
+    
+    // Generate forecast warnings from REAL API data
+    forecastWarnings.value = generateForecastWarnings(forecastData);
+    console.log('Generated forecast warnings from real data:', forecastWarnings.value);
+    
+  } catch (error) {
+    console.error('Failed to load real weather data for forecast warnings:', error);
+    // Fallback to empty warnings if API fails
+    forecastWarnings.value = [];
+  }
+};
+
 // Computed property to get active alerts with formatted data
 const activeAlerts = computed(() => {
   return alerts.value.map(alert => {
@@ -215,7 +256,7 @@ const activeAlerts = computed(() => {
 onMounted(async () => {
   await Promise.all([
     fetchActiveAlerts(),
-    fetchForecastWarnings(),
+    loadWeatherData(), // This will also fetch forecast warnings
     loadSettings()
   ]);
 });
@@ -324,7 +365,46 @@ const updateNotificationSetting = async (settingName, value) => {
   border: 1px solid rgba(255, 255, 255, 0.1);
 }
 
-.alerts-section h3, .warnings-section h3, .settings-section h3 {
+.warnings-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+.warnings-header h3 {
+  color: white;
+  font-size: 20px;
+  margin: 0;
+}
+
+.refresh-button {
+  background: rgba(59, 130, 246, 0.2);
+  border: 1px solid rgba(59, 130, 246, 0.4);
+  color: white;
+  padding: 8px 16px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.refresh-button:hover {
+  background: rgba(59, 130, 246, 0.4);
+  transform: translateY(-2px);
+}
+
+.refresh-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.alerts-section h3, .settings-section h3 {
   color: white;
   font-size: 20px;
   margin-bottom: 20px;
@@ -489,11 +569,29 @@ const updateNotificationSetting = async (settingName, value) => {
   padding: 20px;
   border: 1px solid rgba(255, 255, 255, 0.1);
   transition: all 0.3s ease;
+  position: relative;
+  overflow: hidden;
 }
 
 .warning-card:hover {
   transform: translateY(-5px);
   border-color: rgba(245, 158, 11, 0.5);
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3);
+}
+
+.warning-card.warning {
+  border-left: 4px solid #f59e0b;
+  background: rgba(245, 158, 11, 0.1);
+}
+
+.warning-card.error {
+  border-left: 4px solid #ef4444;
+  background: rgba(239, 68, 68, 0.1);
+}
+
+.warning-card.info {
+  border-left: 4px solid #3b82f6;
+  background: rgba(59, 130, 246, 0.1);
 }
 
 .warning-header {
@@ -501,29 +599,73 @@ const updateNotificationSetting = async (settingName, value) => {
   align-items: center;
   gap: 10px;
   margin-bottom: 12px;
+  flex-wrap: wrap;
 }
 
 .warning-header i {
   font-size: 24px;
   color: #f59e0b;
+  flex-shrink: 0;
 }
 
-.warning-header span {
+.warning-day {
   color: white;
   font-weight: bold;
   font-size: 16px;
+  flex: 1;
+}
+
+.warning-type {
+  color: #9ca3af;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  background: rgba(255, 255, 255, 0.1);
+  padding: 2px 8px;
+  border-radius: 4px;
 }
 
 .warning-text {
   color: #d1d5db;
   font-size: 14px;
   margin-bottom: 10px;
+  line-height: 1.5;
 }
 
 .warning-value {
   color: #f59e0b;
   font-size: 20px;
   font-weight: bold;
+  margin-bottom: 10px;
+}
+
+.warning-severity-badge {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  padding: 4px 8px;
+  border-radius: 6px;
+  font-size: 10px;
+  font-weight: bold;
+  letter-spacing: 0.5px;
+}
+
+.warning-severity-badge.warning {
+  background: rgba(245, 158, 11, 0.2);
+  color: #f59e0b;
+  border: 1px solid rgba(245, 158, 11, 0.3);
+}
+
+.warning-severity-badge.error {
+  background: rgba(239, 68, 68, 0.2);
+  color: #ef4444;
+  border: 1px solid rgba(239, 68, 68, 0.3);
+}
+
+.warning-severity-badge.info {
+  background: rgba(59, 130, 246, 0.2);
+  color: #3b82f6;
+  border: 1px solid rgba(59, 130, 246, 0.3);
 }
 
 .settings-list {

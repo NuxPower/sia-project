@@ -103,43 +103,17 @@ const {
 } = useWeatherAPI();
 
 const { getDayLabel, getWeatherIcon } = useWeatherUtils();
-const { showTestAlert, showWeatherAlert, showIrrigationAlert, showHarvestAlert, checkWeatherConditions } = useGlobalAlerts();
+const { fetchRealWeatherAlerts, showWeatherAlert, showIrrigationAlert, showHarvestAlert, checkWeatherConditions } = useGlobalAlerts();
 
-// Test function to check real weather alerts
-const handleTestAlert = () => {
-  console.log('Test button clicked!');
+// Test function to fetch and check real weather alerts
+const handleTestAlert = async () => {
+  console.log('Test button clicked - fetching real weather data!');
   
-  // Check current weather data for real alerts
-  if (currentWeather.value) {
-    console.log('Checking current weather for alerts:', currentWeather.value);
-    const weatherData = { 
-      current: currentWeather.value, 
-      history: [], 
-      forecast: forecast.value 
-    };
-    const hasAlerts = checkWeatherConditions(weatherData);
-    
-    if (!hasAlerts) {
-      // If no real alerts triggered, show "No warnings" message with detailed weather info
-      const { showInfo } = useGlobalAlerts();
-      const temp = Math.round(currentWeather.value.main.temp);
-      const windSpeed = Math.round((currentWeather.value.wind?.speed || 0) * 3.6);
-      const humidity = currentWeather.value.main.humidity || 0;
-      
-      showInfo(
-        'Weather Status', 
-        `No warnings for now. Current: ${currentWeather.value.weather[0].description} at ${temp}°C, Wind: ${windSpeed} km/h, Humidity: ${humidity}%`,
-        { duration: 8000 }
-      );
-    }
-  } else {
-    // If no weather data available, show info message
-    const { showInfo } = useGlobalAlerts();
-    showInfo(
-      'Weather Status', 
-      'No weather data available. Please search for a location first.',
-      { duration: 5000 }
-    );
+  try {
+    // Fetch real weather data and generate alerts
+    await fetchRealWeatherAlerts();
+  } catch (error) {
+    console.error('Error fetching real weather alerts:', error);
   }
 };
 
