@@ -311,11 +311,39 @@ const nextMonth = () => {
 
 @media (max-width: 768px) {
   .calendar-view {
-    padding: 20px;
+    padding: 20px 10px;
+  }
+  
+  .calendar-header {
+    padding: 15px 20px;
   }
   
   .calendar-header h2 {
     font-size: 20px;
+  }
+  
+  .nav-button {
+    width: 40px;
+    height: 40px;
+    font-size: 14px;
+  }
+  
+  .calendar-grid {
+    padding: 15px;
+  }
+  
+  .weekday {
+    font-size: 11px;
+    padding: 8px 4px;
+  }
+  
+  .calendar-days {
+    gap: 6px;
+  }
+  
+  .calendar-day {
+    padding: 6px;
+    border-radius: 8px;
   }
   
   .day-number {
@@ -328,6 +356,65 @@ const nextMonth = () => {
   
   .day-temp {
     font-size: 11px;
+  }
+  
+  .legend {
+    flex-direction: column;
+    gap: 10px;
+    padding: 15px;
+  }
+  
+  .legend-item {
+    font-size: 13px;
+  }
+}
+
+@media (max-width: 480px) {
+  .calendar-view {
+    padding: 15px 8px;
+  }
+  
+  .calendar-header {
+    padding: 12px 15px;
+  }
+  
+  .calendar-header h2 {
+    font-size: 18px;
+  }
+  
+  .nav-button {
+    width: 36px;
+    height: 36px;
+    font-size: 13px;
+  }
+  
+  .calendar-grid {
+    padding: 10px;
+  }
+  
+  .weekday {
+    font-size: 10px;
+    padding: 6px 2px;
+  }
+  
+  .calendar-days {
+    gap: 4px;
+  }
+  
+  .calendar-day {
+    padding: 4px;
+  }
+  
+  .day-number {
+    font-size: 11px;
+  }
+  
+  .day-weather i {
+    font-size: 16px;
+  }
+  
+  .day-temp {
+    font-size: 10px;
   }
 }
 </style>

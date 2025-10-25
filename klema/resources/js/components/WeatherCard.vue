@@ -1,13 +1,13 @@
 <template>
   <div 
     class="weather-card"
-    :class="cardClass"
+    :class="[cardClass, { 'compact': isCompact }]"
     @mouseenter="handleMouseEnter"
     @mouseleave="handleMouseLeave"
   >    
     <div class="day-label">{{ getDayLabel(day) }}</div>
     
-    <div class="date">
+    <div v-if="!isCompact" class="date">
       {{ formatDate(day.date) }}
     </div>
     
@@ -20,7 +20,7 @@
       <span class="temp-low">L: {{ day.temp_min }}°</span>
     </div>
     
-    <div class="condition">{{ day.condition || '' }}</div>
+    <div v-if="!isCompact" class="condition">{{ day.condition || '' }}</div>
   </div>
 </template>
 
@@ -30,7 +30,11 @@ import { computed } from 'vue';
 const props = defineProps({
   day: Object,
   getDayLabel: Function,
-  getWeatherIcon: Function
+  getWeatherIcon: Function,
+  isCompact: {
+    type: Boolean,
+    default: false
+  }
 });
 
 const cardClass = computed(() => ({
@@ -85,6 +89,11 @@ const handleMouseLeave = (e) => {
   position: relative;
 }
 
+.weather-card.compact {
+  padding: 8px 6px;
+  min-width: 60px;
+}
+
 .weather-card.history {
   background: rgba(156, 163, 175, 0.2);
   border: 1px solid rgba(156, 163, 175, 0.3);
@@ -122,6 +131,12 @@ const handleMouseLeave = (e) => {
   text-align: center;
 }
 
+.compact .day-label {
+  font-size: 10px;
+  margin-bottom: 4px;
+  margin-top: 4px;
+}
+
 .date {
   font-size: 9px;
   margin-bottom: 8px;
@@ -135,11 +150,20 @@ const handleMouseLeave = (e) => {
   filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.5));
 }
 
+.compact .weather-icon {
+  font-size: 16px;
+  margin-bottom: 6px;
+}
+
 .temperature {
   display: flex;
   flex-direction: column;
   align-items: center;
   font-size: 11px;
+}
+
+.compact .temperature {
+  font-size: 10px;
 }
 
 .temp-high {
@@ -153,6 +177,10 @@ const handleMouseLeave = (e) => {
   font-size: 10px;
 }
 
+.compact .temp-low {
+  font-size: 9px;
+}
+
 .condition {
   font-size: 8px;
   margin-top: 4px;
@@ -162,5 +190,24 @@ const handleMouseLeave = (e) => {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+@media (max-width: 768px) {
+  .weather-card {
+    min-width: 60px;
+    padding: 8px 6px;
+  }
+  
+  .day-label {
+    font-size: 10px;
+  }
+  
+  .weather-icon {
+    font-size: 16px;
+  }
+  
+  .temperature {
+    font-size: 10px;
+  }
 }
 </style>

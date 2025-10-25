@@ -82,7 +82,7 @@ const forecast = ref([]);
 const currentWeather = ref(null);
 const mapLoading = ref(true);
 const isLoadingWeather = ref(false);
-const activeView = ref('dashboard'); // Default to dashboard view
+const activeView = ref('map'); // Default to dashboard view
 
 const { 
   fetchWeatherByLocation, 

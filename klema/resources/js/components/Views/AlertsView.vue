@@ -5,10 +5,6 @@
         <i class="fas fa-bell"></i>
         Weather Alerts & Notifications
       </h2>
-      <button class="add-alert-button" @click="showAddAlert = !showAddAlert">
-        <i class="fas fa-plus"></i>
-        New Alert
-      </button>
     </div>
 
     <!-- Active Alerts -->

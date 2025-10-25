@@ -365,10 +365,10 @@
 
     <!-- Sidebar Navigation -->
     <nav class="navbar" id="sidebar">
-        <div class="navbar-icon active" onclick="setActiveView('dashboard')" title="Dashboard">
+        <div class="navbar-icon" onclick="setActiveView('dashboard')" title="Dashboard">
             <i class="fas fa-th-large"></i>
         </div>
-        <div class="navbar-icon" onclick="setActiveView('map')" title="Weather Map">
+        <div class="navbar-icon active" onclick="setActiveView('map')" title="Weather Map">
             <i class="fas fa-map"></i>
         </div>
         <div class="navbar-icon" onclick="setActiveView('calendar')" title="Calendar">
