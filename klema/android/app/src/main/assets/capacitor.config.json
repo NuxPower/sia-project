@@ -1,0 +1,13 @@
+{
+	"appId": "com.klema.weather",
+	"appName": "Klema",
+	"webDir": "dist",
+	"bundledWebRuntime": false,
+	"server": {
+		"url": "https://your-laravel-app.com",
+		"cleartext": true
+	},
+	"android": {
+		"allowMixedContent": true
+	}
+}
