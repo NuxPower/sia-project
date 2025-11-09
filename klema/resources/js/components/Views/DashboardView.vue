@@ -109,11 +109,11 @@ const formatDate = (date) => {
 
 <style scoped>
 .dashboard-view {
-  padding: 40px;
-  max-width: 1400px;
-  margin: 0 auto;
+  width: 100%;
+  margin: 0;
+  padding: 0;
   overflow-y: auto;
-  height: 100vh;
+  height: 100%;
   
   /* Hide scrollbar */
   scrollbar-width: none; /* Firefox */

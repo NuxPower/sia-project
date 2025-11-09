@@ -128,6 +128,10 @@
         <i class="fas fa-trash"></i>
         Clear All Data
       </button>
+      <button class="action-button logout" @click="logout">
+        <i class="fas fa-sign-out-alt"></i>
+        Logout
+      </button>
     </div>
   </div>
 </template>
@@ -152,15 +156,47 @@ const getCurrentLocation = () => {
     alert('Geolocation is not supported by your browser.');
   }
 };
+
+const logout = async () => {
+  const csrfToken = document
+    .querySelector('meta[name="csrf-token"]')
+    ?.getAttribute('content');
+
+  if (!csrfToken) {
+    alert('Unable to logout: CSRF token not found.');
+    return;
+  }
+
+  try {
+    const response = await fetch('/logout', {
+      method: 'POST',
+      headers: {
+        'X-CSRF-TOKEN': csrfToken,
+        'Accept': 'application/json',
+        'Content-Type': 'application/json'
+      },
+      credentials: 'same-origin'
+    });
+
+    if (response.ok) {
+      window.location.href = '/';
+    } else {
+      throw new Error('Logout failed');
+    }
+  } catch (error) {
+    console.error('Logout error:', error);
+    alert('Failed to logout. Please try again.');
+  }
+};
 </script>
 
 <style scoped>
 .settings-view {
-  padding: 40px;
-  max-width: 900px;
-  margin: 0 auto;
+  width: 100%;
+  margin: 0;
+  padding: 0;
   overflow-y: auto;
-  height: 100vh;
+  height: 100%;
   
   /* Hide scrollbar */
   scrollbar-width: none; /* Firefox */
@@ -370,6 +406,15 @@ const getCurrentLocation = () => {
 
 .action-button.danger:hover {
   background: rgba(239, 68, 68, 0.4);
+}
+
+.action-button.logout {
+  background: rgba(148, 163, 184, 0.2);
+  border-color: rgba(148, 163, 184, 0.4);
+}
+
+.action-button.logout:hover {
+  background: rgba(148, 163, 184, 0.35);
 }
 
 .switch {

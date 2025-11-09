@@ -8,6 +8,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\ValidationException;
+use Illuminate\Auth\Events\Registered;
 
 class AuthController extends Controller
 {
@@ -25,6 +26,12 @@ class AuthController extends Controller
 
         if (Auth::attempt($request->only('email', 'password'), $request->boolean('remember'))) {
             $request->session()->regenerate();
+            $user = Auth::user();
+
+            if (! $user->hasVerifiedEmail()) {
+                return redirect()->route('verification.notice')->with('status', __('Please verify your email address to continue.'));
+            }
+
             return redirect()->intended('/dashboard');
         }
 
@@ -52,18 +59,18 @@ class AuthController extends Controller
             'name' => 'required|string|max:255',
             'email' => 'required|string|email|max:255|unique:users',
             'password' => 'required|string|min:8|confirmed',
-            'role' => 'required|in:admin,farmer',
         ]);
 
         $user = User::create([
             'name' => $request->name,
             'email' => $request->email,
             'password' => Hash::make($request->password),
-            'role' => $request->role,
+            'role' => 'farmer',
         ]);
 
+        event(new Registered($user));
         Auth::login($user);
 
-        return redirect('/dashboard');
+        return redirect()->route('verification.notice')->with('status', __('A verification link has been sent to your email address.'));
     }
 }

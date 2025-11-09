@@ -1,8 +1,8 @@
-// Fonts
+// 1. Load your own custom variables first (defines $body-bg, etc.)
+@use './variables' as *;
+
+// 2. Load bootstrap and let it pick up your overrides automatically
+@use "bootstrap" as *;
+
+// 3. Fonts
 @import url('https://fonts.bunny.net/css?family=Nunito');
-
-// Variables
-@import 'variables';
-
-// Bootstrap
-@import 'bootstrap/scss/bootstrap';

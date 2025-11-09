@@ -201,7 +201,7 @@ const loadWeatherData = async () => {
   try {
     const location = 'Butuan, Caraga, PH';
     const { forecastData } = await fetchWeatherByLocation(location);
-    forecastWarnings.value = await fetchForecastWarnings({ forecast: forecastData });
+    await fetchForecastWarnings({ forecast: forecastData });
   } catch (error) {
     console.error('Failed to load weather data:', error);
     forecastWarnings.value = [];
@@ -269,11 +269,11 @@ const updateNotificationSetting = async (settingName, value) => {
 
 <style scoped>
 .alerts-view {
-  padding: 40px;
-  max-width: 1400px;
-  margin: 0 auto;
+  width: 100%;
+  margin: 0;
+  padding: 0;
   overflow-y: auto;
-  height: 100vh;
+  height: 100%;
   scrollbar-width: none;
   -ms-overflow-style: none;
 }

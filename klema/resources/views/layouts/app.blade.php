@@ -32,165 +32,63 @@
         /* Sidebar Container */
         .navbar {
             position: fixed;
-            left: 20px;
+            left: 24px;
             top: 50%;
             transform: translateY(-50%);
             z-index: 1000;
             display: flex;
             flex-direction: column;
-            gap: 15px;
-            transition: all 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55);
-        }
-
-        .navbar.hidden {
-            left: -80px;
-            opacity: 0;
+            align-items: center;
+            gap: 28px;
+            width: 92px;
+            padding: 32px 0;
+            background: rgba(15, 16, 20, 0.95);
+            border-radius: 40px;
+            border: 1px solid rgba(255, 255, 255, 0.04);
+            box-shadow: 0 20px 45px rgba(0, 0, 0, 0.45);
+            backdrop-filter: blur(18px);
         }
 
         /* Navigation Icons */
         .navbar-icon {
-            width: 60px;
-            height: 60px;
-            background: rgba(0, 0, 0, 0.8);
-            border: 2px solid rgba(255, 255, 255, 0.2);
-            border-radius: 16px;
+            width: 58px;
+            height: 58px;
+            border-radius: 20px;
             display: flex;
             align-items: center;
             justify-content: center;
             cursor: pointer;
             transition: all 0.3s ease;
-            color: white;
-            font-size: 20px;
-            backdrop-filter: blur(15px);
-            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+        }
+
+        .navbar-icon img {
+            width: 30px;
+            height: 30px;
+            opacity: 0.55;
+            filter: grayscale(100%) brightness(1.2);
+            transition: opacity 0.3s ease, filter 0.3s ease, transform 0.3s ease;
         }
 
         .navbar-icon:hover {
-            background: rgba(59, 130, 246, 0.3);
-            border-color: rgba(59, 130, 246, 0.5);
-            transform: scale(1.1);
-            box-shadow: 0 12px 40px rgba(59, 130, 246, 0.4);
+            background: rgba(255, 255, 255, 0.08);
+            box-shadow: 0 12px 25px rgba(0, 0, 0, 0.35);
+            transform: translateY(-2px);
+        }
+
+        .navbar-icon:hover img {
+            opacity: 0.85;
+            filter: grayscale(20%) brightness(1.15);
+            transform: scale(1.05);
         }
 
         .navbar-icon.active {
-            background: rgba(59, 130, 246, 0.4);
-            border-color: #3b82f6;
-            box-shadow: 0 0 30px rgba(59, 130, 246, 0.5);
+            background: rgba(255, 255, 255, 0.12);
+            box-shadow: 0 14px 30px rgba(0, 0, 0, 0.45);
         }
 
-        /* Toggle Button */
-        .sidebar-toggle {
-            position: fixed;
-            left: 20px;
-            top: 20px;
-            width: 50px;
-            height: 50px;
-            background: rgba(0, 0, 0, 0.8);
-            border: 2px solid rgba(59, 130, 246, 0.3);
-            border-radius: 12px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            color: white;
-            font-size: 18px;
-            backdrop-filter: blur(15px);
-            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
-            z-index: 1001;
-        }
-
-        .sidebar-toggle:hover {
-            background: rgba(59, 130, 246, 0.3);
-            border-color: rgba(59, 130, 246, 0.6);
-            transform: scale(1.1) rotate(90deg);
-            box-shadow: 0 8px 30px rgba(59, 130, 246, 0.4);
-        }
-
-        .sidebar-toggle.active {
-            background: rgba(59, 130, 246, 0.4);
-            border-color: #3b82f6;
-        }
-
-        .sidebar-toggle i {
-            transition: transform 0.3s ease;
-        }
-
-        .sidebar-toggle.sidebar-hidden i {
-            transform: rotate(180deg);
-        }
-
-        /* Logout Button */
-        .logout-button {
-            position: fixed;
-            bottom: 30px;
-            left: 20px;
-            width: 60px;
-            height: 60px;
-            background: rgba(220, 38, 38, 0.8);
-            border: 2px solid rgba(239, 68, 68, 0.3);
-            border-radius: 16px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            cursor: pointer;
-            transition: all 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55);
-            color: white;
-            font-size: 20px;
-            backdrop-filter: blur(15px);
-            box-shadow: 0 8px 32px rgba(220, 38, 38, 0.3);
-            z-index: 1000;
-            text-decoration: none;
-        }
-
-        .logout-button:hover {
-            background: rgba(220, 38, 38, 1);
-            border-color: rgba(239, 68, 68, 0.8);
-            transform: scale(1.1);
-            box-shadow: 0 12px 40px rgba(220, 38, 38, 0.5);
-            color: white;
-            text-decoration: none;
-        }
-
-        .logout-button.hidden {
-            left: -80px;
-            opacity: 0;
-        }
-
-        /* Tooltip for hidden state */
-        .sidebar-hint {
-            position: fixed;
-            left: 80px;
-            top: 20px;
-            background: rgba(59, 130, 246, 0.9);
-            color: white;
-            padding: 8px 16px;
-            border-radius: 8px;
-            font-size: 13px;
-            opacity: 0;
-            pointer-events: none;
-            transition: opacity 0.3s ease;
-            z-index: 999;
-            white-space: nowrap;
-            backdrop-filter: blur(10px);
-            border: 1px solid rgba(255, 255, 255, 0.2);
-        }
-
-        .sidebar-hint::before {
-            content: '';
-            position: absolute;
-            left: -6px;
-            top: 50%;
-            transform: translateY(-50%);
-            width: 0;
-            height: 0;
-            border-top: 6px solid transparent;
-            border-bottom: 6px solid transparent;
-            border-right: 6px solid rgba(59, 130, 246, 0.9);
-        }
-
-        .sidebar-toggle:hover+.sidebar-hint {
+        .navbar-icon.active img {
             opacity: 1;
+            filter: none;
         }
 
         /* Animation for icons */
@@ -357,40 +255,24 @@
 </head>
 
 <body>
-    <!-- Sidebar Toggle Button -->
-    <div class="sidebar-toggle" id="sidebarToggle" onclick="toggleSidebar()">
-        <i class="fas fa-bars"></i>
-    </div>
-    <div class="sidebar-hint">Toggle Menu</div>
-
     <!-- Sidebar Navigation -->
     <nav class="navbar" id="sidebar">
-        <div class="navbar-icon" onclick="setActiveView('dashboard')" title="Dashboard">
-            <i class="fas fa-th-large"></i>
+        <div class="navbar-icon" onclick="setActiveView('dashboard', this)" title="Dashboard">
+            <img src="{{ asset('assets/mage_dashboard-fill.png') }}" alt="Dashboard icon">
         </div>
-        <div class="navbar-icon active" onclick="setActiveView('map')" title="Weather Map">
-            <i class="fas fa-map"></i>
+        <div class="navbar-icon active" onclick="setActiveView('map', this)" title="Weather Map">
+            <img src="{{ asset('assets/solar_map-linear.png') }}" alt="Weather map icon">
         </div>
-        <div class="navbar-icon" onclick="setActiveView('calendar')" title="Calendar">
-            <i class="fas fa-calendar"></i>
+        <div class="navbar-icon" onclick="setActiveView('calendar', this)" title="Calendar">
+            <img src="{{ asset('assets/uil_calender.png') }}" alt="Calendar icon">
         </div>
-        <div class="navbar-icon" onclick="setActiveView('alerts')" title="Alerts">
-            <i class="fas fa-bell"></i>
+        <div class="navbar-icon" onclick="setActiveView('alerts', this)" title="Alerts">
+            <img src="{{ asset('assets/mingcute_notification-line.png') }}" alt="Alerts icon">
         </div>
-        <div class="navbar-icon" onclick="setActiveView('settings')" title="Settings">
-            <i class="fas fa-cog"></i>
+        <div class="navbar-icon" onclick="setActiveView('settings', this)" title="Settings">
+            <img src="{{ asset('assets/uil_setting.png') }}" alt="Settings icon">
         </div>
     </nav>
-
-    <!-- Logout Button -->
-    <a href="#" class="logout-button" id="logoutButton"
-        onclick="event.preventDefault(); document.getElementById('logout-form').submit();" title="Logout">
-        <i class="fas fa-sign-out-alt"></i>
-    </a>
-
-    <form id="logout-form" action="{{ route('logout') }}" method="POST" style="display: none;">
-        @csrf
-    </form>
 
     <!-- Main Content -->
     <div id="app">
@@ -398,44 +280,14 @@
     </div>
 
     <script>
-        // Sidebar state management
-        let sidebarVisible = true;
-
-        function toggleSidebar() {
-            const sidebar = document.getElementById('sidebar');
-            const logoutButton = document.getElementById('logoutButton');
-            const toggleButton = document.getElementById('sidebarToggle');
-
-            sidebarVisible = !sidebarVisible;
-
-            if (sidebarVisible) {
-                // Show sidebar
-                sidebar.classList.remove('hidden');
-                logoutButton.classList.remove('hidden');
-                toggleButton.classList.remove('sidebar-hidden');
-            } else {
-                // Hide sidebar
-                sidebar.classList.add('hidden');
-                logoutButton.classList.add('hidden');
-                toggleButton.classList.add('sidebar-hidden');
-            }
-
-            // Save state to localStorage
-            localStorage.setItem('sidebarVisible', sidebarVisible);
-
-            // Add a little haptic feedback effect
-            toggleButton.style.transform = 'scale(0.9)';
-            setTimeout(() => {
-                toggleButton.style.transform = 'scale(1)';
-            }, 100);
-        }
-
-        function setActiveView(view) {
+        function setActiveView(view, element) {
             document.querySelectorAll('.navbar-icon').forEach(icon => {
                 icon.classList.remove('active');
             });
 
-            event.currentTarget.classList.add('active');
+            if (element) {
+                element.classList.add('active');
+            }
 
             if (window.vueApp && window.vueApp.setActiveView) {
                 window.vueApp.setActiveView(view);
@@ -443,32 +295,6 @@
 
             console.log('Active view:', view);
         }
-
-        // Restore sidebar state on page load
-        document.addEventListener('DOMContentLoaded', function () {
-            const savedState = localStorage.getItem('sidebarVisible');
-
-            if (savedState === 'false') {
-                const sidebar = document.getElementById('sidebar');
-                const logoutButton = document.getElementById('logoutButton');
-                const toggleButton = document.getElementById('sidebarToggle');
-
-                sidebar.classList.add('hidden');
-                logoutButton.classList.add('hidden');
-                toggleButton.classList.add('sidebar-hidden');
-                sidebarVisible = false;
-            }
-        });
-
-        // Keyboard shortcut: Press 'B' to toggle sidebar
-        document.addEventListener('keydown', function (event) {
-            if (event.key === 'b' || event.key === 'B') {
-                // Only if not typing in an input field
-                if (!['INPUT', 'TEXTAREA'].includes(document.activeElement.tagName)) {
-                    toggleSidebar();
-                }
-            }
-        });
     </script>
 </body>
 

@@ -154,6 +154,12 @@ class WeatherService
         return $this->getMockHistoricalWeather($date);
     }
 
+    public function getHistoricalWeatherByCoordinates($lat, $lon, $date)
+    {
+        // Coordinate-based historical data also falls back to mock responses for now
+        return $this->getMockHistoricalWeather($date);
+    }
+
     private function processForecastData($data)
     {
         $dailyForecasts = [];

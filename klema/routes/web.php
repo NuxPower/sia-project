@@ -9,15 +9,16 @@ use App\Http\Controllers\WeatherController;
 use App\Http\Controllers\ExportController;
 use App\Http\Controllers\ActivityController;
 use App\Http\Controllers\Auth\AuthController;
+use App\Http\Controllers\Auth\EmailVerificationController;
 
 Route::get('/', function () {
-    return redirect('/weather-test');
+    return redirect()->route('login');
 });
 
-// Test route for weather dashboard (no auth required)
+// Weather dashboard test route (requires authentication)
 Route::get('/weather-test', function () {
     return view('dashboard');
-});
+})->middleware(['auth', 'verified'])->name('weather.test');
 
 // Weather API endpoints (no auth required for testing)
 Route::get('/api/weather/current', [WeatherController::class, 'getCurrentWeather']);
@@ -30,7 +31,7 @@ Route::get('/test-weather', function () {
     return response()->json($current);
 });
 
-Route::middleware('auth')->group(function () {
+Route::middleware(['auth', 'verified'])->group(function () {
     // Dashboard routes
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
     Route::get('/calendar', [DashboardController::class, 'calendar'])->name('calendar');
@@ -65,3 +66,7 @@ Route::post('/login', [AuthController::class, 'login']);
 Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
 Route::get('/register', [AuthController::class, 'showRegister'])->name('register');
 Route::post('/register', [AuthController::class, 'register']);
+// Email verification
+Route::get('/email/verify', [EmailVerificationController::class, 'notice'])->middleware('auth')->name('verification.notice');
+Route::get('/email/verify/{id}/{hash}', [EmailVerificationController::class, 'verify'])->middleware(['auth', 'signed'])->name('verification.verify');
+Route::post('/email/verification-notification', [EmailVerificationController::class, 'resend'])->middleware(['auth', 'throttle:6,1'])->name('verification.send');

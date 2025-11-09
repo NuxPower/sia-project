@@ -3,124 +3,140 @@
 @section('title', 'Register - KLEMA')
 
 @section('content')
-<div class="min-h-screen flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
-    <div class="max-w-md w-full space-y-8">
-        <div class="text-center">
-            <div class="mx-auto h-20 w-20 bg-blue-600 rounded-2xl flex items-center justify-center mb-6">
-                <i class="fas fa-seedling text-white text-3xl"></i>
-            </div>
-            <h2 class="text-3xl font-bold text-white">Join KLEMA</h2>
-            <p class="mt-2 text-sm text-white/70">Create your account to get started</p>
+<div class="auth-card">
+    <div class="auth-card__header">
+        <div class="auth-card__badge">
+            <i class="fas fa-seedling text-3xl text-blue-200"></i>
         </div>
-        
-        <form class="mt-8 space-y-6" action="{{ route('register') }}" method="POST">
-            @csrf
-            <div class="space-y-4">
-                <div>
-                    <label for="name" class="block text-sm font-medium text-white/80 mb-2">Full Name</label>
-                    <input id="name" 
-                           name="name" 
-                           type="text" 
-                           value="{{ old('name') }}"
-                           class="w-full px-4 py-3 bg-white/10 backdrop-blur-md border border-white/20 rounded-xl text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-blue-500/50 @error('name') border-red-500 @enderror" 
-                           placeholder="Enter your full name"
-                           required>
-                    @error('name')
-                        <p class="mt-1 text-sm text-red-400">{{ $message }}</p>
-                    @enderror
-                </div>
-                
-                <div>
-                    <label for="email" class="block text-sm font-medium text-white/80 mb-2">Email Address</label>
-                    <input id="email" 
-                           name="email" 
-                           type="email" 
-                           value="{{ old('email') }}"
-                           class="w-full px-4 py-3 bg-white/10 backdrop-blur-md border border-white/20 rounded-xl text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-blue-500/50 @error('email') border-red-500 @enderror" 
-                           placeholder="Enter your email"
-                           required>
-                    @error('email')
-                        <p class="mt-1 text-sm text-red-400">{{ $message }}</p>
-                    @enderror
-                </div>
+        <div>
+            <h1 class="auth-card__title">Join KLEMA</h1>
+            <p class="auth-card__subtitle">Create your account to get started</p>
+        </div>
+    </div>
 
-                <div>
-                    <label for="role" class="block text-sm font-medium text-white/80 mb-2">Account Type</label>
-                    <select id="role" 
-                            name="role" 
-                            class="w-full px-4 py-3 bg-white/10 backdrop-blur-md border border-white/20 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-blue-500/50 @error('role') border-red-500 @enderror" 
-                            required>
-                        <option value="">Select your role</option>
-                        <option value="farmer" {{ old('role') == 'farmer' ? 'selected' : '' }}>Farmer</option>
-                        <option value="admin" {{ old('role') == 'admin' ? 'selected' : '' }}>Administrator</option>
-                    </select>
-                    @error('role')
-                        <p class="mt-1 text-sm text-red-400">{{ $message }}</p>
-                    @enderror
-                </div>
-                
-                <div>
-                    <label for="password" class="block text-sm font-medium text-white/80 mb-2">Password</label>
-                    <div class="relative">
-                        <input id="password" 
-                               name="password" 
-                               type="password"
-                               class="w-full px-4 py-3 bg-white/10 backdrop-blur-md border border-white/20 rounded-xl text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-blue-500/50 @error('password') border-red-500 @enderror" 
-                               placeholder="Create a password"
-                               required>
-                        <button type="button" 
-                                onclick="togglePassword('password')"
-                                class="absolute right-4 top-1/2 transform -translate-y-1/2 text-white/60 hover:text-white">
-                            <i id="password-icon" class="fas fa-eye"></i>
-                        </button>
-                    </div>
-                    @error('password')
-                        <p class="mt-1 text-sm text-red-400">{{ $message }}</p>
-                    @enderror
-                </div>
+    <form class="auth-form" action="{{ route('register') }}" method="POST">
+        @csrf
 
-                <div>
-                    <label for="password_confirmation" class="block text-sm font-medium text-white/80 mb-2">Confirm Password</label>
-                    <div class="relative">
-                        <input id="password_confirmation" 
-                               name="password_confirmation" 
-                               type="password"
-                               class="w-full px-4 py-3 bg-white/10 backdrop-blur-md border border-white/20 rounded-xl text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-blue-500/50" 
-                               placeholder="Confirm your password"
-                               required>
-                        <button type="button" 
-                                onclick="togglePassword('password_confirmation')"
-                                class="absolute right-4 top-1/2 transform -translate-y-1/2 text-white/60 hover:text-white">
-                            <i id="password_confirmation-icon" class="fas fa-eye"></i>
-                        </button>
-                    </div>
-                </div>
+        <div class="auth-form__group">
+            <label for="name" class="auth-form__label">Full Name</label>
+            <div class="auth-input-wrapper @error('name') auth-input--error @enderror">
+                <i class="fas fa-user"></i>
+                <input
+                    id="name"
+                    name="name"
+                    type="text"
+                    value="{{ old('name') }}"
+                    class="auth-input @error('name') has-error @enderror"
+                    placeholder="Enter your full name"
+                    required
+                    autocomplete="name"
+                >
             </div>
+            @error('name')
+                <p class="auth-feedback">{{ $message }}</p>
+            @enderror
+        </div>
 
-            <div>
-                <button type="submit" 
-                        class="group relative w-full flex justify-center py-3 px-4 border border-transparent text-sm font-medium rounded-xl text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-all duration-200">
-                    <span class="absolute left-0 inset-y-0 flex items-center pl-3">
-                        <i class="fas fa-user-plus text-blue-300 group-hover:text-blue-200"></i>
-                    </span>
-                    Create Account
+        <div class="auth-form__group">
+            <label for="email" class="auth-form__label">Email Address</label>
+            <div class="auth-input-wrapper @error('email') auth-input--error @enderror">
+                <i class="fas fa-envelope"></i>
+                <input
+                    id="email"
+                    name="email"
+                    type="email"
+                    value="{{ old('email') }}"
+                    class="auth-input @error('email') has-error @enderror"
+                    placeholder="Enter your email"
+                    required
+                    autocomplete="email"
+                >
+            </div>
+            @error('email')
+                <p class="auth-feedback">{{ $message }}</p>
+            @enderror
+        </div>
+
+        <div class="auth-form__group">
+            <label class="auth-form__label">Account Type</label>
+            <div class="auth-input-wrapper" style="pointer-events: none; opacity: 0.8;">
+                <i class="fas fa-user-tag"></i>
+                <div class="auth-input" style="padding-right: 20px;">Farmer</div>
+            </div>
+            <input type="hidden" name="role" value="farmer">
+        </div>
+
+        <div class="auth-form__group">
+            <label for="password" class="auth-form__label">Password</label>
+            <div class="auth-input-wrapper @error('password') auth-input--error @enderror">
+                <i class="fas fa-lock"></i>
+                <input
+                    id="password"
+                    name="password"
+                    type="password"
+                    class="auth-input @error('password') has-error @enderror"
+                    placeholder="Create a password"
+                    required
+                    autocomplete="new-password"
+                >
+                <button
+                    type="button"
+                    class="password-toggle"
+                    onclick="togglePassword('password', 'password-icon')"
+                >
+                    <i id="password-icon" class="fas fa-eye"></i>
                 </button>
             </div>
+            @error('password')
+                <p class="auth-feedback">{{ $message }}</p>
+            @enderror
+        </div>
 
-            <div class="text-center">
-                <span class="text-white/60">Already have an account?</span>
-                <a href="{{ route('login') }}" class="font-medium text-blue-400 hover:text-blue-300 ml-1">
-                    Sign in
-                </a>
+        <div class="auth-form__group">
+            <label for="password_confirmation" class="auth-form__label">Confirm Password</label>
+            <div class="auth-input-wrapper">
+                <i class="fas fa-lock"></i>
+                <input
+                    id="password_confirmation"
+                    name="password_confirmation"
+                    type="password"
+                    class="auth-input"
+                    placeholder="Confirm your password"
+                    required
+                    autocomplete="new-password"
+                >
+                <button
+                    type="button"
+                    class="password-toggle"
+                    onclick="togglePassword('password_confirmation', 'password-confirmation-icon')"
+                >
+                    <i id="password-confirmation-icon" class="fas fa-eye"></i>
+                </button>
             </div>
-        </form>
-    </div>
+        </div>
+
+        <button type="submit" class="auth-button">
+            <i class="fas fa-user-plus"></i>
+            <span>Create Account</span>
+        </button>
+
+        <div class="auth-footer">
+            <span>Already have an account?</span>
+            <a href="{{ route('login') }}" class="auth-link">Sign in</a>
+        </div>
+    </form>
 </div>
 
 <script>
-    function togglePassword(fieldId) {
+    document.body.classList.add('auth-scroll');
+
+    window.addEventListener('beforeunload', function () {
+        document.body.classList.remove('auth-scroll');
+    });
+
+    function togglePassword(fieldId, iconId) {
         const passwordField = document.getElementById(fieldId);
-        const passwordIcon = document.getElementById(fieldId + '-icon');
+        const passwordIcon = document.getElementById(iconId);
         
         if (passwordField.type === 'password') {
             passwordField.type = 'text';

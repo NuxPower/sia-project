@@ -1,70 +1,72 @@
 <template>
   <div class="weather-dashboard">
-    <!-- Map View (default) -->
-    <template v-if="activeView === 'map'">
-      <SearchBar 
-        v-model="searchLocation"
-        @search="searchWeather"
-        :is-loading="isLoadingWeather"
-      />
-      
-      <ClickInstruction />
-      
-      <WeatherLayerControls @toggle-layer="handleLayerToggle" />
-      
+    <SearchBar 
+      v-if="activeView === 'map'"
+      v-model="searchLocation"
+      @search="searchWeather"
+      :is-loading="isLoadingWeather"
+    />
+    
+    <ClickInstruction v-if="activeView === 'map'" />
+    
+    <WeatherLayerControls 
+      v-if="activeView === 'map'"
+      @toggle-layer="handleLayerToggle" 
+    />
+
+    <div class="map-wrapper">
       <WeatherMap
         ref="weatherMapRef"
         :is-loading="mapLoading"
         @map-click="handleMapClick"
         @map-ready="handleMapReady"
       />
-      
+
       <LoadingIndicator
-        v-if="isLoadingWeather"
+        v-if="isLoadingWeather && activeView === 'map'"
         message="Fetching weather data..."
         subtitle="Loading forecast for pinned location"
       />
-      
-      <WeatherTimeline
-        :forecast="forecast"
-        :get-day-label="getDayLabel"
-        :get-weather-icon="getWeatherIcon"
-      />
-      
-      <TimelineLegend />
-    </template>
 
-    <!-- Dashboard View -->
-    <DashboardView 
-      v-else-if="activeView === 'dashboard'"
-      :current-weather="currentWeather"
+      <div v-if="activeView !== 'map'" class="map-overlay"></div>
+    </div>
+    
+    <WeatherTimeline
+      v-if="activeView === 'map'"
       :forecast="forecast"
       :get-day-label="getDayLabel"
       :get-weather-icon="getWeatherIcon"
     />
-
-    <!-- Calendar View -->
-    <CalendarView 
-      v-else-if="activeView === 'calendar'"
-      :forecast="forecast"
-      :get-weather-icon="getWeatherIcon"
-    />
-
-    <!-- Alerts View -->
-    <AlertsView v-else-if="activeView === 'alerts'" />
-
-    <!-- Settings View -->
-    <SettingsView v-else-if="activeView === 'settings'" />
     
-    <!-- Global Alert Notifications -->
+    <TimelineLegend v-if="activeView === 'map'" />
+
+    <transition name="overlay-fade">
+      <div v-if="activeView !== 'map'" class="overlay-wrapper">
+        <div class="overlay-panel">
+          <div class="overlay-content">
+            <DashboardView 
+              v-if="activeView === 'dashboard'"
+              :current-weather="currentWeather"
+              :forecast="forecast"
+              :get-day-label="getDayLabel"
+              :get-weather-icon="getWeatherIcon"
+            />
+
+            <CalendarView 
+              v-else-if="activeView === 'calendar'"
+              :forecast="forecast"
+              :get-weather-icon="getWeatherIcon"
+            />
+
+            <AlertsView v-else-if="activeView === 'alerts'" />
+
+            <SettingsView v-else-if="activeView === 'settings'" />
+          </div>
+        </div>
+      </div>
+    </transition>
+
     <GlobalAlertNotification />
-    
-    <!-- Dev Mode: Test Alert Button -->
-    <div v-if="isDevelopment" class="test-alert-button">
-      <button @click="handleTestAlert" class="test-button" title="Test Global Alert">
-        <i class="fas fa-bell"></i>
-      </button>
-    </div>
   </div>
 </template>
 
@@ -86,8 +88,6 @@ import { useWeatherAPI } from '../composables/useWeatherAPI';
 import { useWeatherUtils } from '../composables/useWeatherUtils';
 import { useGlobalAlerts } from '../composables/useGlobalAlerts';
 
-const isDevelopment = import.meta.env.DEV;
-
 const weatherMapRef = ref(null);
 const searchLocation = ref('Maramag, Northern Mindanao');
 const forecast = ref([]);
@@ -103,15 +103,7 @@ const {
 } = useWeatherAPI();
 
 const { getDayLabel, getWeatherIcon } = useWeatherUtils();
-const { fetchRealWeatherAlerts, checkWeatherConditions } = useGlobalAlerts();
-
-const handleTestAlert = async () => {
-  try {
-    await fetchRealWeatherAlerts();
-  } catch (error) {
-    console.error('Error fetching weather alerts:', error);
-  }
-};
+const { checkWeatherConditions } = useGlobalAlerts();
 
 const setActiveView = (view) => {
   activeView.value = view;
@@ -188,52 +180,77 @@ onMounted(() => {
   overflow: hidden;
 }
 
-.test-alert-button {
-  position: fixed;
-  bottom: 100px;
-  left: 20px;
-  z-index: 10000;
+.map-wrapper {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
 }
 
-.test-button {
-  width: 60px;
-  height: 60px;
-  background: rgba(239, 68, 68, 0.8);
-  border: 2px solid rgba(239, 68, 68, 0.3);
-  border-radius: 16px;
+.map-wrapper :deep(.weather-map-container) {
+  width: 100%;
+  height: 100%;
+}
+
+.map-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.55);
+  backdrop-filter: blur(6px);
+  z-index: 2;
+  pointer-events: auto;
+}
+
+.overlay-wrapper {
+  position: absolute;
+  inset: 0;
   display: flex;
-  align-items: center;
   justify-content: center;
-  cursor: pointer;
-  transition: all 0.3s ease;
-  color: white;
-  font-size: 20px;
-  backdrop-filter: blur(15px);
-  box-shadow: 0 8px 32px rgba(239, 68, 68, 0.3);
-  animation: pulse 2s infinite;
+  align-items: center;
+  padding: 40px 40px 40px 140px;
+  z-index: 3;
+  pointer-events: none;
 }
 
-.test-button:hover {
-  background: rgba(239, 68, 68, 1);
-  transform: scale(1.1);
-  animation: none;
+.overlay-panel {
+  pointer-events: auto;
+  width: 100%;
+  height: calc(100vh - 60px);
+  overflow: hidden;
+  border-radius: 28px;
+  background: rgba(12, 16, 24, 0.82);
+  backdrop-filter: blur(18px);
+  box-shadow: 0 30px 65px rgba(0, 0, 0, 0.45);
+  padding: 0;
+  position: relative;
 }
 
-@keyframes pulse {
-  0%, 100% { box-shadow: 0 8px 32px rgba(239, 68, 68, 0.3); }
-  50% { box-shadow: 0 8px 32px rgba(239, 68, 68, 0.6); }
+.overlay-content {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 }
 
-@media (max-width: 768px) {
-  .test-alert-button {
-    bottom: 80px;
-    left: 10px;
-  }
-  
-  .test-button {
-    width: 50px;
-    height: 50px;
-    font-size: 18px;
-  }
+.overlay-content :deep(.dashboard-view),
+.overlay-content :deep(.settings-view),
+.overlay-content :deep(.alerts-view),
+.overlay-content :deep(.calendar-view) {
+  flex: 1;
+  width: 100%;
+  margin: 0;
+  overflow-y: auto;
+  padding: 28px 36px 48px;
+}
+
+.overlay-fade-enter-active,
+.overlay-fade-leave-active {
+  transition: opacity 0.3s ease, transform 0.3s ease;
+}
+
+.overlay-fade-enter-from,
+.overlay-fade-leave-to {
+  opacity: 0;
+  transform: translateY(12px);
 }
 </style>
