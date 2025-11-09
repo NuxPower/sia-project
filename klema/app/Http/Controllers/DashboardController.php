@@ -6,7 +6,6 @@ namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 use App\Services\WeatherService;
 use App\Models\Farm;
-use App\Models\WeatherData;
 use App\Models\Alert;
 use Carbon\Carbon;
 
@@ -90,22 +89,20 @@ class DashboardController extends Controller
     private function storeWeatherDataForFarms($farms, $weatherData)
     {
         foreach ($farms as $farm) {
-            // Check if we already have recent data (within last hour)
             $recentData = $farm->weatherData()
                 ->where('recorded_at', '>', Carbon::now()->subHour())
-                ->first();
+                ->exists();
 
-            if (!$recentData && isset($weatherData['main'])) {
-                WeatherData::create([
-                    'farm_id' => $farm->farm_id,
-                    'temperature' => $weatherData['main']['temp'] ?? null,
-                    'humidity' => $weatherData['main']['humidity'] ?? null,
-                    'rainfall' => $weatherData['rain']['1h'] ?? 0,
-                    'wind_speed' => $weatherData['wind']['speed'] ?? null,
-                    'condition' => $weatherData['weather'][0]['main'] ?? null,
-                    'recorded_at' => now(),
-                ]);
+            if ($recentData || !isset($weatherData['main'])) {
+                continue;
             }
+
+            $this->weatherService->storeWeatherSnapshot($weatherData, [
+                'farm_id' => $farm->farm_id,
+                'location' => $farm->farm_name,
+                'lat' => $farm->latitude,
+                'lon' => $farm->longitude,
+            ]);
         }
     }
 

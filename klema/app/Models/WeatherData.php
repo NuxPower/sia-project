@@ -15,11 +15,15 @@ class WeatherData extends Model
 
     protected $fillable = [
         'farm_id',
+        'location_name',
+        'latitude',
+        'longitude',
         'temperature',
         'humidity',
         'rainfall',
         'wind_speed',
         'condition',
+        'condition_icon',
         'recorded_at'
     ];
 
@@ -28,6 +32,8 @@ class WeatherData extends Model
         'humidity' => 'decimal:2',
         'rainfall' => 'decimal:2',
         'wind_speed' => 'decimal:2',
+        'latitude' => 'decimal:6',
+        'longitude' => 'decimal:6',
         'recorded_at' => 'datetime',
     ];
 

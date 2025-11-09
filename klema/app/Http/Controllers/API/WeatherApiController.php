@@ -3,10 +3,12 @@
 namespace App\Http\Controllers\API;
 
 use App\Http\Controllers\Controller;
+use App\Models\WeatherData;
 use App\Services\WeatherService;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Carbon\Carbon;
+use Illuminate\Support\Str;
 
 class WeatherApiController extends Controller
 {
@@ -34,6 +36,12 @@ class WeatherApiController extends Controller
                 // Use location name
                 $weather = $this->weatherService->getCurrentWeather($location);
             }
+
+            $this->weatherService->storeWeatherSnapshot($weather, [
+                'location' => $location,
+                'lat' => $lat,
+                'lon' => $lon,
+            ]);
 
             return response()->json($weather);
         } catch (\Throwable $e) {
@@ -83,11 +91,17 @@ class WeatherApiController extends Controller
         $days = max(1, min($days, 7));
 
         try {
-            $history = [];
+            $history = $this->getStoredWeatherHistory($location, $lat, $lon, $days);
+            $historyByDate = collect($history)->keyBy('date');
+
             $today = Carbon::today();
 
             for ($i = 1; $i <= $days; $i++) {
                 $date = $today->copy()->subDays($i)->format('Y-m-d');
+
+                if ($historyByDate->has($date)) {
+                    continue;
+                }
 
                 if ($lat && $lon && method_exists($this->weatherService, 'getHistoricalWeatherByCoordinates')) {
                     $entry = $this->weatherService->getHistoricalWeatherByCoordinates($lat, $lon, $date);
@@ -95,10 +109,20 @@ class WeatherApiController extends Controller
                     $entry = $this->weatherService->getHistoricalWeather($location, $date);
                 }
 
-                $history[] = $this->normalizeHistoricalEntry($date, $entry);
+                $normalized = $this->normalizeHistoricalEntry($date, $entry);
+                $historyByDate->put($date, $normalized);
+
+                $this->weatherService->storeWeatherSnapshot($entry, [
+                    'location' => $location,
+                    'lat' => $lat,
+                    'lon' => $lon,
+                    'recorded_at' => Carbon::createFromFormat('Y-m-d', $date)->setHour(12),
+                ]);
             }
 
-            return response()->json(array_reverse($history));
+            $sortedHistory = $historyByDate->sortKeys()->values()->all();
+
+            return response()->json($sortedHistory);
         } catch (\Throwable $e) {
             \Log::error('Weather History API error: ' . $e->getMessage());
 
@@ -175,6 +199,95 @@ class WeatherApiController extends Controller
         }
 
         return (int) round($value);
+    }
+
+    private function getStoredWeatherHistory(?string $location, ?string $lat, ?string $lon, int $days): array
+    {
+        $startDate = Carbon::today()->subDays($days)->startOfDay();
+
+        $query = WeatherData::query()
+            ->where('recorded_at', '>=', $startDate)
+            ->orderBy('recorded_at');
+
+        $locationKey = $this->normalizeLocation($location);
+        $lat = $lat !== null ? round((float) $lat, 6) : null;
+        $lon = $lon !== null ? round((float) $lon, 6) : null;
+
+        if ($locationKey !== null) {
+            $query->where('location_name', $locationKey);
+        } elseif ($lat !== null && $lon !== null) {
+            $query->where('latitude', $lat)->where('longitude', $lon);
+        } else {
+            return [];
+        }
+
+        $records = $query->get();
+        $history = [];
+
+        foreach ($records as $record) {
+            if (!$record->recorded_at) {
+                continue;
+            }
+
+            $dateKey = $record->recorded_at->toDateString();
+
+            if (!isset($history[$dateKey])) {
+                $history[$dateKey] = [
+                    'date' => $dateKey,
+                    'temperatures' => [],
+                    'condition' => $record->condition,
+                    'icon' => $record->condition_icon,
+                    'latest_recorded_at' => $record->recorded_at,
+                ];
+            }
+
+            if ($record->temperature !== null) {
+                $history[$dateKey]['temperatures'][] = (float) $record->temperature;
+            }
+
+            if ($record->recorded_at->gt($history[$dateKey]['latest_recorded_at'])) {
+                $history[$dateKey]['condition'] = $record->condition;
+                $history[$dateKey]['icon'] = $record->condition_icon;
+                $history[$dateKey]['latest_recorded_at'] = $record->recorded_at;
+            }
+        }
+
+        ksort($history);
+
+        $history = array_map(function ($entry) {
+            $temps = $entry['temperatures'];
+
+            return [
+                'date' => $entry['date'],
+                'temp_max' => !empty($temps) ? (int) round(max($temps)) : null,
+                'temp_min' => !empty($temps) ? (int) round(min($temps)) : null,
+                'condition' => $entry['condition'] ?? 'Unknown',
+                'icon' => $entry['icon'] ?? '01d',
+            ];
+        }, $history);
+
+        $history = array_values($history);
+
+        if (count($history) > $days) {
+            return array_slice($history, -$days);
+        }
+
+        return $history;
+    }
+
+    private function normalizeLocation(?string $location): ?string
+    {
+        if ($location === null) {
+            return null;
+        }
+
+        $trimmed = trim($location);
+
+        if ($trimmed === '') {
+            return null;
+        }
+
+        return Str::lower($trimmed);
     }
 
 }

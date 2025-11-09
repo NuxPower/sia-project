@@ -2,9 +2,11 @@
 
 namespace App\Services;
 
+use App\Models\WeatherData;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Cache;
 use Carbon\Carbon;
+use Illuminate\Support\Str;
 
 class WeatherService
 {
@@ -158,6 +160,74 @@ class WeatherService
     {
         // Coordinate-based historical data also falls back to mock responses for now
         return $this->getMockHistoricalWeather($date);
+    }
+
+    public function storeWeatherSnapshot(array $weather, array $context = []): ?WeatherData
+    {
+        if (empty($weather['main'])) {
+            return null;
+        }
+
+        $recordedAt = $this->resolveRecordedAt($weather, $context['recorded_at'] ?? null);
+        $farmId = $context['farm_id'] ?? null;
+
+        $location = $context['location'] ?? $context['location_name'] ?? ($weather['name'] ?? null);
+        $locationName = $location ? Str::lower(trim($location)) : null;
+        if ($locationName === '') {
+            $locationName = null;
+        }
+
+        $lat = $context['lat'] ?? data_get($weather, 'coord.lat');
+        $lon = $context['lon'] ?? data_get($weather, 'coord.lon');
+
+        if (!$farmId && $locationName === null && ($lat === null || $lon === null)) {
+            // Without a farm or identifiable location, skip persistence
+            return null;
+        }
+
+        $lat = $lat !== null ? round((float) $lat, 6) : null;
+        $lon = $lon !== null ? round((float) $lon, 6) : null;
+
+        $query = WeatherData::query()->where('recorded_at', $recordedAt);
+
+        if ($farmId) {
+            $query->where('farm_id', $farmId);
+        } else {
+            $query->whereNull('farm_id');
+
+            if ($locationName !== null) {
+                $query->where('location_name', $locationName);
+            } else {
+                $query->whereNull('location_name');
+            }
+
+            if ($lat !== null && $lon !== null) {
+                $query->where('latitude', $lat)->where('longitude', $lon);
+            } else {
+                $query->whereNull('latitude')->whereNull('longitude');
+            }
+        }
+
+        $payload = [
+            'farm_id' => $farmId,
+            'location_name' => $locationName,
+            'latitude' => $lat,
+            'longitude' => $lon,
+            'temperature' => data_get($weather, 'main.temp'),
+            'humidity' => data_get($weather, 'main.humidity'),
+            'rainfall' => data_get($weather, 'rain.1h', 0),
+            'wind_speed' => data_get($weather, 'wind.speed'),
+            'condition' => data_get($weather, 'weather.0.main'),
+            'condition_icon' => data_get($weather, 'weather.0.icon'),
+            'recorded_at' => $recordedAt,
+        ];
+
+        if ($existing = $query->first()) {
+            $existing->fill($payload)->save();
+            return $existing;
+        }
+
+        return WeatherData::create($payload);
     }
 
     private function processForecastData($data)
@@ -407,5 +477,30 @@ class WeatherService
                 '1h' => 12.5
             ]
         ];
+    }
+
+    private function resolveRecordedAt(array $weather, $override = null): Carbon
+    {
+        if ($override instanceof Carbon) {
+            return $override->copy()->startOfHour();
+        }
+
+        if (is_numeric($override)) {
+            return Carbon::createFromTimestamp($override)->startOfHour();
+        }
+
+        if (is_string($override)) {
+            try {
+                return Carbon::parse($override)->startOfHour();
+            } catch (\Throwable $e) {
+                // fall through
+            }
+        }
+
+        if (isset($weather['dt']) && is_numeric($weather['dt'])) {
+            return Carbon::createFromTimestamp($weather['dt'])->startOfHour();
+        }
+
+        return Carbon::now()->startOfHour();
     }
 }

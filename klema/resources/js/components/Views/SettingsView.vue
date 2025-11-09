@@ -173,9 +173,11 @@ const logout = async () => {
       headers: {
         'X-CSRF-TOKEN': csrfToken,
         'Accept': 'application/json',
-        'Content-Type': 'application/json'
+        'Content-Type': 'application/json',
+        'X-Requested-With': 'XMLHttpRequest'
       },
-      credentials: 'same-origin'
+      credentials: 'include',
+      body: JSON.stringify({})
     });
 
     if (response.ok) {

@@ -1,0 +1,122 @@
+Software Requirements Specification (SRS)
+System Integration of KLEMA: Integrated Weather and Mapping System for Agricultural Resilience
+1. Introduction
+1.1 Purpose
+
+KLEMA aims to enhance agricultural resilience by integrating real-time weather data, mapping, and farm management into one web-based platform. It provides farmers and agricultural stakeholders with actionable insights to support decision-making, reduce risk, and improve productivity in the face of climate change.
+
+1.2 Scope
+
+The system offers a digital platform combining weather monitoring, geospatial mapping, and farm data management. It leverages:
+
+OpenWeather API for weather data
+
+OpenStreetMap for farm mapping
+
+Laravel (PHP) for backend services
+
+Vue.js + Leaflet.js for frontend mapping
+
+PostgreSQL for database management
+
+It provides real-time dashboards, secure authentication, weather alerts, and reporting tools.
+
+2. Overall Description
+2.1 Product Perspective
+
+KLEMA is a web-based system designed with a Layered MVC architecture:
+
+Frontend Layer: Vue.js + Leaflet.js
+
+Backend Layer: Laravel framework
+
+Database Layer: PostgreSQL (geospatial data support)
+
+External APIs: OpenWeather for meteorological data
+
+2.2 Users
+
+Local farmers (monitor weather, map farms, receive alerts)
+
+Agricultural cooperatives / LGUs (manage data, generate reports)
+
+NGOs or research groups (analyze and export data for planning)
+
+2.3 Constraints
+
+Depends on third-party APIs (OpenWeather, OSM)
+
+Requires stable internet for real-time data updates
+
+Limited to regions supported by weather APIs
+
+3. System Features
+Module	Description / Features
+Authentication & User Management	Secure login/registration using JWT; role-based access (Admin, Farmer)
+Farm Management	CRUD operations for farms (name, size, soil type, location)
+Map Integration	Interactive map with geoJSON visualization of farms; boundary drawing and coordinate storage
+Weather Monitoring	Fetch real-time weather (temperature, humidity, rainfall, wind speed); view forecasts
+Alerts & Notifications	Automatic alerts for severe weather; manual alerts by admin
+Activity Logging	Logs farm activities and user actions for tracking
+Data Export	Export reports (CSV, PDF) for farms, weather data, and activities
+Dashboard & Analytics	Visual analytics for weather trends, farm productivity, and activity summary
+Responsive Design	Fully accessible via desktop, tablet, and mobile
+Security	Token-based authentication, policies for access control, and secure API endpoints
+4. System Architecture
+
+Layers:
+
+Client Layer: Browser interface for data visualization and user input.
+
+Controller Layer: Handles HTTP requests (e.g., FarmController, WeatherController).
+
+Service Layer: Manages business logic and API integrations (e.g., WeatherService).
+
+Model Layer: ORM mapping for database tables.
+
+Policy Layer: Enforces user roles and access permissions.
+
+Database Layer: Stores farms, users, weather, and alert data.
+
+External Systems: OpenWeather and OSM for external data integration.
+
+5. API Endpoints Summary
+Category	Endpoint Example	Description
+Auth	POST /api/login, /api/register	User authentication and session management
+Farms	GET /api/farms	Manage and retrieve farm records
+Map	GET /api/map-data	Retrieve geoJSON for farm boundaries
+Weather	GET /api/weather/current	Fetch current weather and forecasts
+Alerts	GET /api/alerts	Retrieve or create alerts
+Reports	GET /api/export/farms	Export data (CSV/PDF)
+Dashboard	GET /api/dashboard	Fetch statistics and analytics
+6. Non-Functional Requirements
+Category	Requirement
+Performance	Real-time weather updates within 2 seconds after API call
+Security	JWT-based authentication; HTTPS required
+Scalability	Modular MVC design for future IoT and predictive analytics integration
+Reliability	Database backup and fault-tolerant API error handling
+Usability	Responsive interface; intuitive maps and dashboards
+Maintainability	Clear code separation via Laravel and Vue.js modular structure
+7. Future Enhancements
+
+IoT Sensor Integration – Ingest microclimate data from soil and weather sensors.
+
+Predictive Analytics – Use machine learning for yield and weather forecasts.
+
+Water Resource Mapping – Integrate topographic data for irrigation planning.
+
+Multi-Channel Alerts – Send notifications via SMS and offline channels.
+
+8. Expected Outcomes
+
+Real-time farm weather monitoring
+
+Centralized and secure farm-weather database
+
+Improved farmer decision-making and risk reduction
+
+Accessible platform for data-driven agricultural management
+
+9. Conclusion
+
+KLEMA integrates weather intelligence, mapping, and data visualization into one platform to strengthen agricultural resilience. It empowers farmers and agricultural stakeholders to respond proactively to climate challenges using technology-driven insights.
