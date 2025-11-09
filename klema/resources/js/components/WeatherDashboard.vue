@@ -87,6 +87,7 @@ import GlobalAlertNotification from './GlobalAlertNotification.vue';
 import { useWeatherAPI } from '../composables/useWeatherAPI';
 import { useWeatherUtils } from '../composables/useWeatherUtils';
 import { useGlobalAlerts } from '../composables/useGlobalAlerts';
+import { ensureApiToken } from '../services/auth';
 
 const weatherMapRef = ref(null);
 const searchLocation = ref('Maramag, Northern Mindanao');
@@ -157,12 +158,14 @@ const searchWeather = async () => {
   }
 };
 
-const handleMapReady = () => {
+const handleMapReady = async () => {
   mapLoading.value = false;
-  searchWeather();
+  await ensureApiToken(window.axios);
+  await searchWeather();
 };
 
-onMounted(() => {
+onMounted(async () => {
+  await ensureApiToken(window.axios);
   window.vueApp = {
     setActiveView,
     searchWeather,

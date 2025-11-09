@@ -138,6 +138,8 @@
 
 <script setup>
 import { ref } from 'vue';
+import { authorizedFetch } from '../../services/http';
+import { revokeApiToken } from '../../services/auth';
 
 const defaultLocation = ref('Maramag, Northern Mindanao');
 
@@ -158,33 +160,17 @@ const getCurrentLocation = () => {
 };
 
 const logout = async () => {
-  const csrfToken = document
-    .querySelector('meta[name="csrf-token"]')
-    ?.getAttribute('content');
-
-  if (!csrfToken) {
-    alert('Unable to logout: CSRF token not found.');
-    return;
-  }
-
   try {
-    const response = await fetch('/logout', {
-      method: 'POST',
-      headers: {
-        'X-CSRF-TOKEN': csrfToken,
-        'Accept': 'application/json',
-        'Content-Type': 'application/json',
-        'X-Requested-With': 'XMLHttpRequest'
-      },
-      credentials: 'include',
-      body: JSON.stringify({})
+    const response = await authorizedFetch('/api/auth/logout', {
+      method: 'POST'
     });
 
-    if (response.ok) {
-      window.location.href = '/';
-    } else {
+    if (!response.ok) {
       throw new Error('Logout failed');
     }
+
+    revokeApiToken();
+    window.location.href = '/login';
   } catch (error) {
     console.error('Logout error:', error);
     alert('Failed to logout. Please try again.');

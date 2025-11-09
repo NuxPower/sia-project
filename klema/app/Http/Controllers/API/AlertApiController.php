@@ -15,11 +15,14 @@ class AlertApiController extends Controller
      */
     public function index(): JsonResponse
     {
-        $alerts = Alert::whereHas('farm', function($query) {
-            $query->where('user_id', auth()->id());
-        })->with('farm')
-          ->orderBy('issued_at', 'desc')
-          ->get();
+        $alerts = Alert::when(! auth()->user()?->isAdmin(), function ($query) {
+                $query->whereHas('farm', function ($farmQuery) {
+                    $farmQuery->where('user_id', auth()->id());
+                });
+            })
+            ->with('farm')
+            ->orderBy('issued_at', 'desc')
+            ->get();
         
         return response()->json([
             'success' => true,
@@ -39,9 +42,8 @@ class AlertApiController extends Controller
         ]);
 
         $farm = Farm::findOrFail($validated['farm_id']);
-        
-        // Check if user owns the farm
-        if ($farm->user_id !== auth()->id()) {
+
+        if (! $this->canManageFarm($farm)) {
             return response()->json([
                 'success' => false,
                 'message' => 'Unauthorized access to farm'
@@ -68,8 +70,7 @@ class AlertApiController extends Controller
      */
     public function show(Alert $alert): JsonResponse
     {
-        // Check if user owns the farm associated with this alert
-        if ($alert->farm->user_id !== auth()->id()) {
+        if (! $this->canManageFarm($alert->farm)) {
             return response()->json([
                 'success' => false,
                 'message' => 'Unauthorized access to alert'
@@ -87,8 +88,7 @@ class AlertApiController extends Controller
      */
     public function update(Request $request, Alert $alert): JsonResponse
     {
-        // Check if user owns the farm associated with this alert
-        if ($alert->farm->user_id !== auth()->id()) {
+        if (! $this->canManageFarm($alert->farm)) {
             return response()->json([
                 'success' => false,
                 'message' => 'Unauthorized access to alert'
@@ -115,8 +115,7 @@ class AlertApiController extends Controller
      */
     public function destroy(Alert $alert): JsonResponse
     {
-        // Check if user owns the farm associated with this alert
-        if ($alert->farm->user_id !== auth()->id()) {
+        if (! $this->canManageFarm($alert->farm)) {
             return response()->json([
                 'success' => false,
                 'message' => 'Unauthorized access to alert'
@@ -136,8 +135,7 @@ class AlertApiController extends Controller
      */
     public function resolve(Alert $alert): JsonResponse
     {
-        // Check if user owns the farm associated with this alert
-        if ($alert->farm->user_id !== auth()->id()) {
+        if (! $this->canManageFarm($alert->farm)) {
             return response()->json([
                 'success' => false,
                 'message' => 'Unauthorized access to alert'
@@ -157,12 +155,16 @@ class AlertApiController extends Controller
      */
     public function active(): JsonResponse
     {
-        $alerts = Alert::whereHas('farm', function($query) {
-            $query->where('user_id', auth()->id());
-        })->where('resolved', false)
-          ->with('farm')
-          ->orderBy('issued_at', 'desc')
-          ->get();
+        $alerts = Alert::query()
+            ->when(! auth()->user()?->isAdmin(), function ($query) {
+                $query->whereHas('farm', function ($farmQuery) {
+                    $farmQuery->where('user_id', auth()->id());
+                });
+            })
+            ->where('resolved', false)
+            ->with('farm')
+            ->orderBy('issued_at', 'desc')
+            ->get();
         
         return response()->json([
             'success' => true,
@@ -208,5 +210,26 @@ class AlertApiController extends Controller
             'success' => true,
             'warnings' => $warnings
         ]);
+    }
+
+    private function canManageFarm(Farm $farm): bool
+    {
+        $user = auth()->user();
+
+        if (! $user) {
+            return false;
+        }
+
+        if ($user->isAdmin()) {
+            return true;
+        }
+
+        $token = $user->currentAccessToken();
+
+        if ($token && ($token->can('*') || $token->can('role:admin'))) {
+            return true;
+        }
+
+        return $farm->user_id === $user->id;
     }
 }

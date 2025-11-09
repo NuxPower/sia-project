@@ -1,10 +1,12 @@
+import { authorizedFetch } from '../services/http';
+
 export function useWeatherAPI() {
   const fetchWeatherByCoordinates = async (lat, lng) => {
     const currentUrl = `/api/weather/current?lat=${lat}&lon=${lng}`;
     const forecastUrl = `/api/weather/forecast?lat=${lat}&lon=${lng}&days=7`;
     const historyUrl = `/api/weather/history?lat=${lat}&lon=${lng}&days=3`;
     
-    const currentResponse = await fetch(currentUrl);
+    const currentResponse = await authorizedFetch(currentUrl);
     if (!currentResponse.ok) {
       throw new Error(`Failed to fetch current weather: ${currentResponse.status}`);
     }
@@ -12,8 +14,8 @@ export function useWeatherAPI() {
     const current = await currentResponse.json();
     
     const [forecastResponse, historyResponse] = await Promise.all([
-      fetch(forecastUrl),
-      fetch(historyUrl).catch(() => null)
+      authorizedFetch(forecastUrl),
+      authorizedFetch(historyUrl).catch(() => null)
     ]);
     
     if (!forecastResponse.ok) {
@@ -27,17 +29,17 @@ export function useWeatherAPI() {
   };
   
   const fetchWeatherByLocation = async (location) => {
-    const currentResponse = await fetch(`/api/weather/current?location=${encodeURIComponent(location)}`);
+    const currentResponse = await authorizedFetch(`/api/weather/current?location=${encodeURIComponent(location)}`);
     if (!currentResponse.ok) throw new Error('Failed to fetch current weather');
     
     const current = await currentResponse.json();
     
-    const forecastResponse = await fetch(`/api/weather/forecast?location=${encodeURIComponent(location)}&days=7`);
+    const forecastResponse = await authorizedFetch(`/api/weather/forecast?location=${encodeURIComponent(location)}&days=7`);
     if (!forecastResponse.ok) throw new Error('Failed to fetch forecast');
     
     const forecastData = await forecastResponse.json();
     
-    const historyResponse = await fetch(`/api/weather/history?location=${encodeURIComponent(location)}&days=3`).catch(() => null);
+    const historyResponse = await authorizedFetch(`/api/weather/history?location=${encodeURIComponent(location)}&days=3`).catch(() => null);
     const history = historyResponse?.ok ? await historyResponse.json() : [];
     
     return { current, forecastData, history };

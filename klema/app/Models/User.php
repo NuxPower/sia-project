@@ -54,4 +54,42 @@ class User extends Authenticatable implements MustVerifyEmail
     {
         return $this->role === 'farmer';
     }
+
+    /**
+     * Determine the default abilities for issued personal access tokens.
+     *
+     * @return array<int, string>
+     */
+    public function defaultTokenAbilities(): array
+    {
+        if ($this->isAdmin()) {
+            return ['*', 'role:admin'];
+        }
+
+        $abilities = [
+            'weather:read',
+            'weather:write',
+            'farms:read',
+            'farms:write',
+            'alerts:read',
+            'alerts:write',
+            'activities:read',
+            'activities:write',
+            'role:farmer',
+        ];
+
+        return array_unique($abilities);
+    }
+
+    /**
+     * Issue a scoped personal access token, replacing older tokens with the same name.
+     */
+    public function issueToken(string $name = 'klema-api-token', ?int $expirationMinutes = null): string
+    {
+        $this->tokens()->where('name', $name)->delete();
+
+        $expiresAt = $expirationMinutes ? now()->addMinutes($expirationMinutes) : null;
+
+        return $this->createToken($name, $this->defaultTokenAbilities(), $expiresAt)->plainTextToken;
+    }
 }

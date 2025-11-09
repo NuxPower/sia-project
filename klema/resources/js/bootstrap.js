@@ -7,12 +7,28 @@ import 'bootstrap';
  */
 
 import axios from 'axios';
+import { getApiToken, revokeApiToken } from './services/auth';
 window.axios = axios;
 
 window.axios.defaults.headers.common['X-Requested-With'] = 'XMLHttpRequest';
 window.axios.defaults.withCredentials = true;
 window.axios.defaults.xsrfHeaderName = 'X-XSRF-TOKEN';
 window.axios.defaults.xsrfCookieName = 'XSRF-TOKEN';
+
+window.axios.interceptors.request.use((config) => {
+    const token = getApiToken();
+
+    if (token && !config.headers?.Authorization) {
+        config.headers = {
+            ...config.headers,
+            Authorization: `Bearer ${token}`,
+        };
+    }
+
+    config.withCredentials = true;
+
+    return config;
+});
 
 /**
  * Echo exposes an expressive API for subscribing to channels and listening
@@ -41,6 +57,10 @@ window.axios.interceptors.response.use(
     error => {
         if (error?.response?.status === 423) {
             window.location.href = '/email/verify';
+        }
+
+        if (error?.response?.status === 401) {
+            revokeApiToken();
         }
 
         return Promise.reject(error);
