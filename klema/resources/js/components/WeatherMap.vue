@@ -23,13 +23,18 @@ const props = defineProps({
   isLoading: Boolean
 });
 
-const emit = defineEmits(['map-click', 'map-ready']);
+const emit = defineEmits(['map-click', 'map-ready', 'location-update']);
 
 const mapContainer = ref(null);
 const map = ref(null);
 const currentMarker = ref(null);
 const weatherLayers = ref({});
 const layerControl = ref(null);
+const farmBoundaryLayer = ref(null);
+const farmPointLayer = ref(null);
+const interactionMode = ref('weather');
+const boundaryDrawing = ref(null);
+const pointPlacement = ref(null);
 
 const initMap = async () => {
   await nextTick();
@@ -46,7 +51,7 @@ const initMap = async () => {
   }).setView([7.5, 124.5], 7);
   
   map.value.on('click', (e) => {
-    emit('map-click', { lat: e.latlng.lat, lng: e.latlng.lng });
+    handleMapClick(e.latlng);
   });
   
   const { baseLayers, overlayLayers } = createMapLayers();
@@ -63,6 +68,9 @@ const initMap = async () => {
     collapsed: true
   }).addTo(map.value);
   
+  farmBoundaryLayer.value = L.layerGroup().addTo(map.value);
+  farmPointLayer.value = L.layerGroup().addTo(map.value);
+
   // Apply custom styles
   applyMapStyles();
   
@@ -99,21 +107,27 @@ const toggleWeatherLayer = (layerId, active) => {
 
 const moveToLocation = (lat, lon, zoom = 10) => {
   if (map.value) {
-    map.value.setView([lat, lon], zoom);
+    map.value.setView([lat, lon], zoom, { animate: false });
   }
 };
 
 const updateMarker = (lat, lon, weatherData) => {
   if (!map.value) return;
   
-  if (currentMarker.value) {
-    map.value.removeLayer(currentMarker.value);
+  if (!currentMarker.value) {
+    currentMarker.value = L.marker([lat, lon], { draggable: true }).addTo(map.value);
+    currentMarker.value.on('dragend', () => {
+      const { lat: newLat, lng: newLng } = currentMarker.value.getLatLng();
+      emit('location-update', { lat: newLat, lon: newLng });
+    });
+  } else {
+    currentMarker.value.setLatLng([lat, lon]);
   }
-  
-  currentMarker.value = L.marker([lat, lon]).addTo(map.value);
   
   const popupContent = createPopupContent(lat, lon, weatherData);
   currentMarker.value.bindPopup(popupContent).openPopup();
+
+  emit('location-update', { lat, lon });
 };
 
 const createPopupContent = (lat, lon, weatherData) => {
@@ -135,6 +149,222 @@ const createPopupContent = (lat, lon, weatherData) => {
   `;
 };
 
+const handleMapClick = ({ lat, lng }) => {
+  if (boundaryDrawing.value) {
+    addBoundaryVertex(lat, lng);
+    return;
+  }
+
+  if (pointPlacement.value) {
+    finalizePointPlacement(lat, lng);
+    return;
+  }
+
+  emit('map-click', { lat, lng });
+};
+
+const renderFarmOverlays = ({ farmFeatures = [], pointFeatures = [] }) => {
+  if (!map.value) return;
+
+  farmBoundaryLayer.value.clearLayers();
+  farmPointLayer.value.clearLayers();
+
+  if (farmFeatures.length) {
+    L.geoJSON({
+      type: 'FeatureCollection',
+      features: farmFeatures
+    }, {
+      style: feature => ({
+        color: getFarmColor(feature.properties?.farm_id),
+        weight: feature.properties?.type === 'centroid' ? 0 : 2,
+        opacity: 0.8,
+        fillOpacity: 0.15
+      }),
+      pointToLayer: (feature, latlng) => {
+        return L.circleMarker(latlng, {
+          radius: 6,
+          color: getFarmColor(feature.properties?.farm_id),
+          fillOpacity: 0.9
+        });
+      },
+      onEachFeature: (feature, layer) => {
+        if (!feature?.properties) {
+          return;
+        }
+
+        const { farm_name, size_hectares, soil_type, description } = feature.properties;
+        const popup = `
+          <div style="min-width: 220px;">
+            <h3 style="margin: 0 0 8px 0; color: #1e40af;">${farm_name ?? 'Unnamed Farm'}</h3>
+            ${size_hectares ? `<div><strong>Size:</strong> ${Number(size_hectares).toFixed(2)} ha</div>` : ''}
+            ${soil_type ? `<div><strong>Soil:</strong> ${soil_type}</div>` : ''}
+            ${description ? `<div style="margin-top: 6px;">${description}</div>` : ''}
+          </div>
+        `;
+        layer.bindPopup(popup);
+      }
+    }).addTo(farmBoundaryLayer.value);
+  }
+
+  if (pointFeatures.length) {
+    L.geoJSON({
+      type: 'FeatureCollection',
+      features: pointFeatures
+    }, {
+      pointToLayer: (feature, latlng) => {
+        return L.marker(latlng, {
+          icon: L.divIcon({
+            className: 'farm-point-icon',
+            html: `<div class="farm-point-marker">${feature.properties?.label?.[0] ?? 'P'}</div>`
+          })
+        });
+      },
+      onEachFeature: (feature, layer) => {
+        const { label, point_type } = feature.properties ?? {};
+        const popup = `
+          <div style="min-width:180px;">
+            <strong>${label ?? 'Point'}</strong>
+            ${point_type ? `<div style="margin-top:4px;">Type: ${point_type}</div>` : ''}
+          </div>
+        `;
+        layer.bindPopup(popup);
+      }
+    }).addTo(farmPointLayer.value);
+  }
+};
+
+const startBoundaryDrawing = ({ initialCoordinates = [], onComplete, onCancel }) => {
+  if (!map.value) return null;
+
+  interactionMode.value = 'boundary';
+  clearBoundaryDrawing();
+
+  const normalized = initialCoordinates.map(point => [point.lat, point.lng]);
+  const polygonLayer = L.polygon(normalized, {
+    color: '#2563eb',
+    weight: 2,
+    opacity: 0.9,
+    fillOpacity: 0.15
+  });
+
+  boundaryDrawing.value = {
+    points: [...normalized],
+    polygonLayer,
+    onComplete,
+    onCancel
+  };
+
+  if (normalized.length) {
+    polygonLayer.addTo(map.value);
+  }
+
+  return {
+    finish: finishBoundaryDrawing,
+    cancel: cancelBoundaryDrawing,
+    reset: () => resetBoundaryDrawing(initialCoordinates)
+  };
+};
+
+const addBoundaryVertex = (lat, lng) => {
+  if (!boundaryDrawing.value) return;
+
+  boundaryDrawing.value.points.push([lat, lng]);
+
+  if (!map.value) return;
+
+  if (!map.value.hasLayer(boundaryDrawing.value.polygonLayer)) {
+    boundaryDrawing.value.polygonLayer.addTo(map.value);
+  }
+
+  boundaryDrawing.value.polygonLayer.setLatLngs([boundaryDrawing.value.points]);
+};
+
+const finishBoundaryDrawing = () => {
+  if (!boundaryDrawing.value) return;
+
+  const { points, onComplete } = boundaryDrawing.value;
+
+  if (points.length < 3) {
+    alert('A boundary requires at least three points.');
+    return;
+  }
+
+  const formatted = points.map(([lat, lng]) => ({ lat, lng }));
+
+  if (onComplete) {
+    onComplete(formatted);
+  }
+
+  clearBoundaryDrawing();
+  interactionMode.value = 'weather';
+};
+
+const cancelBoundaryDrawing = () => {
+  if (boundaryDrawing.value?.onCancel) {
+    boundaryDrawing.value.onCancel();
+  }
+
+  clearBoundaryDrawing();
+  interactionMode.value = 'weather';
+};
+
+const resetBoundaryDrawing = (initialCoordinates = []) => {
+  if (!boundaryDrawing.value) {
+    return;
+  }
+
+  const normalized = initialCoordinates.map(point => [point.lat, point.lng]);
+  boundaryDrawing.value.points = [...normalized];
+
+  boundaryDrawing.value.polygonLayer.setLatLngs([normalized]);
+
+  if (!normalized.length) {
+    boundaryDrawing.value.polygonLayer.removeFrom(map.value);
+  } else if (!map.value.hasLayer(boundaryDrawing.value.polygonLayer)) {
+    boundaryDrawing.value.polygonLayer.addTo(map.value);
+  }
+};
+
+const clearBoundaryDrawing = () => {
+  if (boundaryDrawing.value?.polygonLayer && map.value?.hasLayer(boundaryDrawing.value.polygonLayer)) {
+    map.value.removeLayer(boundaryDrawing.value.polygonLayer);
+  }
+
+  boundaryDrawing.value = null;
+};
+
+const startPointPlacement = ({ onPlace }) => {
+  interactionMode.value = 'point';
+  pointPlacement.value = {
+    onPlace
+  };
+};
+
+const finalizePointPlacement = (lat, lng) => {
+  if (!pointPlacement.value) {
+    return;
+  }
+
+  const { onPlace } = pointPlacement.value;
+  interactionMode.value = 'weather';
+  pointPlacement.value = null;
+
+  if (onPlace) {
+    onPlace({ lat, lng });
+  }
+};
+
+const cancelPointPlacement = () => {
+  interactionMode.value = 'weather';
+  pointPlacement.value = null;
+};
+
+const getFarmColor = (farmId) => {
+  const colors = ['#2563eb', '#16a34a', '#dc2626', '#7c3aed', '#d97706', '#0891b2'];
+  const index = Math.abs(parseInt(farmId ?? 0, 10)) % colors.length;
+  return colors[index];
+};
+
 onMounted(async () => {
   initLeafletIcons();
   await new Promise(resolve => setTimeout(resolve, 500));
@@ -144,7 +374,14 @@ onMounted(async () => {
 defineExpose({
   moveToLocation,
   updateMarker,
-  toggleWeatherLayer
+  toggleWeatherLayer,
+  renderFarmOverlays,
+  startBoundaryDrawing,
+  finishBoundaryDrawing,
+  cancelBoundaryDrawing,
+  resetBoundaryDrawing,
+  startPointPlacement,
+  cancelPointPlacement
 });
 </script>
 
@@ -165,5 +402,27 @@ defineExpose({
   left: 0;
   z-index: 1;
   background: #2c3e50;
+}
+</style>
+
+<style>
+.farm-point-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.farm-point-marker {
+  background: #1f2937;
+  color: #fff;
+  font-size: 12px;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid #fff;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
 }
 </style>

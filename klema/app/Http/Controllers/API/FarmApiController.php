@@ -7,6 +7,7 @@ use App\Models\Farm;
 use App\Models\FarmPoint;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Validation\Rule;
 
 class FarmApiController extends Controller
 {
@@ -15,14 +16,23 @@ class FarmApiController extends Controller
      */
     public function index(): JsonResponse
     {
-        $farms = auth()->user()->farms()->with([
-            'weatherData' => function($query) {
-                $query->latest('recorded_at')->limit(1);
-            },
-            'alerts' => function($query) {
-                $query->where('resolved', false);
-            }
-        ])->get();
+        $user = auth()->user();
+
+        $farmsQuery = Farm::query()
+            ->with([
+                'weatherData' => function ($query) {
+                    $query->latest('recorded_at')->limit(1);
+                },
+                'alerts' => function ($query) {
+                    $query->where('resolved', false);
+                },
+            ]);
+
+        if (! $user->isAdmin()) {
+            $farmsQuery->where('user_id', $user->id);
+        }
+
+        $farms = $farmsQuery->get();
         
         return response()->json([
             'success' => true,
@@ -39,14 +49,27 @@ class FarmApiController extends Controller
             'farm_name' => 'required|string|max:100',
             'latitude' => 'required|numeric|between:-90,90',
             'longitude' => 'required|numeric|between:-180,180',
+            'size_hectares' => 'nullable|numeric|min:0|max:100000',
+            'soil_type' => ['nullable', 'string', Rule::in(config('farm.soil_types'))],
+            'description' => 'nullable|string',
+            'boundary' => 'nullable',
         ]);
 
-        $farm = Farm::create([
+        $farm = new Farm([
             'user_id' => auth()->id(),
             'farm_name' => $validated['farm_name'],
             'latitude' => $validated['latitude'],
             'longitude' => $validated['longitude'],
+            'size_hectares' => $validated['size_hectares'] ?? null,
+            'soil_type' => $validated['soil_type'] ?? null,
+            'description' => $validated['description'] ?? null,
         ]);
+
+        if (array_key_exists('boundary', $validated)) {
+            $farm->boundary = $validated['boundary'];
+        }
+
+        $farm->save();
 
         return response()->json([
             'success' => true,
@@ -101,9 +124,26 @@ class FarmApiController extends Controller
             'farm_name' => 'sometimes|string|max:100',
             'latitude' => 'sometimes|numeric|between:-90,90',
             'longitude' => 'sometimes|numeric|between:-180,180',
+            'size_hectares' => 'sometimes|nullable|numeric|min:0|max:100000',
+            'soil_type' => ['sometimes','nullable','string', Rule::in(config('farm.soil_types'))],
+            'description' => 'sometimes|nullable|string',
+            'boundary' => 'nullable',
         ]);
 
-        $farm->update($validated);
+        $farm->fill($request->only([
+            'farm_name',
+            'latitude',
+            'longitude',
+            'size_hectares',
+            'soil_type',
+            'description',
+        ]));
+
+        if ($request->exists('boundary')) {
+            $farm->boundary = $request->input('boundary');
+        }
+
+        $farm->save();
 
         return response()->json([
             'success' => true,
@@ -147,16 +187,17 @@ class FarmApiController extends Controller
         }
 
         $validated = $request->validate([
+            'label' => 'required|string|max:100',
             'latitude' => 'required|numeric|between:-90,90',
             'longitude' => 'required|numeric|between:-180,180',
-            'point_name' => 'sometimes|string|max:100',
+            'point_type' => 'nullable|string|max:50',
         ]);
 
-        $point = FarmPoint::create([
-            'farm_id' => $farm->farm_id,
+        $point = $farm->farmPoints()->create([
+            'label' => $validated['label'],
             'latitude' => $validated['latitude'],
             'longitude' => $validated['longitude'],
-            'point_name' => $validated['point_name'] ?? 'Point ' . ($farm->farmPoints()->count() + 1),
+            'point_type' => $validated['point_type'] ?? null,
         ]);
 
         return response()->json([
@@ -187,6 +228,84 @@ class FarmApiController extends Controller
         return response()->json([
             'success' => true,
             'weather_data' => $weatherData
+        ]);
+    }
+
+    public function mapData(): JsonResponse
+    {
+        $user = auth()->user();
+
+        $farmsQuery = Farm::with('farmPoints');
+        if (! $user->isAdmin()) {
+            $farmsQuery->where('user_id', $user->id);
+        }
+
+        $farms = $farmsQuery->get();
+
+        $farmFeatures = [];
+        $pointFeatures = [];
+
+        foreach ($farms as $farm) {
+            $properties = [
+                'farm_id' => $farm->farm_id,
+                'farm_name' => $farm->farm_name,
+                'size_hectares' => $farm->size_hectares,
+                'soil_type' => $farm->soil_type,
+                'description' => $farm->description,
+            ];
+
+            $boundary = $farm->boundary;
+
+            if ($boundary) {
+                $farmFeatures[] = [
+                    'type' => 'Feature',
+                    'geometry' => $boundary,
+                    'properties' => array_merge($properties, [
+                        'type' => 'boundary',
+                    ]),
+                ];
+            } else {
+                $farmFeatures[] = [
+                    'type' => 'Feature',
+                    'geometry' => [
+                        'type' => 'Point',
+                        'coordinates' => [(float) $farm->longitude, (float) $farm->latitude],
+                    ],
+                    'properties' => array_merge($properties, [
+                        'type' => 'centroid',
+                    ]),
+                ];
+            }
+
+            foreach ($farm->farmPoints as $point) {
+                $pointFeatures[] = [
+                    'type' => 'Feature',
+                    'geometry' => [
+                        'type' => 'Point',
+                        'coordinates' => [(float) $point->longitude, (float) $point->latitude],
+                    ],
+                    'properties' => [
+                        'point_id' => $point->point_id,
+                        'farm_id' => $farm->farm_id,
+                        'label' => $point->label,
+                        'point_type' => $point->point_type,
+                    ],
+                ];
+            }
+        }
+
+        return response()->json([
+            'success' => true,
+            'farms' => $farms,
+            'soil_types' => config('farm.soil_types'),
+            'farm_features' => [
+                'type' => 'FeatureCollection',
+                'features' => $farmFeatures,
+            ],
+            'point_features' => [
+                'type' => 'FeatureCollection',
+                'features' => $pointFeatures,
+            ],
         ]);
     }
 }

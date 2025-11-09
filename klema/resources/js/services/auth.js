@@ -29,6 +29,7 @@ export async function ensureApiToken(axiosInstance) {
 
   try {
     const axiosClient = axiosInstance ?? (await import('axios')).default;
+    await axiosClient.get('/sanctum/csrf-cookie', { withCredentials: true });
     const { data } = await axiosClient.post('/api/auth/token', {}, {
       withCredentials: true,
       headers: {

@@ -15,6 +15,7 @@
       :get-day-label="getDayLabel"
       :get-weather-icon="getWeatherIcon"
       :is-compact="isCompact"
+      @select="handleDaySelect"
     />
   </div>
 </template>
@@ -23,16 +24,23 @@
 import { ref } from 'vue';
 import WeatherCard from './WeatherCard.vue';
 
-defineProps({
+const props = defineProps({
   forecast: Array,
   getDayLabel: Function,
   getWeatherIcon: Function
 });
 
+const emit = defineEmits(['day-selected']);
+
 const isCompact = ref(false);
 
 const toggleCompact = () => {
   isCompact.value = !isCompact.value;
+};
+
+const handleDaySelect = (day) => {
+  if (!day) return;
+  emit('day-selected', day);
 };
 </script>
 

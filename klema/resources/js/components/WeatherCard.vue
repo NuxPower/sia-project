@@ -4,6 +4,7 @@
     :class="[cardClass, { 'compact': isCompact }]"
     @mouseenter="handleMouseEnter"
     @mouseleave="handleMouseLeave"
+    @click="$emit('select', day)"
   >    
     <div class="day-label">{{ getDayLabel(day) }}</div>
     
@@ -73,6 +74,8 @@ const handleMouseLeave = (e) => {
     e.currentTarget.style.transform = 'scale(1)';
   }
 };
+
+defineEmits(['select']);
 </script>
 
 <style scoped>

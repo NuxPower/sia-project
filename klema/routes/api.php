@@ -41,6 +41,7 @@ Route::middleware(['auth:sanctum', 'verified', 'role:admin,farmer'])->group(func
     Route::apiResource('farms', FarmApiController::class);
     Route::post('/farms/{farm}/points', [FarmApiController::class, 'addPoint']);
     Route::get('/farms/{farm}/weather', [FarmApiController::class, 'getWeatherData']);
+    Route::get('/map/farms', [FarmApiController::class, 'mapData']);
 
     // Alert endpoints
     Route::get('/alerts/active', [AlertApiController::class, 'active']);

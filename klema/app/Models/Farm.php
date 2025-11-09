@@ -4,7 +4,6 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Support\Facades\DB;
 
 class Farm extends Model
 {
@@ -17,16 +16,20 @@ class Farm extends Model
         'farm_name',
         'latitude',
         'longitude',
-        'boundary'
+        'size_hectares',
+        'soil_type',
+        'description',
+        'boundary',
     ];
 
     protected $casts = [
         'latitude' => 'decimal:6',
         'longitude' => 'decimal:6',
+        'size_hectares' => 'decimal:2',
+        'boundary_geojson' => 'array',
     ];
 
-    // PostgreSQL geometry handling
-    protected $geometry = ['boundary'];
+    protected $appends = ['boundary'];
 
     public function user()
     {
@@ -58,22 +61,100 @@ class Farm extends Model
         return $this->alerts()->where('resolved', false)->get();
     }
 
-    // PostgreSQL geometry helper methods
-    public function setBoundaryAttribute($value)
+    public function setBoundaryAttribute($value): void
     {
-        if (is_array($value)) {
-            $this->attributes['boundary'] = DB::raw("ST_GeomFromText('POLYGON((" . implode(',', array_map(function($point) {
-                return $point['lng'] . ' ' . $point['lat'];
-            }, $value)) . "))', 4326)");
-        }
+        $geoJson = $this->normalizeBoundary($value);
+        $this->attributes['boundary_geojson'] = $geoJson ? json_encode($geoJson) : null;
     }
 
-    public function getBoundaryAttribute($value)
+    public function getBoundaryAttribute(): ?array
     {
-        if ($value) {
-            $result = DB::select("SELECT ST_AsGeoJSON(?) as boundary", [$value]);
-            return json_decode($result[0]->boundary, true);
+        $raw = $this->attributes['boundary_geojson'] ?? null;
+
+        if ($raw === null) {
+            return null;
         }
+
+        if (is_array($raw)) {
+            return $raw;
+        }
+
+        $decoded = json_decode($raw, true);
+
+        return json_last_error() === JSON_ERROR_NONE ? $decoded : null;
+    }
+
+    private function normalizeBoundary($value): ?array
+    {
+        if (empty($value)) {
+            return null;
+        }
+
+        if (is_string($value)) {
+            $decoded = json_decode($value, true);
+            if (json_last_error() === JSON_ERROR_NONE) {
+                $value = $decoded;
+            }
+        }
+
+        if (is_array($value) && isset($value['type']) && strtolower($value['type']) === 'polygon') {
+            return $value;
+        }
+
+        if (is_array($value) && isset($value['coordinates'])) {
+            return [
+                'type' => 'Polygon',
+                'coordinates' => $value['coordinates'],
+            ];
+        }
+
+        if (is_array($value) && $this->isCoordinateCollection($value)) {
+            $ring = array_map(function ($point) {
+                $lat = $point['lat'] ?? $point[0] ?? null;
+                $lng = $point['lng'] ?? $point['lon'] ?? $point[1] ?? null;
+
+                return [
+                    (float) $lng,
+                    (float) $lat,
+                ];
+            }, $value);
+
+            if (count($ring) < 3) {
+                return null;
+            }
+
+            if ($ring[0] !== end($ring)) {
+                $ring[] = $ring[0];
+            }
+
+            return [
+                'type' => 'Polygon',
+                'coordinates' => [$ring],
+            ];
+        }
+
         return null;
+    }
+
+    private function isCoordinateCollection(array $value): bool
+    {
+        if (empty($value)) {
+            return false;
+        }
+
+        foreach ($value as $point) {
+            if (! is_array($point)) {
+                return false;
+            }
+
+            $hasNamed = isset($point['lat'], $point['lng']) || isset($point['lat'], $point['lon']);
+            $hasIndexed = array_key_exists(0, $point) && array_key_exists(1, $point);
+
+            if (! $hasNamed && ! $hasIndexed) {
+                return false;
+            }
+        }
+
+        return true;
     }
 }

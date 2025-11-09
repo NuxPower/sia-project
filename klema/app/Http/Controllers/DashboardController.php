@@ -7,6 +7,8 @@ use Illuminate\Http\Request;
 use App\Services\WeatherService;
 use App\Models\Farm;
 use App\Models\Alert;
+use App\Models\WeatherData;
+use Illuminate\Support\Str;
 use Carbon\Carbon;
 
 class DashboardController extends Controller

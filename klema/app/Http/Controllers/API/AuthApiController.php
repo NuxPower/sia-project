@@ -75,13 +75,13 @@ class AuthApiController extends Controller
             ]);
         }
 
-        if (! $user->hasVerifiedEmail()) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Please verify your email address to continue.',
-                'requires_verification' => true,
-            ], 423);
-        }
+            if (! $user->hasVerifiedEmail()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Please verify your email address to continue.',
+                    'requires_verification' => true,
+                ], 423);
+            }
 
         $tokenName = $validated['device_name'] ?? 'klema-api-token';
         $tokenName = Str::limit($tokenName, 255, '');
@@ -94,13 +94,13 @@ class AuthApiController extends Controller
             $request->session()?->regenerate();
         }
 
-        return response()->json([
-            'success' => true,
+            return response()->json([
+                'success' => true,
             'token' => $plainTextToken,
             'token_type' => 'Bearer',
             'expires_in' => $expiration ? $expiration * 60 : null,
             'abilities' => $user->defaultTokenAbilities(),
-            'user' => $user->load('farms'),
+                'user' => $user->load('farms'),
         ]);
     }
 

@@ -103,20 +103,23 @@
 
 <script setup>
 import { ref, computed, watch } from 'vue'
-import { useFarms } from '../composables/useFarms'
-import { useAlerts } from '../composables/useAlerts'
 
 const props = defineProps({
   show: {
     type: Boolean,
     default: false
+  },
+  farms: {
+    type: Array,
+    default: () => []
+  },
+  createAlert: {
+    type: Function,
+    required: true
   }
 })
 
 const emit = defineEmits(['close', 'alert-created'])
-
-const { farms, fetchFarms } = useFarms()
-const { createAlert, loading, error } = useAlerts()
 
 const form = ref({
   farm_id: '',
@@ -124,15 +127,18 @@ const form = ref({
   message: ''
 })
 
+const loading = ref(false)
+const error = ref(null)
+
 const isFormValid = computed(() => {
   return form.value.farm_id && form.value.alert_type && form.value.message.trim()
 })
 
-// Load farms when modal opens
-watch(() => props.show, async (newValue) => {
+// Reset form when modal opens
+watch(() => props.show, (newValue) => {
   if (newValue) {
-    await fetchFarms()
     resetForm()
+    error.value = null
   }
 })
 
@@ -149,10 +155,13 @@ const closeModal = () => {
 }
 
 const submitAlert = async () => {
-  if (!isFormValid.value) return
+  if (!isFormValid.value || loading.value) return
+
+  loading.value = true
+  error.value = null
 
   try {
-    const newAlert = await createAlert({
+    const newAlert = await props.createAlert({
       farm_id: form.value.farm_id,
       alert_type: form.value.alert_type,
       message: form.value.message.trim()
@@ -164,6 +173,9 @@ const submitAlert = async () => {
     }
   } catch (err) {
     console.error('Failed to create alert:', err)
+    error.value = err?.response?.data?.message || 'Failed to create alert'
+  } finally {
+    loading.value = false
   }
 }
 </script>

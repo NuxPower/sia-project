@@ -75,11 +75,15 @@ const handleActionClick = (alert) => {
 <style scoped>
 .global-alerts-container {
   position: fixed;
-  top: 20px;
-  right: 20px;
+  top: 24px;
+  left: 50%;
+  transform: translateX(-50%);
   z-index: 9999;
-  max-width: 400px;
+  width: min(420px, calc(100% - 48px));
   pointer-events: none;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
 }
 
 .alert-notification {
@@ -93,21 +97,23 @@ const handleActionClick = (alert) => {
   gap: 12px;
   backdrop-filter: blur(15px);
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
-  transform: translateX(0);
+  transform: translateY(0);
   transition: all 0.3s cubic-bezier(0.68, -0.55, 0.265, 1.55);
   pointer-events: auto;
   position: relative;
   overflow: hidden;
   cursor: pointer;
+  width: 100%;
+  animation: dropDown 0.35s ease-out;
 }
 
 .alert-notification:hover {
-  transform: translateX(-5px) scale(1.02);
+  transform: translateY(2px) scale(1.02);
   box-shadow: 0 12px 40px rgba(0, 0, 0, 0.4);
 }
 
 .alert-notification.alert-sliding-out {
-  transform: translateX(100%);
+  transform: translateY(-120%);
   opacity: 0;
 }
 
@@ -240,9 +246,9 @@ const handleActionClick = (alert) => {
 @media (max-width: 768px) {
   .global-alerts-container {
     top: 10px;
-    right: 10px;
-    left: 10px;
-    max-width: none;
+    left: 50%;
+    transform: translateX(-50%);
+    width: calc(100% - 24px);
   }
   
   .alert-notification {
@@ -259,18 +265,13 @@ const handleActionClick = (alert) => {
   }
 }
 
-/* Animation for new alerts */
-.alert-notification {
-  animation: slideInRight 0.3s ease-out;
-}
-
-@keyframes slideInRight {
+@keyframes dropDown {
   from {
-    transform: translateX(100%);
+    transform: translateY(-40%);
     opacity: 0;
   }
   to {
-    transform: translateX(0);
+    transform: translateY(0);
     opacity: 1;
   }
 }

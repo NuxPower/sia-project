@@ -41,7 +41,25 @@
       </div>
     </div>
 
-    <!-- Weather Forecast Grid -->
+    <FarmManagementPanel
+      class="dashboard-farm-panel"
+      :farms="farms"
+      :loading="farmsLoading"
+      :is-drawing="isDrawing"
+      :is-placing-point="isPlacingPoint"
+      :soil-types="soilTypes"
+      variant="dashboard"
+      @refresh="refresh"
+      @create-farm="createFarm"
+      @save-farm="updateFarm"
+      @clear-boundary="clearBoundary"
+      @start-boundary="startBoundary"
+      @finish-boundary="finishBoundary"
+      @cancel-boundary="cancelBoundary"
+      @start-point="startPoint"
+      @cancel-point="cancelPoint"
+    />
+
     <div class="forecast-grid">
       <h3>7-Day Forecast</h3>
       <div class="forecast-cards">
@@ -91,13 +109,58 @@
 
 <script setup>
 import { computed } from 'vue';
+import FarmManagementPanel from '../FarmManagementPanel.vue';
 
 const props = defineProps({
   currentWeather: Object,
   forecast: Array,
   getDayLabel: Function,
-  getWeatherIcon: Function
+  getWeatherIcon: Function,
+  farms: {
+    type: Array,
+    default: () => []
+  },
+  soilTypes: {
+    type: Array,
+    default: () => []
+  },
+  farmsLoading: {
+    type: Boolean,
+    default: false
+  },
+  isDrawing: {
+    type: Boolean,
+    default: false
+  },
+  isPlacingPoint: {
+    type: Boolean,
+    default: false
+  }
 });
+
+const emit = defineEmits([
+  'refresh-farms',
+  'create-farm',
+  'save-farm',
+  'clear-boundary',
+  'start-boundary',
+  'finish-boundary',
+  'cancel-boundary',
+  'start-point',
+  'cancel-point'
+]);
+
+const farms = computed(() => props.farms ?? []);
+
+const refresh = () => emit('refresh-farms');
+const createFarm = (payload) => emit('create-farm', payload);
+const updateFarm = (farmId, payload) => emit('save-farm', farmId, payload);
+const clearBoundary = (farmId) => emit('clear-boundary', farmId);
+const startBoundary = (farmId) => emit('start-boundary', farmId);
+const finishBoundary = () => emit('finish-boundary');
+const cancelBoundary = () => emit('cancel-boundary');
+const startPoint = (farmId, payload) => emit('start-point', farmId, payload);
+const cancelPoint = () => emit('cancel-point');
 
 const formatDate = (date) => {
   if (!date) return '';
@@ -122,6 +185,10 @@ const formatDate = (date) => {
 
 .dashboard-view::-webkit-scrollbar {
   display: none; /* Chrome, Safari, Opera */
+}
+
+.dashboard-farm-panel {
+  margin-bottom: 24px;
 }
 
 .weather-summary-card {

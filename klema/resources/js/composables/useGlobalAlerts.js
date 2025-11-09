@@ -3,11 +3,54 @@ import { ref } from 'vue'
 const isDev = import.meta.env.VITE_APP_ENV === 'local';
 const log = (...args) => isDev && console.log(...args);
 
+const MAX_VISIBLE_ALERTS = 2;
+const activeAlertKeys = new Set();
+const alertQueue = [];
+
 const alerts = ref([])
 const isVisible = ref(false)
 
 export function useGlobalAlerts() {
+    const scheduleAutoDismiss = (alert) => {
+        if (alert.persistent) return;
+
+        if (alert.timeoutId) {
+            clearTimeout(alert.timeoutId);
+        }
+
+        alert.timeoutId = setTimeout(() => {
+            removeAlert(alert.id);
+        }, alert.duration);
+    };
+
+    const processQueue = () => {
+        while (alerts.value.length < MAX_VISIBLE_ALERTS && alertQueue.length > 0) {
+            const nextAlert = alertQueue.shift();
+            alerts.value.push(nextAlert);
+            isVisible.value = true;
+            scheduleAutoDismiss(nextAlert);
+        }
+
+        if (alerts.value.length === 0 && alertQueue.length === 0) {
+            isVisible.value = false;
+        }
+    };
+
+    const createAlertKey = (alert) => {
+        return [
+            alert.type || 'info',
+            alert.title || 'Alert',
+            alert.message || ''
+        ].join('::');
+    };
+
     const addAlert = (alert) => {
+        const key = createAlertKey(alert);
+
+        if (activeAlertKeys.has(key)) {
+            return null;
+        }
+
         const newAlert = {
             id: Date.now() + Math.random(),
             type: alert.type || 'info',
@@ -16,34 +59,64 @@ export function useGlobalAlerts() {
             duration: alert.duration || 5000,
             persistent: alert.persistent || false,
             action: alert.action || null,
-            createdAt: new Date()
+            createdAt: new Date(),
+            slidingOut: false,
+            timeoutId: null,
+            key
         }
-        
-        alerts.value.push(newAlert)
-        isVisible.value = true
-        
-        if (!newAlert.persistent) {
-            setTimeout(() => {
-                removeAlert(newAlert.id)
-            }, newAlert.duration)
-        }
-        
+
+        alertQueue.push(newAlert)
+        activeAlertKeys.add(key);
+        processQueue()
+
         return newAlert.id
     }
     
     const removeAlert = (alertId) => {
         const index = alerts.value.findIndex(alert => alert.id === alertId)
         if (index > -1) {
-            alerts.value.splice(index, 1)
+            const [removedAlert] = alerts.value.splice(index, 1)
+            if (removedAlert?.timeoutId) {
+                clearTimeout(removedAlert.timeoutId)
+            }
+            if (removedAlert?.key) {
+                activeAlertKeys.delete(removedAlert.key);
+            }
+        } else {
+            const queueIndex = alertQueue.findIndex(alert => alert.id === alertId)
+            if (queueIndex > -1) {
+                const [queuedAlert] = alertQueue.splice(queueIndex, 1)
+                if (queuedAlert?.timeoutId) {
+                    clearTimeout(queuedAlert.timeoutId)
+                }
+                if (queuedAlert?.key) {
+                    activeAlertKeys.delete(queuedAlert.key);
+                }
+            }
         }
         
-        if (alerts.value.length === 0) {
-            isVisible.value = false
-        }
+        processQueue()
     }
     
     const clearAllAlerts = () => {
+        alerts.value.forEach(alert => {
+            if (alert?.timeoutId) {
+                clearTimeout(alert.timeoutId)
+            }
+        })
+        alerts.value.forEach(alert => {
+            if (alert?.key) {
+                activeAlertKeys.delete(alert.key);
+            }
+        })
+        alertQueue.forEach(alert => {
+            if (alert?.key) {
+                activeAlertKeys.delete(alert.key);
+            }
+        })
         alerts.value = []
+        alertQueue.length = 0
+        activeAlertKeys.clear()
         isVisible.value = false
     }
     

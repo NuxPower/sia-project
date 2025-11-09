@@ -52,7 +52,7 @@
           <div class="day-number">{{ day.date }}</div>
           <div v-if="day.weather" class="day-weather">
             <i :class="getWeatherIcon(day.weather.condition)"></i>
-            <span class="day-temp">{{ day.weather.temp }}°</span>
+            <span class="day-temp">{{ day.weather.temp !== null && day.weather.temp !== undefined ? `${day.weather.temp}°` : '—' }}</span>
           </div>
           <div v-if="day.activities?.length" class="day-activities">
             <div
@@ -179,8 +179,14 @@ import { ref, computed, onMounted, watch } from 'vue';
 import axios from 'axios';
 
 const props = defineProps({
-  forecast: Array,
-  getWeatherIcon: Function
+  getWeatherIcon: {
+    type: Function,
+    required: true
+  },
+  timeline: {
+    type: Array,
+    default: () => []
+  }
 });
 
 const weekdays = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -200,6 +206,10 @@ const showActivityModal = ref(false);
 const isSubmittingActivity = ref(false);
 const formErrors = ref({});
 const formSubmitError = ref('');
+
+const forecastDays = computed(() => Array.isArray(props.timeline) ? props.timeline : []);
+
+const { getWeatherIcon } = props;
 
 function toDateOnly(value) {
   if (!value) return null;
@@ -277,6 +287,17 @@ const activitiesByDate = computed(() => {
   return grouped;
 });
 
+const forecastByDate = computed(() => {
+  return forecastDays.value.reduce((map, entry) => {
+    if (!entry) return map;
+    const dateKey = entry.date || (entry.dt ? new Date(entry.dt * 1000).toISOString().slice(0, 10) : null);
+    if (dateKey) {
+      map[dateKey] = entry;
+    }
+    return map;
+  }, {});
+});
+
 const calendarDays = computed(() => {
   const year = currentDate.value.getFullYear();
   const month = currentDate.value.getMonth();
@@ -293,11 +314,23 @@ const calendarDays = computed(() => {
   const addDay = (dateObj, { currentMonth }) => {
     const normalized = new Date(dateObj.getFullYear(), dateObj.getMonth(), dateObj.getDate());
     const dateKey = formatDateKey(normalized);
+    const forecastEntry = forecastByDate.value[dateKey];
+    const rawTemp = forecastEntry
+      ? forecastEntry.temp_max ?? forecastEntry.temp_min ?? forecastEntry.main?.temp ?? forecastEntry.temperature ?? null
+      : null;
+    const temperature = rawTemp !== null && rawTemp !== undefined ? Math.round(rawTemp) : null;
+    const weatherSummary = forecastEntry
+      ? {
+          condition: forecastEntry.condition,
+          temp: temperature,
+          raw: forecastEntry
+        }
+      : null;
     return {
       date: normalized.getDate(),
       currentMonth,
       isToday: normalized.getTime() === today.getTime(),
-      weather: props.forecast?.find((f) => f.date === dateKey) ?? null,
+      weather: weatherSummary,
       activities: activitiesByDate.value[dateKey] ?? [],
       fullDate: dateKey
     };
@@ -368,54 +401,6 @@ const closeActivityModal = () => {
 const handleDayClick = (day) => {
   openActivityModal(day.fullDate);
 };
-
-const submitActivity = async () => {
-  isSubmittingActivity.value = true;
-  formErrors.value = {};
-  formSubmitError.value = '';
-
-  try {
-    const payload = { ...form.value };
-    const { data } = await axios.post('/api/activities', payload);
-    const responseMessage = data?.message || 'Activity scheduled successfully!';
-    activityFeedback.value = responseMessage;
-    activityFeedbackType.value = data?.suitable === false ? 'warning' : 'success';
-    await fetchActivities();
-    showActivityModal.value = false;
-  } catch (error) {
-    if (error.response?.status === 422) {
-      formErrors.value = error.response.data.errors || {};
-    } else {
-      console.error('Failed to save activity', error);
-      const message = error.response?.data?.message || 'Failed to save activity. Please try again.';
-      formSubmitError.value = message;
-      activityFeedback.value = message;
-      activityFeedbackType.value = 'error';
-    }
-  } finally {
-    isSubmittingActivity.value = false;
-  }
-};
-
-const previousMonth = () => {
-  currentDate.value = new Date(
-    currentDate.value.getFullYear(),
-    currentDate.value.getMonth() - 1,
-    1
-  );
-};
-
-const nextMonth = () => {
-  currentDate.value = new Date(
-    currentDate.value.getFullYear(),
-    currentDate.value.getMonth() + 1,
-    1
-  );
-};
-
-watch(currentDate, () => {
-  fetchActivities();
-}, { immediate: true });
 
 onMounted(() => {
   resetForm(formatDateKey(new Date()));
