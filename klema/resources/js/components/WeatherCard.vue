@@ -13,7 +13,7 @@
     </div>
     
     <div class="weather-icon">
-      <i :class="getWeatherIcon(day.condition)"></i>
+      <i :class="getWeatherIcon(day)"></i>
     </div>
     
     <div class="temperature">

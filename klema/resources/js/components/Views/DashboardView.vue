@@ -11,7 +11,7 @@
         <div class="temperature-display">
           <span class="temp-value">{{ Math.round(currentWeather.main.temp) }}°C</span>
           <div class="weather-description">
-            <i :class="getWeatherIcon(currentWeather.weather[0].main)"></i>
+            <i :class="getWeatherIcon({ condition: currentWeather.weather?.[0]?.main, icon: currentWeather.weather?.[0]?.icon })"></i>
             <span>{{ currentWeather.weather[0].description }}</span>
           </div>
         </div>
@@ -72,7 +72,7 @@
           <div class="forecast-day">{{ getDayLabel(day) }}</div>
           <div class="forecast-date">{{ formatDate(day.date) }}</div>
           <div class="forecast-icon">
-            <i :class="getWeatherIcon(day.condition)"></i>
+            <i :class="getWeatherIcon(day)"></i>
           </div>
           <div class="forecast-temp">
             <span class="temp-max">{{ day.temp_max }}°</span>

@@ -134,7 +134,18 @@ const formattedDate = computed(() => {
   });
 });
 
-const weatherIcon = computed(() => getWeatherIcon(props.detail?.condition));
+const weatherIcon = computed(() => {
+  const condition =
+    props.detail?.condition ??
+    props.detail?.weather?.[0]?.main ??
+    props.day?.condition;
+  const iconCode =
+    props.detail?.icon ??
+    props.detail?.weather?.[0]?.icon ??
+    props.day?.icon;
+
+  return getWeatherIcon({ condition, icon: iconCode });
+});
 
 const precipitationChance = computed(() => {
   const val =

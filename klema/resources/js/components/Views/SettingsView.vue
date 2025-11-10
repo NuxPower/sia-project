@@ -15,7 +15,7 @@
       </h3>
       <div class="setting-item">
         <label>Default Location</label>
-        <input type="text" v-model="defaultLocation" class="setting-input">
+        <input type="text" v-model="settings.defaultLocation" class="setting-input">
       </div>
       <div class="setting-item">
         <label>Use Current Location</label>
@@ -36,18 +36,18 @@
         <label>Temperature Unit</label>
         <div class="radio-group">
           <label class="radio-label">
-            <input type="radio" name="temp" value="celsius" checked>
+            <input type="radio" name="temp" value="celsius" v-model="settings.temperatureUnit">
             <span>Celsius (°C)</span>
           </label>
           <label class="radio-label">
-            <input type="radio" name="temp" value="fahrenheit">
+            <input type="radio" name="temp" value="fahrenheit" v-model="settings.temperatureUnit">
             <span>Fahrenheit (°F)</span>
           </label>
         </div>
       </div>
       <div class="setting-item">
         <label>Wind Speed Unit</label>
-        <select class="setting-select">
+        <select class="setting-select" v-model="settings.windSpeedUnit">
           <option value="ms">m/s</option>
           <option value="kmh">km/h</option>
           <option value="mph">mph</option>
@@ -57,11 +57,11 @@
         <label>Time Format</label>
         <div class="radio-group">
           <label class="radio-label">
-            <input type="radio" name="time" value="24h" checked>
+            <input type="radio" name="time" value="24h" v-model="settings.timeFormat">
             <span>24-hour</span>
           </label>
           <label class="radio-label">
-            <input type="radio" name="time" value="12h">
+            <input type="radio" name="time" value="12h" v-model="settings.timeFormat">
             <span>12-hour</span>
           </label>
         </div>
@@ -80,7 +80,7 @@
           <small>Keep track of your location searches</small>
         </div>
         <label class="switch">
-          <input type="checkbox" checked>
+          <input type="checkbox" v-model="settings.saveSearchHistory">
           <span class="slider"></span>
         </label>
       </div>
@@ -90,7 +90,7 @@
           <small>Help improve the app by sharing usage data</small>
         </div>
         <label class="switch">
-          <input type="checkbox">
+          <input type="checkbox" v-model="settings.anonymousUsageData">
           <span class="slider"></span>
         </label>
       </div>
@@ -120,13 +120,15 @@
 
     <!-- Actions -->
     <div class="settings-actions">
-      <button class="action-button primary">
+      <button class="action-button primary" @click="saveSettings" :disabled="isSaving">
         <i class="fas fa-save"></i>
-        Save Changes
+        <span v-if="!isSaving">Save Changes</span>
+        <span v-else>Saving...</span>
       </button>
-      <button class="action-button danger">
+      <button class="action-button danger" @click="clearAllData" :disabled="isClearing">
         <i class="fas fa-trash"></i>
-        Clear All Data
+        <span v-if="!isClearing">Clear All Data</span>
+        <span v-else>Clearing...</span>
       </button>
       <button class="action-button logout" @click="logout">
         <i class="fas fa-sign-out-alt"></i>
@@ -137,26 +139,110 @@
 </template>
 
 <script setup>
-import { ref } from 'vue';
+import { reactive, ref, onMounted } from 'vue';
 import { authorizedFetch } from '../../services/http';
 import { revokeApiToken } from '../../services/auth';
+import { useGlobalAlerts } from '../../composables/useGlobalAlerts';
 
-const defaultLocation = ref('Maramag, Northern Mindanao');
+const STORAGE_KEY = 'appSettings';
+const NOTIFICATION_SETTINGS_KEY = 'notificationSettings';
+
+const defaultSettings = Object.freeze({
+  defaultLocation: 'Maramag, Northern Mindanao',
+  temperatureUnit: 'celsius',
+  windSpeedUnit: 'ms',
+  timeFormat: '24h',
+  saveSearchHistory: true,
+  anonymousUsageData: false
+});
+
+const settings = reactive({ ...defaultSettings });
+const isSaving = ref(false);
+const isClearing = ref(false);
+
+const { showSuccess, showError } = useGlobalAlerts();
+
+const loadSettings = () => {
+  if (typeof window === 'undefined') {
+    return;
+  }
+
+  try {
+    const stored = window.localStorage?.getItem(STORAGE_KEY);
+    if (stored) {
+      const parsed = JSON.parse(stored);
+      Object.assign(settings, { ...defaultSettings, ...parsed });
+    }
+  } catch (error) {
+    console.error('Failed to load settings:', error);
+    showError('Load Failed', 'Unable to load your saved settings.');
+  }
+};
+
+onMounted(() => {
+  loadSettings();
+});
+
+const saveSettings = async () => {
+  if (isSaving.value) return;
+
+  try {
+    isSaving.value = true;
+
+    if (typeof window !== 'undefined') {
+      window.localStorage?.setItem(STORAGE_KEY, JSON.stringify(settings));
+    }
+
+    showSuccess('Settings Saved', 'Your preferences have been updated.');
+  } catch (error) {
+    console.error('Save settings error:', error);
+    showError('Save Failed', 'Unable to save your settings. Please try again.');
+  } finally {
+    isSaving.value = false;
+  }
+};
+
+const clearAllData = async () => {
+  if (isClearing.value) return;
+  if (typeof window === 'undefined') return;
+
+  const confirmed = window.confirm('This will reset your local settings. Continue?');
+  if (!confirmed) return;
+
+  try {
+    isClearing.value = true;
+
+    window.localStorage?.removeItem(STORAGE_KEY);
+    window.localStorage?.removeItem(NOTIFICATION_SETTINGS_KEY);
+
+    Object.assign(settings, { ...defaultSettings });
+
+    showSuccess('Data Cleared', 'All settings have been reset to defaults.');
+  } catch (error) {
+    console.error('Clear data error:', error);
+    showError('Reset Failed', 'Unable to clear settings. Please try again.');
+  } finally {
+    isClearing.value = false;
+  }
+};
 
 const getCurrentLocation = () => {
-  if (navigator.geolocation) {
-    navigator.geolocation.getCurrentPosition(
-      (position) => {
-        console.log('Location detected:', position.coords);
-        alert(`Location detected: ${position.coords.latitude}, ${position.coords.longitude}`);
-      },
-      (error) => {
-        alert('Unable to detect location. Please check your browser permissions.');
-      }
-    );
-  } else {
-    alert('Geolocation is not supported by your browser.');
+  if (typeof navigator === 'undefined' || !navigator.geolocation) {
+    showError('Geolocation Unsupported', 'Your browser does not support geolocation.');
+    return;
   }
+
+  navigator.geolocation.getCurrentPosition(
+    (position) => {
+      console.log('Location detected:', position.coords);
+      const { latitude, longitude } = position.coords;
+      settings.defaultLocation = `${latitude.toFixed(4)}, ${longitude.toFixed(4)}`;
+      showSuccess('Location Detected', 'Default location updated. Save to keep this change.');
+    },
+    () => {
+      showError('Location Error', 'Unable to detect location. Please check your browser permissions.');
+    }
+  );
 };
 
 const logout = async () => {
@@ -173,7 +259,7 @@ const logout = async () => {
     window.location.href = '/login';
   } catch (error) {
     console.error('Logout error:', error);
-    alert('Failed to logout. Please try again.');
+    showError('Logout Failed', 'Failed to logout. Please try again.');
   }
 };
 </script>
@@ -376,6 +462,17 @@ const logout = async () => {
 
 .action-button:hover {
   transform: translateY(-2px);
+}
+
+.action-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.action-button:disabled:hover {
+  background: inherit;
+  transform: none;
 }
 
 .action-button.primary {

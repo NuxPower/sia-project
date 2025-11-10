@@ -51,7 +51,7 @@
         >
           <div class="day-number">{{ day.date }}</div>
           <div v-if="day.weather" class="day-weather">
-            <i :class="getWeatherIcon(day.weather.condition)"></i>
+            <i :class="getWeatherIcon({ condition: day.weather.condition, icon: day.weather.icon })"></i>
             <span class="day-temp">{{ day.weather.temp !== null && day.weather.temp !== undefined ? `${day.weather.temp}°` : '—' }}</span>
           </div>
           <div v-if="day.activities?.length" class="day-activities">

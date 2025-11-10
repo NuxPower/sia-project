@@ -36,6 +36,21 @@ const interactionMode = ref('weather');
 const boundaryDrawing = ref(null);
 const pointPlacement = ref(null);
 
+const clampLatitude = (value) => {
+  if (!Number.isFinite(value)) {
+    return null;
+  }
+  return Math.max(-90, Math.min(90, value));
+};
+
+const wrapLongitude = (value) => {
+  if (!Number.isFinite(value)) {
+    return null;
+  }
+  const normalized = ((value + 180) % 360 + 360) % 360;
+  return normalized - 180;
+};
+
 const initMap = async () => {
   await nextTick();
   
@@ -160,7 +175,15 @@ const handleMapClick = ({ lat, lng }) => {
     return;
   }
 
-  emit('map-click', { lat, lng });
+  const normalizedLat = clampLatitude(lat);
+  const normalizedLng = wrapLongitude(lng);
+
+  if (normalizedLat === null || normalizedLng === null) {
+    console.warn('Ignoring map click: invalid coordinates', { lat, lng });
+    return;
+  }
+
+  emit('map-click', { lat: normalizedLat, lng: normalizedLng });
 };
 
 const renderFarmOverlays = ({ farmFeatures = [], pointFeatures = [] }) => {

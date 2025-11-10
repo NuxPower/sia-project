@@ -243,8 +243,11 @@ const handleMapClick = async ({ lat, lng }) => {
     const { current, history, forecastData } = await fetchWeatherByCoordinates(lat, lng, { days: 16 });
     currentWeather.value = current;
     const previousTimeline = fullForecastTimeline.value;
-    fullForecastTimeline.value = createWeatherTimeline(history, current, forecastData, { reuseHistory: previousTimeline });
-    forecast.value = createWeatherTimeline(history, current, forecastData, { windowSize: 7, reuseHistory: previousTimeline });
+    const timelineOptions = Array.isArray(history) && history.length
+      ? { reuseHistory: previousTimeline }
+      : {};
+    fullForecastTimeline.value = createWeatherTimeline(history, current, forecastData, timelineOptions);
+    forecast.value = createWeatherTimeline(history, current, forecastData, { windowSize: 7, ...timelineOptions });
     latestForecastData.value = forecastData;
     
     if (current.name) {
@@ -283,8 +286,11 @@ const searchWeather = async () => {
 
     currentWeather.value = current;
     const previousTimeline = fullForecastTimeline.value;
-    fullForecastTimeline.value = createWeatherTimeline(history, current, forecastData, { reuseHistory: previousTimeline });
-    forecast.value = createWeatherTimeline(history, current, forecastData, { windowSize: 7, reuseHistory: previousTimeline });
+    const timelineOptions = Array.isArray(history) && history.length
+      ? { reuseHistory: previousTimeline }
+      : {};
+    fullForecastTimeline.value = createWeatherTimeline(history, current, forecastData, timelineOptions);
+    forecast.value = createWeatherTimeline(history, current, forecastData, { windowSize: 7, ...timelineOptions });
     latestForecastData.value = forecastData;
     
     if (current.coord) {

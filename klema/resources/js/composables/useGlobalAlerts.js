@@ -3,7 +3,7 @@ import { ref } from 'vue'
 const isDev = import.meta.env.VITE_APP_ENV === 'local';
 const log = (...args) => isDev && console.log(...args);
 
-const MAX_VISIBLE_ALERTS = 2;
+const MAX_VISIBLE_ALERTS = 1;
 const activeAlertKeys = new Set();
 const alertQueue = [];
 

@@ -26,7 +26,11 @@ class WeatherApiController extends Controller
     {
         $lat = $request->get('lat');
         $lon = $request->get('lon');
-        $location = $request->get('location', 'Butuan, Caraga, PH');
+        $location = $request->get('location');
+
+        if ($location === null && ($lat === null || $lon === null)) {
+            $location = 'Butuan, Caraga, PH';
+        }
         
         try {
             if ($lat && $lon) {
@@ -38,7 +42,7 @@ class WeatherApiController extends Controller
             }
 
             $this->weatherService->storeWeatherSnapshot($weather, [
-                'location' => $location,
+                'location' => $weather['name'] ?? $location,
                 'lat' => $lat,
                 'lon' => $lon,
             ]);
@@ -60,7 +64,11 @@ class WeatherApiController extends Controller
     {
         $lat = $request->get('lat');
         $lon = $request->get('lon');
-        $location = $request->get('location', 'Butuan, Caraga, PH');
+        $location = $request->get('location');
+
+        if ($location === null && ($lat === null || $lon === null)) {
+            $location = 'Butuan, Caraga, PH';
+        }
         $days = $request->get('days', 5);
         
         try {
@@ -86,7 +94,11 @@ class WeatherApiController extends Controller
     {
         $lat = $request->get('lat');
         $lon = $request->get('lon');
-        $location = $request->get('location', 'Butuan, Caraga, PH');
+        $location = $request->get('location');
+
+        if ($location === null && ($lat === null || $lon === null)) {
+            $location = 'Butuan, Caraga, PH';
+        }
         $days = (int) $request->get('days', 3);
         $days = max(1, min($days, 7));
 
@@ -97,27 +109,57 @@ class WeatherApiController extends Controller
             $today = Carbon::today();
 
             for ($i = 1; $i <= $days; $i++) {
-                $date = $today->copy()->subDays($i)->format('Y-m-d');
+                $dateObj = $today->copy()->subDays($i);
+                $date = $dateObj->format('Y-m-d');
 
                 if ($historyByDate->has($date)) {
                     continue;
                 }
 
-                if ($lat && $lon && method_exists($this->weatherService, 'getHistoricalWeatherByCoordinates')) {
-                    $entry = $this->weatherService->getHistoricalWeatherByCoordinates($lat, $lon, $date);
-                } else {
-                    $entry = $this->weatherService->getHistoricalWeather($location, $date);
+                $entry = null;
+                $fetchedExternally = false;
+                $targetLat = $lat !== null ? (float) $lat : null;
+                $targetLon = $lon !== null ? (float) $lon : null;
+
+                if ($targetLat !== null && $targetLon !== null) {
+                    $entry = $this->weatherService->findStoredHistoricalByCoordinates($targetLat, $targetLon, $dateObj);
+
+                    if ($entry === null) {
+                        $entry = $this->weatherService->fetchHistoricalSnapshotByCoordinates($targetLat, $targetLon, $dateObj);
+                        $fetchedExternally = $entry !== null;
+                    }
+                } elseif ($location) {
+                    $entry = $this->weatherService->findStoredHistoricalByLocation($location, $dateObj);
+
+                    if ($entry === null) {
+                        $geocoded = $this->weatherService->geocodeLocation($location);
+                        if ($geocoded) {
+                            $targetLat = $geocoded['lat'];
+                            $targetLon = $geocoded['lon'];
+                            $entry = $this->weatherService->fetchHistoricalSnapshotByCoordinates($targetLat, $targetLon, $dateObj);
+                            $fetchedExternally = $entry !== null;
+                            if ($entry && !isset($entry['name'])) {
+                                $entry['name'] = $geocoded['name'] ?? $location;
+                            }
+                        }
+                    }
+                }
+
+                if ($entry === null) {
+                    continue;
                 }
 
                 $normalized = $this->normalizeHistoricalEntry($date, $entry);
                 $historyByDate->put($date, $normalized);
 
-                $this->weatherService->storeWeatherSnapshot($entry, [
-                    'location' => $location,
-                    'lat' => $lat,
-                    'lon' => $lon,
-                    'recorded_at' => Carbon::createFromFormat('Y-m-d', $date)->setHour(12),
-                ]);
+                if ($fetchedExternally) {
+                    $this->weatherService->storeWeatherSnapshot($entry, [
+                        'location' => data_get($entry, 'name') ?? $location,
+                        'lat' => $targetLat,
+                        'lon' => $targetLon,
+                        'recorded_at' => $dateObj->copy()->setHour(12),
+                    ]);
+                }
             }
 
             $sortedHistory = $historyByDate->sortKeys()->values()->all();
@@ -139,7 +181,11 @@ class WeatherApiController extends Controller
     {
         $lat = $request->get('lat');
         $lon = $request->get('lon');
-        $location = $request->get('location', 'Butuan, Caraga, PH');
+        $location = $request->get('location');
+
+        if ($location === null && ($lat === null || $lon === null)) {
+            $location = 'Butuan, Caraga, PH';
+        }
         
         try {
             $dateObj = Carbon::createFromFormat('Y-m-d', $date);
@@ -149,10 +195,47 @@ class WeatherApiController extends Controller
                 ], 400);
             }
 
-            if ($lat && $lon && method_exists($this->weatherService, 'getHistoricalWeatherByCoordinates')) {
-                $historical = $this->weatherService->getHistoricalWeatherByCoordinates($lat, $lon, $date);
-            } else {
-                $historical = $this->weatherService->getHistoricalWeather($location, $date);
+            $historical = null;
+            $fetchedExternally = false;
+            $targetLat = $lat !== null ? (float) $lat : null;
+            $targetLon = $lon !== null ? (float) $lon : null;
+
+            if ($targetLat !== null && $targetLon !== null) {
+                $historical = $this->weatherService->findStoredHistoricalByCoordinates($targetLat, $targetLon, $dateObj);
+                if ($historical === null) {
+                    $historical = $this->weatherService->fetchHistoricalSnapshotByCoordinates($targetLat, $targetLon, $dateObj);
+                    $fetchedExternally = $historical !== null;
+                }
+            } elseif ($location) {
+                $historical = $this->weatherService->findStoredHistoricalByLocation($location, $dateObj);
+
+                if ($historical === null) {
+                    $geocoded = $this->weatherService->geocodeLocation($location);
+                    if ($geocoded) {
+                        $targetLat = $geocoded['lat'];
+                        $targetLon = $geocoded['lon'];
+                        $historical = $this->weatherService->fetchHistoricalSnapshotByCoordinates($targetLat, $targetLon, $dateObj);
+                        $fetchedExternally = $historical !== null;
+                        if ($historical && !isset($historical['name'])) {
+                            $historical['name'] = $geocoded['name'] ?? $location;
+                        }
+                    }
+                }
+            }
+
+            if ($historical === null) {
+                return response()->json([
+                    'message' => 'Historical weather data is unavailable for the requested location.',
+                ], 404);
+            }
+
+            if ($fetchedExternally) {
+                $this->weatherService->storeWeatherSnapshot($historical, [
+                    'location' => data_get($historical, 'name') ?? $location,
+                    'lat' => $targetLat,
+                    'lon' => $targetLon,
+                    'recorded_at' => $dateObj->copy()->setHour(12),
+                ]);
             }
 
             return response()->json($this->normalizeHistoricalEntry($date, $historical));
