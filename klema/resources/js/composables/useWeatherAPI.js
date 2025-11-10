@@ -3,7 +3,8 @@ import { authorizedFetch } from '../services/http';
 export function useWeatherAPI() {
   const fetchWeatherByCoordinates = async (lat, lng, options = {}) => {
     const days = Math.max(1, Math.min(options.days ?? 7, 16));
-    const historyDays = Math.max(1, Math.min(options.historyDays ?? 3, 10));
+    const requestedHistoryDays = options.historyDays ?? 30;
+    const historyDays = Math.max(1, Math.min(requestedHistoryDays, 30));
     const includeHistory = options.includeHistory ?? true;
 
     const currentUrl = `/api/weather/current?lat=${lat}&lon=${lng}`;
@@ -34,7 +35,8 @@ export function useWeatherAPI() {
   
   const fetchWeatherByLocation = async (location, options = {}) => {
     const days = Math.max(1, Math.min(options.days ?? 7, 16));
-    const historyDays = Math.max(1, Math.min(options.historyDays ?? 3, 10));
+    const requestedHistoryDays = options.historyDays ?? 30;
+    const historyDays = Math.max(1, Math.min(requestedHistoryDays, 30));
     const includeHistory = options.includeHistory ?? true;
 
     const currentResponse = await authorizedFetch(`/api/weather/current?location=${encodeURIComponent(location)}`);
@@ -54,6 +56,72 @@ export function useWeatherAPI() {
     }
     
     return { current, forecastData, history };
+  };
+  
+  const fetchWeatherHistory = async ({ lat, lon, location, days = 30 } = {}) => {
+    const normalizeCoordinate = (value) => {
+      if (value === null || value === undefined) {
+        return null;
+      }
+
+      const numeric = Number(value);
+      return Number.isFinite(numeric) ? numeric : null;
+    };
+
+    const historyDays = Math.max(1, Math.min(days ?? 30, 30));
+    const params = new URLSearchParams();
+    params.set('days', historyDays.toString());
+
+    const normalizedLat = normalizeCoordinate(lat);
+    const normalizedLon = normalizeCoordinate(lon);
+
+    if (Number.isFinite(normalizedLat) && Number.isFinite(normalizedLon)) {
+      params.set('lat', normalizedLat.toString());
+      params.set('lon', normalizedLon.toString());
+    } else if (typeof location === 'string' && location.trim()) {
+      params.set('location', location.trim());
+    }
+
+    const url = `/api/weather/history?${params.toString()}`;
+    const response = await authorizedFetch(url);
+    if (!response.ok) {
+      throw new Error(`Failed to fetch extended weather history: ${response.status}`);
+    }
+
+    return await response.json();
+  };
+
+  const fetchWeatherForecast = async ({ lat, lon, location, days = 16 } = {}) => {
+    const normalizeCoordinate = (value) => {
+      if (value === null || value === undefined) {
+        return null;
+      }
+
+      const numeric = Number(value);
+      return Number.isFinite(numeric) ? numeric : null;
+    };
+
+    const forecastDays = Math.max(1, Math.min(days ?? 16, 16));
+    const params = new URLSearchParams();
+    params.set('days', forecastDays.toString());
+
+    const normalizedLat = normalizeCoordinate(lat);
+    const normalizedLon = normalizeCoordinate(lon);
+
+    if (Number.isFinite(normalizedLat) && Number.isFinite(normalizedLon)) {
+      params.set('lat', normalizedLat.toString());
+      params.set('lon', normalizedLon.toString());
+    } else if (typeof location === 'string' && location.trim()) {
+      params.set('location', location.trim());
+    }
+
+    const url = `/api/weather/forecast?${params.toString()}`;
+    const response = await authorizedFetch(url);
+    if (!response.ok) {
+      throw new Error(`Failed to fetch extended weather forecast: ${response.status}`);
+    }
+
+    return await response.json();
   };
   
   const createWeatherTimeline = (historyData, currentWeather, forecastData, options = {}) => {
@@ -128,18 +196,32 @@ export function useWeatherAPI() {
       return null;
     };
 
-    const { reuseHistory = [] } = options;
+    const {
+      reuseHistory = [],
+      historyWindow = null,
+      includeNoDataPlaceholders = true
+    } = options;
 
     const historyList = Array.isArray(historyData) ? historyData : [];
     const forecastList = Array.isArray(forecastData) ? forecastData : [];
 
-    const pushHistoryEntry = (entry) => {
-      if (!entry) return;
+    const historyEntriesMap = new Map();
+
+    if (Array.isArray(reuseHistory) && reuseHistory.length) {
+      reuseHistory
+        .filter(entry => entry?.isHistory && entry?.date)
+        .forEach(entry => {
+          historyEntriesMap.set(entry.date, { ...entry });
+        });
+    }
+
+    const buildHistoryEntry = (entry) => {
+      if (!entry) return null;
       const normalized = normalizeWeather(entry);
-      if (!normalized) return;
+      if (!normalized) return null;
 
       const dateKey = extractEntryDate(entry);
-      if (!dateKey) return;
+      if (!dateKey) return null;
 
       const dateObj = new Date(dateKey);
 
@@ -150,7 +232,7 @@ export function useWeatherAPI() {
         entry.temp_min ?? entry.main?.temp_min ?? entry.temp?.min ?? entry.main?.temp
       );
 
-      timeline.push({
+      return {
         date: dateKey,
         day: dateObj.toLocaleDateString('en-US', { weekday: 'short' }),
         temp_max: tempMax,
@@ -159,24 +241,56 @@ export function useWeatherAPI() {
         description: normalized.description,
         icon: normalized.icon,
         isHistory: true
-      });
+      };
     };
 
     if (historyList.length) {
-      for (let i = 3; i >= 1; i--) {
-        const date = new Date(today);
-        date.setDate(date.getDate() - i);
-
-        const dateStr = formatLocalDate(date);
-        const historyDay = historyList.find((h) => extractEntryDate(h) === dateStr) || null;
-        if (!historyDay) continue;
-        pushHistoryEntry(historyDay);
-      }
-    } else if (Array.isArray(reuseHistory) && reuseHistory.length) {
-      const previousHistory = reuseHistory.filter(entry => entry?.isHistory).slice(-3);
-      previousHistory.forEach(entry => {
-        timeline.push({ ...entry });
+      historyList.forEach((entry) => {
+        const normalizedEntry = buildHistoryEntry(entry);
+        if (normalizedEntry) {
+          historyEntriesMap.set(normalizedEntry.date, normalizedEntry);
+        }
       });
+    }
+
+    const resolvedHistoryWindow = historyWindow
+      ? Math.max(1, Math.min(historyWindow, 30))
+      : null;
+
+    if (resolvedHistoryWindow) {
+      for (let i = resolvedHistoryWindow; i >= 1; i--) {
+        const dateObj = new Date(today);
+        dateObj.setDate(dateObj.getDate() - i);
+        const dateKey = formatLocalDate(dateObj);
+        const existingEntry = historyEntriesMap.get(dateKey);
+
+        if (existingEntry) {
+          timeline.push(existingEntry);
+          continue;
+        }
+
+        if (includeNoDataPlaceholders) {
+          const placeholder = {
+            date: dateKey,
+            day: dateObj.toLocaleDateString('en-US', { weekday: 'short' }),
+            temp_max: null,
+            temp_min: null,
+            condition: 'No data',
+            description: 'No data available',
+            icon: null,
+            isHistory: true,
+            noData: true,
+            isPlaceholder: true
+          };
+          timeline.push(placeholder);
+          historyEntriesMap.set(dateKey, placeholder);
+        }
+      }
+    } else if (historyEntriesMap.size) {
+      Array.from(historyEntriesMap.values())
+        .sort((a, b) => new Date(a.date) - new Date(b.date))
+        .slice(-30)
+        .forEach(entry => timeline.push(entry));
     }
 
     const weatherEntry = currentWeather?.weather?.[0];
@@ -260,6 +374,8 @@ export function useWeatherAPI() {
   return {
     fetchWeatherByCoordinates,
     fetchWeatherByLocation,
+    fetchWeatherHistory,
+    fetchWeatherForecast,
     createWeatherTimeline
   };
 }

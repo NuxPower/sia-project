@@ -46,59 +46,14 @@
       <div v-if="activeView !== 'map' && !selectedDayDetail" class="overlay-wrapper">
         <div class="overlay-panel">
           <div class="overlay-content">
-            <DashboardView 
-              v-if="activeView === 'dashboard'"
-              :current-weather="currentWeather"
-              :forecast="forecast"
-              :get-day-label="getDayLabel"
-              :get-weather-icon="getWeatherIcon"
-              :farms="rawFarms"
-              :soil-types="soilTypes"
-              :farms-loading="farmMapLoading"
-              :is-drawing="!!boundarySession"
-              :is-placing-point="!!pointSession"
-              @refresh-farms="refreshFarmLayers"
-              @create-farm="createFarm"
-              @save-farm="updateFarmDetails"
-              @clear-boundary="removeFarmBoundary"
-              @start-boundary="startBoundaryEditing"
-              @finish-boundary="finishBoundaryEditing"
-              @cancel-boundary="cancelBoundaryEditing"
-              @start-point="startPointPlacement"
-              @cancel-point="cancelPointPlacement"
-            />
-
-            <CalendarView 
-              v-else-if="activeView === 'calendar'"
-              :get-weather-icon="getWeatherIcon"
-              :timeline="fullForecastTimeline"
-            />
-
-            <AlertsView 
-              v-else-if="activeView === 'alerts'"
-              :alerts="alerts"
-              :alerts-loading="alertsLoading"
-              :alerts-error="alertsError"
-              :forecast-warnings="forecastWarnings"
-              :notification-settings="notificationSettings"
-              :settings-loading="settingsLoading"
-              :settings-error="settingsError"
-              :settings-saved="settingsSaved"
-              :get-alert-type-info="getAlertTypeInfo"
-              :format-alert-time="formatAlertTime"
-              :get-setting-info="getSettingInfo"
-              :resolve-alert="resolveAlert"
-              :delete-alert="deleteAlert"
-              :update-notification-setting="handleNotificationSettingUpdate"
-              :fetch-active-alerts="fetchActiveAlerts"
-              :refresh-forecast-warnings="refreshForecastWarnings"
-              :load-notification-settings="loadSettings"
-              :create-alert="handleCreateAlert"
-              :farms="alertsFarms"
-              :location-label="currentLocationLabel"
-            />
-
-            <SettingsView v-else-if="activeView === 'settings'" />
+            <Transition name="view-slide-fade" mode="out-in">
+              <component
+                v-if="overlayViewConfig.component"
+                :is="overlayViewConfig.component"
+                v-bind="overlayViewConfig.props"
+                :key="overlayViewConfig.key"
+              />
+            </Transition>
           </div>
         </div>
       </div>
@@ -139,10 +94,18 @@ import { useGlobalAlerts } from '../composables/useGlobalAlerts';
 import { useFarmMap } from '../composables/useFarmMap';
 import { ensureApiToken } from '../services/auth';
 import { useAlerts } from '../composables/useAlerts';
-import { useNotificationSettings } from '../composables/useNotificationSettings';
+import { 
+  useNotificationSettings,
+  DEFAULT_NOTIFICATION_SETTINGS,
+  SUPPORTED_NOTIFICATION_SETTING_KEYS
+} from '../composables/useNotificationSettings';
 
 const weatherMapRef = ref(null);
 const DEFAULT_LOCATION = 'Maramag, Northern Mindanao';
+const INITIAL_HISTORY_DAYS = 3;
+const INITIAL_FORECAST_DAYS = 4;
+const MAX_HISTORY_WINDOW = 30;
+const MAX_FORECAST_WINDOW = 16;
 const searchLocation = ref(DEFAULT_LOCATION);
 const forecast = ref([]);
 const fullForecastTimeline = ref([]);
@@ -153,16 +116,25 @@ const activeView = ref('map');
 const boundarySession = ref(null);
 const pointSession = ref(null);
 let suppressNextLocationUpdate = false;
-const latestForecastData = ref(null);
+const latestHistoryData = ref([]);
+const latestForecastData = ref([]);
 const farmPrefillComplete = ref(false);
 const selectedDay = ref(null);
 const selectedDayDetail = ref(null);
 const selectedDayHourly = ref([]);
+const isExtendingHistory = ref(false);
+const activeHistoryFetchKey = ref(null);
+const currentHistoryContext = ref(null);
+const isExtendingForecast = ref(false);
+const activeForecastFetchKey = ref(null);
+const currentForecastContext = ref(null);
 
 const { 
   fetchWeatherByLocation, 
   fetchWeatherByCoordinates,
-  createWeatherTimeline 
+  createWeatherTimeline,
+  fetchWeatherHistory,
+  fetchWeatherForecast
 } = useWeatherAPI();
 
 const { getDayLabel, getWeatherIcon } = useWeatherUtils();
@@ -199,6 +171,38 @@ const {
 const settingsSaved = ref(false);
 const alertsInitialized = ref(false);
 
+const snapshotNotificationPreferences = () => {
+  return Array.from(SUPPORTED_NOTIFICATION_SETTING_KEYS).reduce((acc, key) => {
+    const currentValue = notificationSettings[key];
+    if (typeof currentValue === 'boolean') {
+      acc[key] = currentValue;
+    } else {
+      acc[key] = DEFAULT_NOTIFICATION_SETTINGS[key];
+    }
+    return acc;
+  }, {});
+};
+
+const normalizeForecastArray = (source) => {
+  if (Array.isArray(source)) {
+    return source;
+  }
+
+  if (Array.isArray(source?.forecast)) {
+    return source.forecast;
+  }
+
+  if (Array.isArray(source?.daily)) {
+    return source.daily;
+  }
+
+  if (Array.isArray(source?.list)) {
+    return source.list;
+  }
+
+  return [];
+};
+
 const alertsFarms = computed(() => rawFarms.value ?? []);
 const farmCoordinateMap = computed(() => {
   return (rawFarms.value ?? []).reduce((map, farm) => {
@@ -217,6 +221,302 @@ const currentLocationLabel = computed(() => {
   }
   return searchLocation.value;
 });
+
+const overlayViewConfig = computed(() => {
+  switch (activeView.value) {
+    case 'dashboard':
+      return {
+        key: 'dashboard',
+        component: DashboardView,
+        props: {
+          currentWeather: currentWeather.value,
+          forecast: forecast.value,
+          getDayLabel,
+          getWeatherIcon,
+          farms: rawFarms.value,
+          soilTypes: soilTypes.value,
+          farmsLoading: farmMapLoading.value,
+          isDrawing: !!boundarySession.value,
+          isPlacingPoint: !!pointSession.value,
+          onRefreshFarms: refreshFarmLayers,
+          onCreateFarm: createFarm,
+          onSaveFarm: updateFarmDetails,
+          onClearBoundary: removeFarmBoundary,
+          onStartBoundary: startBoundaryEditing,
+          onFinishBoundary: finishBoundaryEditing,
+          onCancelBoundary: cancelBoundaryEditing,
+          onStartPoint: startPointPlacement,
+          onCancelPoint: cancelPointPlacement
+        }
+      };
+    case 'calendar':
+      return {
+        key: 'calendar',
+        component: CalendarView,
+        props: {
+          getWeatherIcon,
+          timeline: fullForecastTimeline.value
+        }
+      };
+    case 'alerts':
+      return {
+        key: 'alerts',
+        component: AlertsView,
+        props: {
+          alerts: alerts.value,
+          alertsLoading: alertsLoading.value,
+          alertsError: alertsError.value,
+          forecastWarnings: forecastWarnings.value,
+          notificationSettings: notificationSettings,
+          settingsLoading: settingsLoading.value,
+          settingsError: settingsError.value,
+          settingsSaved: settingsSaved.value,
+          getAlertTypeInfo,
+          formatAlertTime,
+          getSettingInfo,
+          resolveAlert,
+          deleteAlert,
+          updateNotificationSetting: handleNotificationSettingUpdate,
+          fetchActiveAlerts,
+          refreshForecastWarnings,
+          loadNotificationSettings: loadSettings,
+          createAlert: handleCreateAlert,
+          farms: alertsFarms.value,
+          locationLabel: currentLocationLabel.value
+        }
+      };
+    case 'settings':
+      return {
+        key: 'settings',
+        component: SettingsView,
+        props: {}
+      };
+    default:
+      return {
+        key: '',
+        component: null,
+        props: {}
+      };
+  }
+});
+
+const normalizeCoordinate = (value) => {
+  if (value === null || value === undefined) {
+    return null;
+  }
+
+  const numeric = Number(value);
+  return Number.isFinite(numeric) ? numeric : null;
+};
+
+const buildBaseSource = ({ lat, lon, location }) => {
+  const normalizedLat = normalizeCoordinate(lat);
+  const normalizedLon = normalizeCoordinate(lon);
+  const normalizedLocation = typeof location === 'string' ? location.trim() : '';
+
+  const hasCoords = Number.isFinite(normalizedLat) && Number.isFinite(normalizedLon);
+  const hasLocation = normalizedLocation.length > 0;
+
+  if (!hasCoords && !hasLocation) {
+    return null;
+  }
+
+  return {
+    lat: hasCoords ? normalizedLat : null,
+    lon: hasCoords ? normalizedLon : null,
+    location: hasLocation ? normalizedLocation : null
+  };
+};
+
+const buildHistorySource = ({ lat, lon, location, initialHistoryLength = 0 }) => {
+  const base = buildBaseSource({ lat, lon, location });
+  if (!base) {
+    return null;
+  }
+
+  return {
+    ...base,
+    initialHistoryLength
+  };
+};
+
+const buildForecastSource = ({ lat, lon, location, initialForecastLength = 0 }) => {
+  const base = buildBaseSource({ lat, lon, location });
+  if (!base) {
+    return null;
+  }
+
+  return {
+    ...base,
+    initialForecastLength
+  };
+};
+
+const buildSourceKey = (source) => {
+  if (!source) {
+    return null;
+  }
+
+  if (Number.isFinite(source.lat) && Number.isFinite(source.lon)) {
+    return `coord:${source.lat.toFixed(4)},${source.lon.toFixed(4)}`;
+  }
+
+  if (source.location) {
+    return `loc:${source.location.toLowerCase()}`;
+  }
+
+  return null;
+};
+
+const refreshTimeline = (history, forecastData, reuseTimeline = fullForecastTimeline.value) => {
+  const effectiveHistory = Array.isArray(history)
+    ? history
+    : (Array.isArray(latestHistoryData.value) ? latestHistoryData.value : []);
+  const effectiveForecast = Array.isArray(forecastData)
+    ? forecastData
+    : (Array.isArray(latestForecastData.value) ? latestForecastData.value : []);
+
+  latestHistoryData.value = Array.isArray(effectiveHistory) ? [...effectiveHistory] : [];
+  latestForecastData.value = Array.isArray(effectiveForecast) ? [...effectiveForecast] : [];
+
+  const timelineOptions = {
+    historyWindow: MAX_HISTORY_WINDOW,
+    reuseHistory: reuseTimeline ?? fullForecastTimeline.value
+  };
+
+  fullForecastTimeline.value = createWeatherTimeline(
+    latestHistoryData.value,
+    currentWeather.value,
+    latestForecastData.value,
+    timelineOptions
+  );
+  forecast.value = createWeatherTimeline(
+    latestHistoryData.value,
+    currentWeather.value,
+    latestForecastData.value,
+    { windowSize: 7, ...timelineOptions }
+  );
+};
+
+const scheduleExtendedHistoryFetch = (source) => {
+  if (!source) {
+    currentHistoryContext.value = null;
+    return;
+  }
+
+  const key = buildSourceKey(source);
+  currentHistoryContext.value = key;
+
+  if (!key) {
+    return;
+  }
+
+  if (source.initialHistoryLength >= MAX_HISTORY_WINDOW) {
+    return;
+  }
+
+  if (Array.isArray(fullForecastTimeline.value)) {
+    const existingHistoryCount = fullForecastTimeline.value.filter(
+      (entry) => entry?.isHistory && !entry?.noData
+    ).length;
+
+    if (existingHistoryCount >= MAX_HISTORY_WINDOW) {
+      return;
+    }
+  }
+
+  if (activeHistoryFetchKey.value === key) {
+    return;
+  }
+
+  activeHistoryFetchKey.value = key;
+  isExtendingHistory.value = true;
+
+  fetchWeatherHistory({
+    lat: source.lat ?? undefined,
+    lon: source.lon ?? undefined,
+    location: source.location ?? undefined,
+    days: MAX_HISTORY_WINDOW
+  })
+    .then((extendedHistory) => {
+      if (currentHistoryContext.value !== key) {
+        return;
+      }
+
+      if (Array.isArray(extendedHistory) && extendedHistory.length) {
+        refreshTimeline(extendedHistory, latestForecastData.value, fullForecastTimeline.value);
+      }
+    })
+    .catch((error) => {
+      console.warn('Failed to extend weather history:', error);
+    })
+    .finally(() => {
+      if (activeHistoryFetchKey.value === key) {
+        activeHistoryFetchKey.value = null;
+        isExtendingHistory.value = false;
+      }
+    });
+};
+
+const scheduleExtendedForecastFetch = (source) => {
+  if (!source) {
+    currentForecastContext.value = null;
+    return;
+  }
+
+  const key = buildSourceKey(source);
+  currentForecastContext.value = key;
+
+  if (!key) {
+    return;
+  }
+
+  if (source.initialForecastLength >= MAX_FORECAST_WINDOW) {
+    return;
+  }
+
+  if (Array.isArray(fullForecastTimeline.value)) {
+    const existingForecastCount = fullForecastTimeline.value.filter(
+      (entry) => entry?.isFuture
+    ).length;
+
+    if (existingForecastCount >= MAX_FORECAST_WINDOW) {
+      return;
+    }
+  }
+
+  if (activeForecastFetchKey.value === key) {
+    return;
+  }
+
+  activeForecastFetchKey.value = key;
+  isExtendingForecast.value = true;
+
+  fetchWeatherForecast({
+    lat: source.lat ?? undefined,
+    lon: source.lon ?? undefined,
+    location: source.location ?? undefined,
+    days: MAX_FORECAST_WINDOW
+  })
+    .then((extendedForecast) => {
+      if (currentForecastContext.value !== key) {
+        return;
+      }
+
+      if (Array.isArray(extendedForecast) && extendedForecast.length) {
+        refreshTimeline(latestHistoryData.value, extendedForecast, fullForecastTimeline.value);
+      }
+    })
+    .catch((error) => {
+      console.warn('Failed to extend weather forecast:', error);
+    })
+    .finally(() => {
+      if (activeForecastFetchKey.value === key) {
+        activeForecastFetchKey.value = null;
+        isExtendingForecast.value = false;
+      }
+    });
+};
 
 watch(rawFarms, async (farms, previous) => {
   if (farms && farms.length > 0) {
@@ -240,22 +540,38 @@ const handleLayerToggle = ({ layerId, active }) => {
 const handleMapClick = async ({ lat, lng }) => {
   isLoadingWeather.value = true;
   try {
-    const { current, history, forecastData } = await fetchWeatherByCoordinates(lat, lng, { days: 16 });
+    const { current, history, forecastData } = await fetchWeatherByCoordinates(
+      lat,
+      lng,
+      { days: INITIAL_FORECAST_DAYS, historyDays: INITIAL_HISTORY_DAYS }
+    );
     currentWeather.value = current;
-    const previousTimeline = fullForecastTimeline.value;
-    const timelineOptions = Array.isArray(history) && history.length
-      ? { reuseHistory: previousTimeline }
-      : {};
-    fullForecastTimeline.value = createWeatherTimeline(history, current, forecastData, timelineOptions);
-    forecast.value = createWeatherTimeline(history, current, forecastData, { windowSize: 7, ...timelineOptions });
-    latestForecastData.value = forecastData;
-    
+    refreshTimeline(history, forecastData, fullForecastTimeline.value);
+
     if (current.name) {
       searchLocation.value = `${current.name}, ${current.sys.country}`;
     }
-    
+
+    const historySource = buildHistorySource({
+      lat,
+      lon: lng,
+      location: current?.name ?? searchLocation.value,
+      initialHistoryLength: Array.isArray(history) ? history.length : 0
+    });
+    scheduleExtendedHistoryFetch(historySource);
+    const forecastSource = buildForecastSource({
+      lat,
+      lon: lng,
+      location: current?.name ?? searchLocation.value,
+      initialForecastLength: Array.isArray(forecastData) ? forecastData.length : 0
+    });
+    scheduleExtendedForecastFetch(forecastSource);
+
     weatherMapRef.value?.updateMarker(lat, lng, current);
-    checkWeatherConditions({ current, history, forecast: forecastData });
+    checkWeatherConditions(
+      { current, history, forecast: forecastData },
+      snapshotNotificationPreferences()
+    );
     await fetchForecastWarnings({ forecast: forecastData });
     if (selectedDay.value?.date) {
       hydrateSelectedDay(selectedDay.value.date);
@@ -279,20 +595,36 @@ const searchWeather = async () => {
     let current, history, forecastData;
 
     if (farmMatch) {
-      ({ current, history, forecastData } = await fetchWeatherByCoordinates(farmMatch.lat, farmMatch.lon, { days: 16 }));
+      ({ current, history, forecastData } = await fetchWeatherByCoordinates(
+        farmMatch.lat,
+        farmMatch.lon,
+        { days: INITIAL_FORECAST_DAYS, historyDays: INITIAL_HISTORY_DAYS }
+      ));
     } else {
-      ({ current, history, forecastData } = await fetchWeatherByLocation(trimmed, { days: 16 }));
+      ({ current, history, forecastData } = await fetchWeatherByLocation(
+        trimmed,
+        { days: INITIAL_FORECAST_DAYS, historyDays: INITIAL_HISTORY_DAYS }
+      ));
     }
 
     currentWeather.value = current;
-    const previousTimeline = fullForecastTimeline.value;
-    const timelineOptions = Array.isArray(history) && history.length
-      ? { reuseHistory: previousTimeline }
-      : {};
-    fullForecastTimeline.value = createWeatherTimeline(history, current, forecastData, timelineOptions);
-    forecast.value = createWeatherTimeline(history, current, forecastData, { windowSize: 7, ...timelineOptions });
-    latestForecastData.value = forecastData;
-    
+    refreshTimeline(history, forecastData, fullForecastTimeline.value);
+
+    const historySource = buildHistorySource({
+      lat: farmMatch ? farmMatch.lat : current?.coord?.lat,
+      lon: farmMatch ? farmMatch.lon : current?.coord?.lon,
+      location: trimmed,
+      initialHistoryLength: Array.isArray(history) ? history.length : 0
+    });
+    scheduleExtendedHistoryFetch(historySource);
+    const forecastSource = buildForecastSource({
+      lat: farmMatch ? farmMatch.lat : current?.coord?.lat,
+      lon: farmMatch ? farmMatch.lon : current?.coord?.lon,
+      location: trimmed,
+      initialForecastLength: Array.isArray(forecastData) ? forecastData.length : 0
+    });
+    scheduleExtendedForecastFetch(forecastSource);
+
     if (current.coord) {
       weatherMapRef.value?.moveToLocation(current.coord.lat, current.coord.lon);
       weatherMapRef.value?.updateMarker(current.coord.lat, current.coord.lon, current);
@@ -302,7 +634,10 @@ const searchWeather = async () => {
       farmPrefillComplete.value = true;
     }
     
-    checkWeatherConditions({ current, history, forecast: forecastData });
+    checkWeatherConditions(
+      { current, history, forecast: forecastData },
+      snapshotNotificationPreferences()
+    );
     await fetchForecastWarnings({ forecast: forecastData });
   } catch (error) {
     console.error('Error searching weather:', error);
@@ -333,15 +668,33 @@ const initializeDefaultLocation = async () => {
     const lon = parseFloat(firstFarm?.longitude);
     if (!Number.isNaN(lat) && !Number.isNaN(lon)) {
       try {
-        const { current, history, forecastData } = await fetchWeatherByCoordinates(lat, lon, { days: 16 });
+        const { current, history, forecastData } = await fetchWeatherByCoordinates(
+          lat,
+          lon,
+          { days: INITIAL_FORECAST_DAYS, historyDays: INITIAL_HISTORY_DAYS }
+        );
         currentWeather.value = current;
-        const previousTimeline = fullForecastTimeline.value;
-        fullForecastTimeline.value = createWeatherTimeline(history, current, forecastData, { reuseHistory: previousTimeline });
-        forecast.value = createWeatherTimeline(history, current, forecastData, { windowSize: 7, reuseHistory: previousTimeline });
-        latestForecastData.value = forecastData;
+        refreshTimeline(history, forecastData, fullForecastTimeline.value);
+        const historySource = buildHistorySource({
+          lat,
+          lon,
+          location: name,
+          initialHistoryLength: Array.isArray(history) ? history.length : 0
+        });
+        scheduleExtendedHistoryFetch(historySource);
+        const forecastSource = buildForecastSource({
+          lat,
+          lon,
+          location: name,
+          initialForecastLength: Array.isArray(forecastData) ? forecastData.length : 0
+        });
+        scheduleExtendedForecastFetch(forecastSource);
         weatherMapRef.value?.moveToLocation(lat, lon);
         weatherMapRef.value?.updateMarker(lat, lon, current);
-        checkWeatherConditions({ current, history, forecast: forecastData });
+        checkWeatherConditions(
+          { current, history, forecast: forecastData },
+          snapshotNotificationPreferences()
+        );
         await fetchForecastWarnings({ forecast: forecastData });
         farmPrefillComplete.value = true;
         return true;
@@ -497,16 +850,34 @@ const updateWeatherForLocation = async (lat, lng, name = null) => {
   isLoadingWeather.value = true;
 
   try {
-    const { current, history, forecastData } = await fetchWeatherByCoordinates(lat, lng, { days: 16 });
+    const { current, history, forecastData } = await fetchWeatherByCoordinates(
+      lat,
+      lng,
+      { days: INITIAL_FORECAST_DAYS, historyDays: INITIAL_HISTORY_DAYS }
+    );
     currentWeather.value = {
       ...current,
       name: name ?? current?.name ?? 'Farm Location'
     };
-    const previousTimeline = fullForecastTimeline.value;
-    fullForecastTimeline.value = createWeatherTimeline(history, currentWeather.value, forecastData, { reuseHistory: previousTimeline });
-    forecast.value = createWeatherTimeline(history, currentWeather.value, forecastData, { windowSize: 7, reuseHistory: previousTimeline });
-    latestForecastData.value = forecastData;
-    checkWeatherConditions({ current: currentWeather.value, history, forecast: forecastData });
+    refreshTimeline(history, forecastData, fullForecastTimeline.value);
+    const historySource = buildHistorySource({
+      lat,
+      lon: lng,
+      location: currentWeather.value.name,
+      initialHistoryLength: Array.isArray(history) ? history.length : 0
+    });
+    scheduleExtendedHistoryFetch(historySource);
+    const forecastSource = buildForecastSource({
+      lat,
+      lon: lng,
+      location: currentWeather.value.name,
+      initialForecastLength: Array.isArray(forecastData) ? forecastData.length : 0
+    });
+    scheduleExtendedForecastFetch(forecastSource);
+    checkWeatherConditions(
+      { current: currentWeather.value, history, forecast: forecastData },
+      snapshotNotificationPreferences()
+    );
     await fetchForecastWarnings({ forecast: forecastData });
 
     suppressNextLocationUpdate = true;
@@ -606,16 +977,20 @@ const initializeAlertsPanel = async () => {
 };
 
 const refreshForecastWarnings = async () => {
+  const preferences = snapshotNotificationPreferences();
+
   try {
-    if (latestForecastData.value) {
-      await fetchForecastWarnings({ forecast: latestForecastData.value });
+    const hasCachedForecast = Array.isArray(latestForecastData.value) && latestForecastData.value.length > 0;
+    if (hasCachedForecast) {
+      await fetchForecastWarnings({ forecast: latestForecastData.value, preferences });
       return;
     }
 
     const targetLocation = searchLocation.value || 'Butuan, Caraga, PH';
     const { forecastData } = await fetchWeatherByLocation(targetLocation);
-    latestForecastData.value = forecastData;
-    await fetchForecastWarnings({ forecast: forecastData });
+    const normalizedForecast = normalizeForecastArray(forecastData);
+    latestForecastData.value = normalizedForecast;
+    await fetchForecastWarnings({ forecast: normalizedForecast, preferences });
   } catch (error) {
     console.error('Failed to refresh forecast warnings:', error);
     forecastWarnings.value = [];
@@ -625,6 +1000,7 @@ const refreshForecastWarnings = async () => {
 const handleNotificationSettingUpdate = async (settingName, value) => {
   try {
     await updateSetting(settingName, value);
+    await refreshForecastWarnings();
     settingsSaved.value = true;
     setTimeout(() => {
       settingsSaved.value = false;
@@ -786,5 +1162,16 @@ const closeDayDetail = () => {
 .overlay-fade-leave-to {
   opacity: 0;
   transform: translateY(12px);
+}
+
+.view-slide-fade-enter-active,
+.view-slide-fade-leave-active {
+  transition: opacity 0.25s ease, transform 0.25s ease;
+}
+
+.view-slide-fade-enter-from,
+.view-slide-fade-leave-to {
+  opacity: 0;
+  transform: translateY(10px);
 }
 </style>

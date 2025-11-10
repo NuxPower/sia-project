@@ -61,9 +61,13 @@ const initMap = async () => {
   mapContainer.value.style.minHeight = '100vh';
   
   map.value = L.map(mapContainer.value, {
-    zoomControl: true,
+    zoomControl: false,
     attributionControl: true
   }).setView([7.5, 124.5], 7);
+
+  L.control.zoom({
+    position: 'bottomright'
+  }).addTo(map.value);
   
   map.value.on('click', (e) => {
     handleMapClick(e.latlng);
@@ -447,5 +451,10 @@ defineExpose({
   justify-content: center;
   border: 2px solid #fff;
   box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+}
+
+.leaflet-bottom.leaflet-right {
+  margin-bottom: 16px;
+  margin-right: 16px;
 }
 </style>

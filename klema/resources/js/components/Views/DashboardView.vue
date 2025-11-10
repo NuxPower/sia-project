@@ -1,7 +1,11 @@
 <template>
-  <div class="dashboard-view">
-    <!-- Top Weather Summary Card -->
-    <div class="weather-summary-card">
+    <div class="dashboard-view">
+      <!-- Top Weather Summary Card -->
+<div 
+        class="weather-summary-card"
+        :class="[weatherEffectClass, { 'has-vanta': isVantaActive }]"
+        ref="weatherCard"
+      >
       <div class="location-info">
         <i class="fas fa-map-marker-alt"></i>
         <h2>{{ currentWeather?.name || 'Loading...' }}</h2>
@@ -41,25 +45,6 @@
       </div>
     </div>
 
-    <FarmManagementPanel
-      class="dashboard-farm-panel"
-      :farms="farms"
-      :loading="farmsLoading"
-      :is-drawing="isDrawing"
-      :is-placing-point="isPlacingPoint"
-      :soil-types="soilTypes"
-      variant="dashboard"
-      @refresh="refresh"
-      @create-farm="createFarm"
-      @save-farm="updateFarm"
-      @clear-boundary="clearBoundary"
-      @start-boundary="startBoundary"
-      @finish-boundary="finishBoundary"
-      @cancel-boundary="cancelBoundary"
-      @start-point="startPoint"
-      @cancel-point="cancelPoint"
-    />
-
     <div class="forecast-grid">
       <h3>7-Day Forecast</h3>
       <div class="forecast-cards">
@@ -82,6 +67,25 @@
         </div>
       </div>
     </div>
+
+    <FarmManagementPanel
+      class="dashboard-farm-panel"
+      :farms="farms"
+      :loading="farmsLoading"
+      :is-drawing="isDrawing"
+      :is-placing-point="isPlacingPoint"
+      :soil-types="soilTypes"
+      variant="dashboard"
+      @refresh="refresh"
+      @create-farm="createFarm"
+      @save-farm="updateFarm"
+      @clear-boundary="clearBoundary"
+      @start-boundary="startBoundary"
+      @finish-boundary="finishBoundary"
+      @cancel-boundary="cancelBoundary"
+      @start-point="startPoint"
+      @cancel-point="cancelPoint"
+    />
 
     <!-- Tips for Farming -->
     <div class="tips-section">
@@ -108,7 +112,11 @@
 </template>
 
 <script setup>
-import { computed } from 'vue';
+import { computed, ref, onMounted, onBeforeUnmount, watch, nextTick } from 'vue';
+import * as THREE from 'three';
+import CLOUDS from 'vanta/dist/vanta.clouds.min.js';
+import FOG from 'vanta/dist/vanta.fog.min.js';
+import WAVES from 'vanta/dist/vanta.waves.min.js';
 import FarmManagementPanel from '../FarmManagementPanel.vue';
 
 const props = defineProps({
@@ -152,6 +160,10 @@ const emit = defineEmits([
 
 const farms = computed(() => props.farms ?? []);
 
+const weatherCard = ref(null);
+const isVantaActive = ref(false);
+let vantaEffect = null;
+
 const refresh = () => emit('refresh-farms');
 const createFarm = (payload) => emit('create-farm', payload);
 const updateFarm = (farmId, payload) => emit('save-farm', farmId, payload);
@@ -162,12 +174,118 @@ const cancelBoundary = () => emit('cancel-boundary');
 const startPoint = (farmId, payload) => emit('start-point', farmId, payload);
 const cancelPoint = () => emit('cancel-point');
 
+const destroyVanta = () => {
+  if (vantaEffect) {
+    vantaEffect.destroy();
+    vantaEffect = null;
+  }
+  isVantaActive.value = false;
+};
+
+const selectVantaEffect = (condition = '') => {
+  const normalized = condition.toLowerCase();
+
+  if (normalized.includes('rain') || normalized.includes('thunder')) {
+    return FOG;
+  }
+
+  if (normalized.includes('clear')) {
+    return WAVES;
+  }
+
+  if (normalized.includes('cloud') || normalized.includes('mist') || normalized.includes('fog') || normalized.includes('haze')) {
+    return CLOUDS;
+  }
+
+  return CLOUDS;
+};
+
+const initVanta = () => {
+  if (typeof window === 'undefined' || !weatherCard.value) {
+    return;
+  }
+
+  destroyVanta();
+
+  const condition = props.currentWeather?.weather?.[0]?.main ?? '';
+  const effectType = selectVantaEffect(condition);
+
+  try {
+    vantaEffect = effectType({
+      el: weatherCard.value,
+      THREE,
+      mouseControls: false,
+      touchControls: false,
+      gyroControls: false,
+      minHeight: 200.0,
+      minWidth: 200.0,
+      scale: 1.0,
+      scaleMobile: 1.0,
+      color: 0x0077ff,
+      backgroundAlpha: 0.0
+    });
+
+    isVantaActive.value = true;
+  } catch {
+    destroyVanta();
+  }
+};
+
+const scheduleVantaInit = () => {
+  if (!weatherCard.value) {
+    return;
+  }
+
+  nextTick(() => {
+    initVanta();
+  });
+};
+
+onMounted(() => {
+  scheduleVantaInit();
+});
+
+onBeforeUnmount(() => {
+  destroyVanta();
+});
+
+watch(
+  () => props.currentWeather?.weather?.[0]?.main,
+  () => {
+    scheduleVantaInit();
+  }
+);
+
 const formatDate = (date) => {
   if (!date) return '';
   const parts = date.split('-');
   const dateObj = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
   return dateObj.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 };
+
+const weatherEffectClass = computed(() => {
+  const condition = props.currentWeather?.weather?.[0]?.main?.toLowerCase();
+
+  if (!condition) return '';
+
+  if (['rain', 'drizzle', 'thunderstorm'].some((type) => condition.includes(type))) {
+    return 'is-raining';
+  }
+
+  if (['snow', 'sleet'].some((type) => condition.includes(type))) {
+    return 'is-snowing';
+  }
+
+  if (['clear'].some((type) => condition.includes(type))) {
+    return 'is-clear';
+  }
+
+  if (['clouds', 'mist', 'fog', 'haze'].some((type) => condition.includes(type))) {
+    return 'is-cloudy';
+  }
+
+  return '';
+});
 </script>
 
 <style scoped>
@@ -198,6 +316,89 @@ const formatDate = (date) => {
   margin-bottom: 30px;
   border: 1px solid rgba(255, 255, 255, 0.1);
   backdrop-filter: blur(10px);
+  position: relative;
+  overflow: hidden;
+}
+
+.weather-summary-card::before {
+  content: '';
+  position: absolute;
+  inset: -40%;
+  background: radial-gradient(circle at 20% 20%, rgba(59, 130, 246, 0.35), transparent 55%),
+              radial-gradient(circle at 80% 30%, rgba(96, 165, 250, 0.25), transparent 60%),
+              radial-gradient(circle at 50% 80%, rgba(56, 189, 248, 0.2), transparent 65%);
+  filter: blur(40px);
+  animation: pulseGlow 12s ease-in-out infinite;
+  opacity: 0.9;
+  z-index: 0;
+}
+
+.weather-summary-card::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.6s ease, transform 1.2s ease;
+  background-repeat: repeat;
+  background-size: cover;
+}
+
+.weather-summary-card.is-raining::after {
+  background-image: repeating-linear-gradient(
+    160deg,
+    rgba(59, 130, 246, 0.35) 0px,
+    rgba(59, 130, 246, 0.35) 1px,
+    transparent 1px,
+    transparent 16px
+  );
+  animation: rainfall 0.9s linear infinite;
+  opacity: 0.7;
+}
+
+.weather-summary-card.is-snowing::after {
+  background-image:
+    radial-gradient(rgba(255, 255, 255, 0.7) 20%, transparent 60%),
+    radial-gradient(rgba(255, 255, 255, 0.6) 18%, transparent 60%);
+  background-size: 8px 10px, 10px 12px;
+  background-position: 0 -20px, 50px -40px;
+  animation: snowfall 12s linear infinite;
+  opacity: 0.8;
+  filter: blur(0.3px);
+}
+
+.weather-summary-card.is-clear::after {
+  background-image:
+    radial-gradient(circle at 20% 20%, rgba(253, 224, 71, 0.45), transparent 60%),
+    radial-gradient(circle at 70% 30%, rgba(59, 130, 246, 0.25), transparent 70%);
+  animation: sunGlow 14s ease-in-out infinite;
+  opacity: 0.55;
+}
+
+.weather-summary-card.is-cloudy::after {
+  background-image:
+    radial-gradient(circle at 15% 40%, rgba(148, 163, 184, 0.35), transparent 70%),
+    radial-gradient(circle at 60% 60%, rgba(148, 163, 184, 0.28), transparent 65%);
+  animation: cloudDrift 18s linear infinite;
+  opacity: 0.6;
+}
+
+.weather-summary-card > *:not(.vanta-canvas) {
+  position: relative;
+  z-index: 1;
+}
+
+.weather-summary-card .vanta-canvas {
+  position: absolute !important;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+}
+
+.weather-summary-card.has-vanta::before,
+.weather-summary-card.has-vanta::after {
+  opacity: 0;
 }
 
 .location-info {
@@ -211,6 +412,10 @@ const formatDate = (date) => {
 .location-info i {
   color: #3b82f6;
   font-size: 24px;
+  -webkit-text-stroke: 0.6px rgba(15, 23, 42, 0.65);
+  text-shadow:
+    0 0 6px rgba(15, 23, 42, 0.4),
+    0 0 12px rgba(15, 23, 42, 0.35);
 }
 
 .location-info h2 {
@@ -249,6 +454,10 @@ const formatDate = (date) => {
 .weather-description i {
   font-size: 32px;
   color: #60a5fa;
+  -webkit-text-stroke: 0.6px rgba(15, 23, 42, 0.6);
+  text-shadow:
+    0 0 8px rgba(15, 23, 42, 0.4),
+    0 0 14px rgba(15, 23, 42, 0.32);
 }
 
 .weather-details {
@@ -271,18 +480,24 @@ const formatDate = (date) => {
   font-size: 24px;
   color: #3b82f6;
   margin-bottom: 8px;
+  -webkit-text-stroke: 0.5px rgba(15, 23, 42, 0.6);
+  text-shadow:
+    0 0 6px rgba(15, 23, 42, 0.45),
+    0 0 12px rgba(15, 23, 42, 0.35);
 }
 
 .detail-item span {
   font-size: 20px;
   font-weight: bold;
-  color: white;
+  color: #1f2937;
   margin-bottom: 4px;
 }
 
 .detail-item small {
   font-size: 12px;
-  color: #9ca3af;
+  color: #374151;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
 }
 
 .forecast-grid {
@@ -423,6 +638,55 @@ const formatDate = (date) => {
   
   .forecast-cards {
     grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  }
+}
+
+@keyframes rainfall {
+  from {
+    background-position: 0 -40px;
+  }
+  to {
+    background-position: 0 40px;
+  }
+}
+
+@keyframes snowfall {
+  from {
+    background-position: 0 -60px, 40px -80px;
+  }
+  to {
+    background-position: 0 80px, 40px 60px;
+  }
+}
+
+@keyframes sunGlow {
+  0%, 100% {
+    opacity: 0.45;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.7;
+    transform: scale(1.08);
+  }
+}
+
+@keyframes cloudDrift {
+  from {
+    background-position: 0 0, 60px 20px;
+  }
+  to {
+    background-position: 80px 30px, 140px 60px;
+  }
+}
+
+@keyframes pulseGlow {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 0.85;
+  }
+  50% {
+    transform: scale(1.08) translate(2%, -3%);
+    opacity: 1;
   }
 }
 </style>

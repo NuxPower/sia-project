@@ -13,7 +13,7 @@
     </div>
     
     <div class="weather-icon">
-      <i :class="getWeatherIcon(day)"></i>
+      <i :class="resolvedIcon"></i>
     </div>
     
     <div class="temperature">
@@ -43,6 +43,20 @@ const cardClass = computed(() => ({
   'today': props.day.isToday,
   'future': props.day.isFuture
 }));
+
+const resolvedIcon = computed(() => {
+  if (!props.day) {
+    return props.getWeatherIcon({});
+  }
+
+  if (props.day.isHistory) {
+    return props.getWeatherIcon({
+      condition: props.day.condition ?? props.day.description ?? props.day.day ?? ''
+    });
+  }
+
+  return props.getWeatherIcon(props.day);
+});
 
 const formatDate = (date) => {
   if (!date) return '';

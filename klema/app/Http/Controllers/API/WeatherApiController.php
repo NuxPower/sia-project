@@ -99,8 +99,8 @@ class WeatherApiController extends Controller
         if ($location === null && ($lat === null || $lon === null)) {
             $location = 'Butuan, Caraga, PH';
         }
-        $days = (int) $request->get('days', 3);
-        $days = max(1, min($days, 7));
+        $days = (int) $request->get('days', 30);
+        $days = max(1, min($days, 30));
 
         try {
             $history = $this->getStoredWeatherHistory($location, $lat, $lon, $days);

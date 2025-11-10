@@ -1,4 +1,5 @@
 import { ref } from 'vue'
+import { DEFAULT_NOTIFICATION_SETTINGS, SUPPORTED_NOTIFICATION_SETTING_KEYS } from './useNotificationSettings'
 
 const isDev = import.meta.env.VITE_APP_ENV === 'local';
 const log = (...args) => isDev && console.log(...args);
@@ -6,11 +7,147 @@ const log = (...args) => isDev && console.log(...args);
 const MAX_VISIBLE_ALERTS = 1;
 const activeAlertKeys = new Set();
 const alertQueue = [];
+const MULTIPLE_ALERT_THRESHOLD = 3;
+const SUMMARY_ALERT_KEY = 'summary::multiple-alerts';
+
+let hasShownPrimaryAlert = false;
 
 const alerts = ref([])
 const isVisible = ref(false)
 
+const sanitizePreferences = (preferences) => {
+    const sanitized = {};
+    SUPPORTED_NOTIFICATION_SETTING_KEYS.forEach((key) => {
+        const defaultValue = DEFAULT_NOTIFICATION_SETTINGS[key];
+        const incoming = preferences && Object.prototype.hasOwnProperty.call(preferences, key)
+            ? preferences[key]
+            : undefined;
+        sanitized[key] = typeof incoming === 'boolean' ? incoming : defaultValue;
+    });
+    return sanitized;
+};
+
+const normalizeForecastArray = (source) => {
+    if (Array.isArray(source)) {
+        return source;
+    }
+
+    if (Array.isArray(source?.forecast)) {
+        return source.forecast;
+    }
+
+    if (Array.isArray(source?.daily)) {
+        return source.daily;
+    }
+
+    if (Array.isArray(source?.list)) {
+        return source.list;
+    }
+
+    return null;
+};
+
+const getPrecipitationAmount = (day) => {
+    if (!day) return 0;
+
+    const rain = day?.rain;
+    if (typeof rain === 'number') {
+        return rain;
+    }
+
+    if (rain && typeof rain === 'object') {
+        const rainValues = Object.values(rain)
+            .map((value) => Number(value))
+            .filter((value) => Number.isFinite(value));
+        if (rainValues.length) {
+            return Math.max(...rainValues);
+        }
+    }
+
+    if (typeof day?.precipitation === 'number') {
+        return day.precipitation;
+    }
+
+    if (typeof day?.snow === 'number') {
+        return day.snow;
+    }
+
+    return 0;
+};
+
+const hasMeaningfulRain = (day) => {
+    const condition = (day?.condition || day?.weather?.[0]?.main || day?.weather?.[0]?.description || '').toLowerCase();
+    if (!condition && !day) {
+        return false;
+    }
+
+    if (condition.includes('rain') || condition.includes('drizzle') || condition.includes('storm') || condition.includes('thunder')) {
+        return true;
+    }
+
+    const precipitationAmount = getPrecipitationAmount(day);
+    return Number.isFinite(precipitationAmount) && precipitationAmount >= 2;
+};
+
+const computeLongestRainStreak = (forecastDays) => {
+    let longest = 0;
+    let current = 0;
+
+    forecastDays.forEach((day) => {
+        if (hasMeaningfulRain(day)) {
+            current += 1;
+        } else {
+            if (current > longest) {
+                longest = current;
+            }
+            current = 0;
+        }
+    });
+
+    if (current > longest) {
+        longest = current;
+    }
+
+    return longest;
+};
+
 export function useGlobalAlerts() {
+    const createSummaryAlert = () => ({
+        id: Date.now() + Math.random(),
+        type: 'info',
+        title: 'Multiple Alerts Detected',
+        message: 'Please see alerts for more details.',
+        duration: 6000,
+        persistent: false,
+        action: null,
+        createdAt: new Date(),
+        slidingOut: false,
+        timeoutId: null,
+        key: SUMMARY_ALERT_KEY
+    });
+
+    const replacePendingWithSummary = () => {
+        const summaryIndex = alertQueue.findIndex(alert => alert.key === SUMMARY_ALERT_KEY);
+        const summaryAlert = summaryIndex > -1 
+            ? alertQueue.splice(summaryIndex, 1)[0]
+            : createSummaryAlert();
+
+        const discardedAlerts = alertQueue.splice(0);
+        discardedAlerts.forEach(alert => {
+            if (alert?.timeoutId) {
+                clearTimeout(alert.timeoutId);
+            }
+            if (alert?.key && alert.key !== SUMMARY_ALERT_KEY) {
+                activeAlertKeys.delete(alert.key);
+            }
+        });
+
+        alertQueue.push(summaryAlert);
+        if (summaryIndex === -1) {
+            activeAlertKeys.add(summaryAlert.key);
+        }
+    };
+
     const scheduleAutoDismiss = (alert) => {
         if (alert.persistent) return;
 
@@ -24,8 +161,17 @@ export function useGlobalAlerts() {
     };
 
     const processQueue = () => {
+        if (hasShownPrimaryAlert && alertQueue.length >= MULTIPLE_ALERT_THRESHOLD) {
+            replacePendingWithSummary();
+        }
+
         while (alerts.value.length < MAX_VISIBLE_ALERTS && alertQueue.length > 0) {
             const nextAlert = alertQueue.shift();
+            if (!hasShownPrimaryAlert && nextAlert.key !== SUMMARY_ALERT_KEY) {
+                hasShownPrimaryAlert = true;
+            } else if (nextAlert.key === SUMMARY_ALERT_KEY) {
+                hasShownPrimaryAlert = true;
+            }
             alerts.value.push(nextAlert);
             isVisible.value = true;
             scheduleAutoDismiss(nextAlert);
@@ -33,6 +179,7 @@ export function useGlobalAlerts() {
 
         if (alerts.value.length === 0 && alertQueue.length === 0) {
             isVisible.value = false;
+            hasShownPrimaryAlert = false;
         }
     };
 
@@ -118,6 +265,7 @@ export function useGlobalAlerts() {
         alertQueue.length = 0
         activeAlertKeys.clear()
         isVisible.value = false
+        hasShownPrimaryAlert = false;
     }
     
     const showSuccess = (title, message, options = {}) => {
@@ -196,28 +344,39 @@ export function useGlobalAlerts() {
         )
     }
     
-    const checkWeatherConditions = (weatherData) => {
+    const checkWeatherConditions = (weatherData, preferenceOverrides = null) => {
         if (!weatherData) return false;
         
         log('Analyzing weather data for alerts');
         
+        const preferences = sanitizePreferences(preferenceOverrides);
         const alertsGenerated = [];
         
-        checkCurrentWeatherConditions(weatherData.current, alertsGenerated);
-        checkForecastWeatherConditions(weatherData.forecast, alertsGenerated);
+        checkCurrentWeatherConditions(weatherData.current, alertsGenerated, preferences);
+        const normalizedForecast = normalizeForecastArray(weatherData.forecast);
+        checkForecastWeatherConditions(normalizedForecast, alertsGenerated, preferences);
         
-        alertsGenerated.forEach(alertData => addAlert(alertData));
+        const todayAlerts = alertsGenerated.filter((alert) =>
+            typeof alert.title === 'string' && alert.title.includes('- Today')
+        );
+        const futureAlerts = alertsGenerated.filter((alert) => !todayAlerts.includes(alert));
+
+        const payloads = futureAlerts.length >= MULTIPLE_ALERT_THRESHOLD
+            ? [...todayAlerts, createSummaryAlert()]
+            : [...todayAlerts, ...futureAlerts];
+
+        payloads.forEach(alertData => addAlert(alertData));
         
         return alertsGenerated.length > 0;
     }
     
-    const checkCurrentWeatherConditions = (currentWeather, alerts) => {
+    const checkCurrentWeatherConditions = (currentWeather, alerts, prefs) => {
         if (!currentWeather?.weather?.[0]?.main) return;
         
         const mainWeather = currentWeather.weather[0].main.toLowerCase();
         const description = currentWeather.weather[0].description;
         
-        if (mainWeather.includes('rain')) {
+        if (prefs.heavyRainAlerts && mainWeather.includes('rain')) {
             const severity = description.includes('heavy') || description.includes('extreme') ? 'Heavy' : 'Light';
             alerts.push({
                 type: 'warning',
@@ -227,7 +386,7 @@ export function useGlobalAlerts() {
             });
         }
         
-        if (mainWeather.includes('storm') || mainWeather.includes('thunderstorm')) {
+        if (prefs.stormAlerts && (mainWeather.includes('storm') || mainWeather.includes('thunderstorm'))) {
             alerts.push({
                 type: 'error',
                 title: 'Storm Warning - Today',
@@ -237,7 +396,7 @@ export function useGlobalAlerts() {
             });
         }
         
-        if (mainWeather.includes('snow')) {
+        if (prefs.stormAlerts && mainWeather.includes('snow')) {
             alerts.push({
                 type: 'warning',
                 title: 'Snow Alert - Today',
@@ -246,7 +405,7 @@ export function useGlobalAlerts() {
             });
         }
         
-        if (mainWeather.includes('cloud') && description.includes('overcast')) {
+        if (prefs.maintenanceAlerts && mainWeather.includes('cloud') && description.includes('overcast')) {
             alerts.push({
                 type: 'info',
                 title: 'Overcast Conditions - Today',
@@ -255,7 +414,7 @@ export function useGlobalAlerts() {
             });
         }
         
-        if (currentWeather?.main?.temp) {
+        if (prefs.temperatureExtremes && currentWeather?.main?.temp) {
             let tempC = currentWeather.main.temp > 100 
                 ? Math.round(currentWeather.main.temp - 273.15) 
                 : Math.round(currentWeather.main.temp);
@@ -277,7 +436,7 @@ export function useGlobalAlerts() {
             }
         }
         
-        if (currentWeather?.wind?.speed) {
+        if (prefs.strongWindWarnings && currentWeather?.wind?.speed) {
             const windKmh = Math.round(currentWeather.wind.speed * 3.6);
             
             if (windKmh > 25) {
@@ -291,10 +450,10 @@ export function useGlobalAlerts() {
         }
     }
     
-    const checkForecastWeatherConditions = (forecastData, alerts) => {
-        if (!forecastData || !Array.isArray(forecastData)) return;
+    const checkForecastWeatherConditions = (forecastArray, alerts, prefs) => {
+        if (!Array.isArray(forecastArray) || !forecastArray.length) return;
         
-        const forecastDays = forecastData.slice(0, 5);
+        const forecastDays = forecastArray.slice(1, 8);
         
         forecastDays.forEach((day, index) => {
             const dayName = getDayName(index);
@@ -303,11 +462,11 @@ export function useGlobalAlerts() {
             
             if (!conditionLower) return;
             
-            checkForecastCondition(conditionLower, condition, dayName, alerts);
-            checkForecastTemperature(day, dayName, alerts);
+            checkForecastCondition(conditionLower, condition, dayName, alerts, prefs);
+            checkForecastTemperature(day, dayName, alerts, prefs);
         });
         
-        checkExtendedWeatherPatterns(forecastDays, alerts);
+        checkExtendedWeatherPatterns(forecastDays, alerts, prefs);
     }
     
     const getDayName = (index) => {
@@ -315,8 +474,8 @@ export function useGlobalAlerts() {
         return names[index] || `In ${index + 1} days`;
     }
     
-    const checkForecastCondition = (conditionLower, condition, dayName, alerts) => {
-        if (conditionLower.includes('rain') || conditionLower.includes('drizzle')) {
+    const checkForecastCondition = (conditionLower, condition, dayName, alerts, prefs) => {
+        if (prefs.heavyRainAlerts && (conditionLower.includes('rain') || conditionLower.includes('drizzle'))) {
             const severity = conditionLower.includes('heavy') || conditionLower.includes('extreme') ? 'Heavy' : 'Light';
             alerts.push({
                 type: 'warning',
@@ -326,7 +485,7 @@ export function useGlobalAlerts() {
             });
         }
         
-        if (conditionLower.includes('storm') || conditionLower.includes('thunder')) {
+        if (prefs.stormAlerts && (conditionLower.includes('storm') || conditionLower.includes('thunder'))) {
             alerts.push({
                 type: 'error',
                 title: `Storm Warning - ${dayName}`,
@@ -336,7 +495,7 @@ export function useGlobalAlerts() {
             });
         }
         
-        if (conditionLower.includes('snow')) {
+        if (prefs.stormAlerts && conditionLower.includes('snow')) {
             alerts.push({
                 type: 'warning',
                 title: `Snow Warning - ${dayName}`,
@@ -345,7 +504,7 @@ export function useGlobalAlerts() {
             });
         }
         
-        if (conditionLower.includes('fog') || conditionLower.includes('mist') || conditionLower.includes('haze')) {
+        if (prefs.maintenanceAlerts && (conditionLower.includes('fog') || conditionLower.includes('mist') || conditionLower.includes('haze'))) {
             alerts.push({
                 type: 'info',
                 title: `Visibility Warning - ${dayName}`,
@@ -355,7 +514,11 @@ export function useGlobalAlerts() {
         }
     }
     
-    const checkForecastTemperature = (day, dayName, alerts) => {
+    const checkForecastTemperature = (day, dayName, alerts, prefs) => {
+        if (!prefs.temperatureExtremes) {
+            return;
+        }
+
         let tempMax = day.temp_max || day.main?.temp_max || day.temp?.max;
         let tempMin = day.temp_min || day.main?.temp_min || day.temp?.min;
         
@@ -395,57 +558,54 @@ export function useGlobalAlerts() {
         }
     }
     
-    const checkExtendedWeatherPatterns = (forecastDays, alerts) => {
-        const patterns = [
-            {
-                filter: day => {
-                    const condition = (day.condition || day.weather?.[0]?.main || '').toLowerCase();
-                    return condition.includes('rain') || condition.includes('drizzle');
-                },
-                threshold: 3,
-                alert: (count) => ({
+    const checkExtendedWeatherPatterns = (forecastDays, alerts, prefs) => {
+        if (!Array.isArray(forecastDays) || !forecastDays.length) {
+            return;
+        }
+
+        if (prefs.maintenanceAlerts) {
+            const longestRainStreak = computeLongestRainStreak(forecastDays);
+            if (longestRainStreak >= 3) {
+                alerts.push({
                     type: 'warning',
                     title: 'Extended Rainfall Period',
-                    message: `Rain expected for ${count} consecutive days.`,
+                    message: `Rain expected for ${longestRainStreak} consecutive days.`,
                     duration: 10000
-                })
-            },
-            {
-                filter: day => {
-                    let tempMax = day.temp_max || day.main?.temp_max || day.temp?.max;
-                    if (tempMax > 100) tempMax -= 273.15;
-                    return tempMax && tempMax > 30;
-                },
-                threshold: 3,
-                alert: (count) => ({
+                });
+            }
+        }
+
+        if (prefs.temperatureExtremes) {
+            const hotStreak = forecastDays.filter(day => {
+                let tempMax = day.temp_max || day.main?.temp_max || day.temp?.max;
+                if (tempMax > 100) tempMax -= 273.15;
+                return tempMax && tempMax > 30;
+            }).length;
+
+            if (hotStreak >= 3) {
+                alerts.push({
                     type: 'warning',
                     title: 'Extended Heat Wave',
-                    message: `High temperatures for ${count} consecutive days.`,
+                    message: `High temperatures for ${hotStreak} consecutive days.`,
                     duration: 10000
-                })
-            },
-            {
-                filter: day => {
-                    let tempMin = day.temp_min || day.main?.temp_min || day.temp?.min;
-                    if (tempMin > 100) tempMin -= 273.15;
-                    return tempMin && tempMin < 10;
-                },
-                threshold: 3,
-                alert: (count) => ({
+                });
+            }
+
+            const coldStreak = forecastDays.filter(day => {
+                let tempMin = day.temp_min || day.main?.temp_min || day.temp?.min;
+                if (tempMin > 100) tempMin -= 273.15;
+                return tempMin && tempMin < 10;
+            }).length;
+
+            if (coldStreak >= 3) {
+                alerts.push({
                     type: 'warning',
                     title: 'Extended Cold Period',
-                    message: `Cold temperatures for ${count} consecutive days.`,
+                    message: `Cold temperatures for ${coldStreak} consecutive days.`,
                     duration: 10000
-                })
+                });
             }
-        ];
-        
-        patterns.forEach(pattern => {
-            const count = forecastDays.filter(pattern.filter).length;
-            if (count >= pattern.threshold) {
-                alerts.push(pattern.alert(count));
-            }
-        });
+        }
     }
     
     return {

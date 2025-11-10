@@ -44,15 +44,19 @@
           :class="{
             'other-month': !day.currentMonth,
             'today': day.isToday,
-            'has-weather': day.weather,
+            'has-weather': day.hasWeather,
+            'no-data': day.weather?.noData,
             'has-activities': day.activities?.length
           }"
           @click="handleDayClick(day)"
         >
           <div class="day-number">{{ day.date }}</div>
-          <div v-if="day.weather" class="day-weather">
+          <div v-if="day.hasWeather" class="day-weather">
             <i :class="getWeatherIcon({ condition: day.weather.condition, icon: day.weather.icon })"></i>
             <span class="day-temp">{{ day.weather.temp !== null && day.weather.temp !== undefined ? `${day.weather.temp}°` : '—' }}</span>
+          </div>
+          <div v-else-if="day.weather?.noData" class="day-no-data">
+            <span>No data available</span>
           </div>
           <div v-if="day.activities?.length" class="day-activities">
             <div
@@ -262,6 +266,15 @@ const currentMonthYear = computed(() => {
   });
 });
 
+const changeMonth = (delta) => {
+  const baseDate = currentDate.value instanceof Date ? currentDate.value : new Date();
+  const nextDate = new Date(baseDate.getFullYear(), baseDate.getMonth() + delta, 1);
+  currentDate.value = nextDate;
+};
+
+const previousMonth = () => changeMonth(-1);
+const nextMonth = () => changeMonth(1);
+
 const activitiesByDate = computed(() => {
   const grouped = activities.value.reduce((map, activity) => {
     const key = formatDateKey(activity.start_date);
@@ -315,22 +328,42 @@ const calendarDays = computed(() => {
     const normalized = new Date(dateObj.getFullYear(), dateObj.getMonth(), dateObj.getDate());
     const dateKey = formatDateKey(normalized);
     const forecastEntry = forecastByDate.value[dateKey];
-    const rawTemp = forecastEntry
-      ? forecastEntry.temp_max ?? forecastEntry.temp_min ?? forecastEntry.main?.temp ?? forecastEntry.temperature ?? null
-      : null;
-    const temperature = rawTemp !== null && rawTemp !== undefined ? Math.round(rawTemp) : null;
-    const weatherSummary = forecastEntry
-      ? {
+
+    let weatherSummary = null;
+    let hasWeather = false;
+
+    if (forecastEntry) {
+      if (forecastEntry.noData || forecastEntry.isPlaceholder) {
+        weatherSummary = {
+          noData: true,
+          message: forecastEntry.description || 'No data available',
+          raw: forecastEntry
+        };
+      } else {
+        const rawTemp =
+          forecastEntry.temp_max
+          ?? forecastEntry.temp_min
+          ?? forecastEntry.main?.temp
+          ?? forecastEntry.temperature
+          ?? null;
+        const temperature = rawTemp !== null && rawTemp !== undefined ? Math.round(rawTemp) : null;
+
+        weatherSummary = {
           condition: forecastEntry.condition,
           temp: temperature,
+          icon: forecastEntry.icon,
           raw: forecastEntry
-        }
-      : null;
+        };
+        hasWeather = true;
+      }
+    }
+
     return {
       date: normalized.getDate(),
       currentMonth,
       isToday: normalized.getTime() === today.getTime(),
       weather: weatherSummary,
+      hasWeather,
       activities: activitiesByDate.value[dateKey] ?? [],
       fullDate: dateKey
     };
@@ -404,6 +437,20 @@ const handleDayClick = (day) => {
 
 onMounted(() => {
   resetForm(formatDateKey(new Date()));
+  fetchActivities();
+});
+
+watch(currentDate, (newDate, oldDate) => {
+  if (
+    !newDate ||
+    (oldDate &&
+      newDate.getMonth() === oldDate.getMonth() &&
+      newDate.getFullYear() === oldDate.getFullYear())
+  ) {
+    return;
+  }
+  resetForm(formatDateKey(newDate));
+  fetchActivities();
 });
 </script>
 
@@ -597,6 +644,11 @@ onMounted(() => {
   box-shadow: 0 0 0 1px rgba(250, 204, 21, 0.2);
 }
 
+.calendar-day.no-data {
+  border-color: rgba(148, 163, 184, 0.35);
+  border-style: dashed;
+}
+
 .day-number {
   color: white;
   font-weight: bold;
@@ -627,6 +679,14 @@ onMounted(() => {
   display: flex;
   flex-direction: column;
   gap: 6px;
+}
+
+.day-no-data {
+  margin-top: 8px;
+  font-size: 12px;
+  color: #94a3b8;
+  text-align: center;
+  font-weight: 500;
 }
 
 .activity-chip {

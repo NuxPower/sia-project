@@ -1,8 +1,6 @@
-import { getApiToken } from './auth';
+import { ensureApiToken, getApiToken, setApiToken } from './auth';
 
-export function authorizedFetch(url, options = {}) {
-  const token = getApiToken();
-
+async function performFetch(url, options, token) {
   const headers = new Headers(options.headers || {});
   headers.set('Accept', headers.get('Accept') || 'application/json');
 
@@ -27,4 +25,24 @@ export function authorizedFetch(url, options = {}) {
   }
 
   return fetch(url, init);
+}
+
+export async function authorizedFetch(url, options = {}) {
+  const initialToken = getApiToken();
+  let response = await performFetch(url, options, initialToken);
+
+  if (response.status !== 401) {
+    return response;
+  }
+
+  setApiToken(null);
+  const refreshedToken = await ensureApiToken();
+
+  if (!refreshedToken) {
+    return response;
+  }
+
+  response = await performFetch(url, options, refreshedToken);
+
+  return response;
 }
