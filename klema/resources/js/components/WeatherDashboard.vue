@@ -7,8 +7,6 @@
       :is-loading="isLoadingWeather"
     />
     
-    <ClickInstruction v-if="activeView === 'map' && !selectedDayDetail" />
-    
     <WeatherLayerControls 
       v-if="activeView === 'map' && !selectedDayDetail"
       @toggle-layer="handleLayerToggle" 
@@ -76,7 +74,6 @@
 import { ref, onMounted, watch, computed } from 'vue';
 import axios from 'axios';
 import SearchBar from './SearchBar.vue';
-import ClickInstruction from './ClickInstruction.vue';
 import WeatherLayerControls from './WeatherLayerControls.vue';
 import WeatherMap from './WeatherMap.vue';
 import LoadingIndicator from './LoadingIndicator.vue';
@@ -540,6 +537,9 @@ const handleLayerToggle = ({ layerId, active }) => {
 const handleMapClick = async ({ lat, lng }) => {
   isLoadingWeather.value = true;
   try {
+    // Automatically focus map on clicked location
+    weatherMapRef.value?.moveToLocation(lat, lng, 12);
+    
     const { current, history, forecastData } = await fetchWeatherByCoordinates(
       lat,
       lng,
@@ -626,7 +626,7 @@ const searchWeather = async () => {
     scheduleExtendedForecastFetch(forecastSource);
 
     if (current.coord) {
-      weatherMapRef.value?.moveToLocation(current.coord.lat, current.coord.lon);
+      weatherMapRef.value?.moveToLocation(current.coord.lat, current.coord.lon, 12);
       weatherMapRef.value?.updateMarker(current.coord.lat, current.coord.lon, current);
     }
  
@@ -689,7 +689,7 @@ const initializeDefaultLocation = async () => {
           initialForecastLength: Array.isArray(forecastData) ? forecastData.length : 0
         });
         scheduleExtendedForecastFetch(forecastSource);
-        weatherMapRef.value?.moveToLocation(lat, lon);
+        weatherMapRef.value?.moveToLocation(lat, lon, 12);
         weatherMapRef.value?.updateMarker(lat, lon, current);
         checkWeatherConditions(
           { current, history, forecast: forecastData },
@@ -1116,7 +1116,7 @@ const closeDayDetail = () => {
   display: flex;
   justify-content: center;
   align-items: center;
-  padding: 40px 40px 40px 140px;
+  padding: 50px 50px 50px 160px;
   z-index: 3;
   pointer-events: none;
 }
@@ -1124,7 +1124,8 @@ const closeDayDetail = () => {
 .overlay-panel {
   pointer-events: auto;
   width: 100%;
-  height: calc(100vh - 60px);
+  max-width: 1400px;
+  height: calc(100vh - 100px);
   overflow: hidden;
   border-radius: 28px;
   background: rgba(12, 16, 24, 0.82);
@@ -1132,6 +1133,65 @@ const closeDayDetail = () => {
   box-shadow: 0 30px 65px rgba(0, 0, 0, 0.45);
   padding: 0;
   position: relative;
+}
+
+@media (max-width: 1024px) {
+  .overlay-wrapper {
+    padding: 40px 40px 40px 120px;
+  }
+  
+  .overlay-panel {
+    height: calc(100vh - 80px);
+    border-radius: 24px;
+    max-width: 1200px;
+  }
+  
+  .overlay-content :deep(.dashboard-view),
+  .overlay-content :deep(.settings-view),
+  .overlay-content :deep(.alerts-view),
+  .overlay-content :deep(.calendar-view) {
+    padding: 32px 40px 48px;
+  }
+}
+
+@media (max-width: 768px) {
+  .overlay-wrapper {
+    padding: 24px 24px 90px 24px;
+    align-items: flex-start;
+  }
+  
+  .overlay-panel {
+    height: calc(100vh - 100px);
+    border-radius: 20px;
+    max-height: calc(100vh - 100px);
+    max-width: 100%;
+  }
+  
+  .overlay-content :deep(.dashboard-view),
+  .overlay-content :deep(.settings-view),
+  .overlay-content :deep(.alerts-view),
+  .overlay-content :deep(.calendar-view) {
+    padding: 24px 28px 40px;
+  }
+}
+
+@media (max-width: 480px) {
+  .overlay-wrapper {
+    padding: 20px 20px 80px 20px;
+  }
+  
+  .overlay-panel {
+    height: calc(100vh - 90px);
+    border-radius: 16px;
+    max-width: 100%;
+  }
+  
+  .overlay-content :deep(.dashboard-view),
+  .overlay-content :deep(.settings-view),
+  .overlay-content :deep(.alerts-view),
+  .overlay-content :deep(.calendar-view) {
+    padding: 20px 24px 32px;
+  }
 }
 
 .overlay-content {
@@ -1150,7 +1210,7 @@ const closeDayDetail = () => {
   width: 100%;
   margin: 0;
   overflow-y: auto;
-  padding: 28px 36px 48px;
+  padding: 36px 48px 56px;
 }
 
 .overlay-fade-enter-active,

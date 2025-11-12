@@ -894,14 +894,231 @@ const precipitationTooltip = (hour) => {
   }
 }
 
-@media (max-width: 640px) {
-  .detail-content {
-    display: flex;
-    flex-direction: column;
+@media (max-width: 768px) {
+  .detail-header {
+    padding: 20px 24px 16px;
   }
-
+  
+  .header-info h1 {
+    font-size: 22px;
+  }
+  
+  .summary-cards {
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 12px;
+  }
+  
   .summary-card {
     padding: 12px 14px;
+  }
+  
+  .summary-card .value {
+    font-size: 16px;
+  }
+  
+  .detail-content {
+    padding: 24px 28px 32px;
+  }
+  
+  .detail-panel {
+    padding: 20px;
+  }
+  
+  .detail-panel h2 {
+    font-size: 16px;
+  }
+  
+  .precip-chart {
+    grid-template-columns: repeat(auto-fit, minmax(35px, 1fr));
+    gap: 10px;
+  }
+  
+  .temperature-table .table-row {
+    grid-template-columns: repeat(3, 1fr);
+    font-size: 12px;
+    padding: 10px 12px;
+  }
+  
+  .table-header {
+    font-size: 10px;
+  }
+}
+
+@media (max-width: 640px) {
+  .detail-header {
+    padding: 16px 20px 14px;
+  }
+  
+  .back-button {
+    padding: 8px 14px;
+    font-size: 14px;
+  }
+  
+  .header-info h1 {
+    font-size: 20px;
+  }
+  
+  .header-info .date {
+    font-size: 13px;
+  }
+  
+  .summary-cards {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+  }
+  
+  .summary-card {
+    padding: 10px 12px;
+  }
+  
+  .summary-card .label {
+    font-size: 10px;
+  }
+  
+  .summary-card .value {
+    font-size: 14px;
+  }
+  
+  .detail-content {
+    padding: 20px 20px 28px;
+    gap: 20px;
+  }
+  
+  .detail-panel {
+    padding: 16px;
+    border-radius: 16px;
+  }
+  
+  .detail-panel h2 {
+    font-size: 15px;
+    margin-bottom: 14px;
+  }
+  
+  .panel-description {
+    font-size: 12px;
+    margin: -8px 0 16px;
+  }
+  
+  .sun-cycle-track {
+    flex-direction: column;
+    gap: 12px;
+  }
+  
+  .sun-path {
+    width: 100%;
+  }
+  
+  .precip-chart {
+    grid-template-columns: repeat(auto-fit, minmax(30px, 1fr));
+    gap: 8px;
+    min-height: 140px;
+  }
+  
+  .bar-wrapper {
+    width: 14px;
+    height: 100px;
+  }
+  
+  .precip-label {
+    font-size: 10px;
+  }
+  
+  .temperature-table .table-row {
+    grid-template-columns: repeat(2, 1fr);
+    font-size: 11px;
+    padding: 8px 10px;
+    row-gap: 6px;
+  }
+  
+  .table-row span:nth-child(3),
+  .table-row span:nth-child(5),
+  .table-row span:nth-child(6) {
+    display: none;
+  }
+  
+  .table-header {
+    font-size: 9px;
+  }
+}
+
+@media (max-width: 480px) {
+  .detail-header {
+    padding: 14px 16px 12px;
+  }
+  
+  .back-button {
+    padding: 6px 12px;
+    font-size: 13px;
+    gap: 6px;
+  }
+  
+  .header-info h1 {
+    font-size: 18px;
+  }
+  
+  .header-info .date {
+    font-size: 12px;
+  }
+  
+  .header-info .location {
+    font-size: 10px;
+  }
+  
+  .summary-cards {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+  
+  .summary-card {
+    padding: 10px;
+  }
+  
+  .summary-card .value {
+    font-size: 13px;
+  }
+  
+  .detail-content {
+    padding: 16px 16px 24px;
+    gap: 16px;
+  }
+  
+  .detail-panel {
+    padding: 14px;
+  }
+  
+  .detail-panel h2 {
+    font-size: 14px;
+  }
+  
+  .panel-description {
+    font-size: 11px;
+  }
+  
+  .precip-chart {
+    grid-template-columns: repeat(auto-fit, minmax(25px, 1fr));
+    gap: 6px;
+  }
+  
+  .bar-wrapper {
+    width: 12px;
+    height: 80px;
+  }
+  
+  .temperature-table .table-row {
+    grid-template-columns: 1fr;
+    font-size: 10px;
+    padding: 6px 8px;
+  }
+  
+  .table-row span:first-child {
+    font-weight: 600;
+    margin-bottom: 4px;
+  }
+  
+  .table-row span:not(:first-child)::before {
+    content: attr(data-label) ': ';
+    font-weight: 500;
+    color: #94a3b8;
   }
 }
 </style>

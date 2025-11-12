@@ -547,18 +547,110 @@ input:checked + .slider:before {
   transform: translateX(24px);
 }
 
+@media (max-width: 1024px) {
+  .settings-header h2 {
+    font-size: 24px;
+  }
+  
+  .settings-section {
+    padding: 22px;
+  }
+}
+
 @media (max-width: 768px) {
   .settings-view {
     padding: 20px;
   }
   
+  .settings-header h2 {
+    font-size: 22px;
+  }
+  
+  .settings-section {
+    padding: 20px;
+    margin-bottom: 18px;
+  }
+  
+  .settings-section h3 {
+    font-size: 16px;
+  }
+  
   .settings-actions {
     flex-direction: column;
+    gap: 12px;
   }
   
   .radio-group {
     flex-direction: column;
     gap: 10px;
+  }
+  
+  .action-button {
+    padding: 12px 20px;
+    font-size: 14px;
+  }
+}
+
+@media (max-width: 480px) {
+  .settings-view {
+    padding: 16px;
+  }
+  
+  .settings-header h2 {
+    font-size: 20px;
+  }
+  
+  .settings-section {
+    padding: 16px;
+    margin-bottom: 16px;
+  }
+  
+  .settings-section h3 {
+    font-size: 15px;
+  }
+  
+  .setting-item {
+    margin-bottom: 16px;
+  }
+  
+  .setting-item label {
+    font-size: 13px;
+  }
+  
+  .setting-input,
+  .setting-select {
+    padding: 10px 14px;
+    font-size: 13px;
+  }
+  
+  .radio-label {
+    font-size: 13px;
+  }
+  
+  .toggle-item {
+    padding: 12px;
+  }
+  
+  .toggle-info span {
+    font-size: 14px;
+  }
+  
+  .toggle-info small {
+    font-size: 12px;
+  }
+  
+  .info-row {
+    padding: 10px;
+  }
+  
+  .info-label,
+  .info-value {
+    font-size: 13px;
+  }
+  
+  .action-button {
+    padding: 10px 16px;
+    font-size: 13px;
   }
 }
 </style>

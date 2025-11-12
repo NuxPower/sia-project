@@ -3,7 +3,8 @@
     <button 
       class="toggle-compact-button" 
       @click="toggleCompact"
-      :title="isCompact ? 'Expand timeline' : 'Compact timeline'"
+      :title="isCompact ? 'Expand forecast' : 'Compact forecast'"
+      aria-label="Toggle forecast size"
     >
       <i :class="isCompact ? 'fas fa-expand-alt' : 'fas fa-compress-alt'"></i>
     </button>
@@ -42,54 +43,38 @@ const handleDaySelect = (day) => {
   if (!day) return;
   emit('day-selected', day);
 };
+
+// No need for mobile detection anymore since button is always available
 </script>
 
 <style scoped>
 .weather-timeline {
   position: fixed;
-  bottom: 15px;
+  bottom: 20px;
   left: 50%;
   transform: translateX(-50%);
   z-index: 1000;
   display: flex;
   align-items: center;
-  gap: 12px;
-  background: rgba(0, 0, 0, 0.9);
-  border-radius: 15px;
-  padding: 12px 16px;
-  backdrop-filter: blur(15px);
-  border: 2px solid rgba(59, 130, 246, 0.3);
-  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.4);
+  gap: 16px;
+  background: linear-gradient(135deg, rgba(15, 23, 42, 0.95), rgba(30, 41, 59, 0.95));
+  border-radius: 20px;
+  padding: 16px 20px;
+  backdrop-filter: blur(20px);
+  border: 2px solid rgba(59, 130, 246, 0.4);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(59, 130, 246, 0.1);
   max-width: 95vw;
   overflow-x: auto;
+  overflow-y: hidden;
   transition: all 0.3s ease;
+  scroll-behavior: smooth;
+  -webkit-overflow-scrolling: touch;
 }
 
 .weather-timeline.compact {
-  padding: 8px 12px;
-  gap: 8px;
-}
-
-.toggle-compact-button {
-  background: rgba(59, 130, 246, 0.3);
-  border: 2px solid rgba(59, 130, 246, 0.5);
-  color: white;
-  width: 36px;
-  height: 36px;
-  min-width: 36px;
-  border-radius: 10px;
-  cursor: pointer;
-  transition: all 0.3s ease;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 14px;
-  flex-shrink: 0;
-}
-
-.toggle-compact-button:hover {
-  background: rgba(59, 130, 246, 0.5);
-  transform: scale(1.1);
+  padding: 12px 16px;
+  gap: 12px;
+  border-radius: 16px;
 }
 
 .weather-timeline::-webkit-scrollbar {
@@ -110,23 +95,86 @@ const handleDaySelect = (day) => {
   background: rgba(59, 130, 246, 0.7);
 }
 
+.toggle-compact-button {
+  background: rgba(59, 130, 246, 0.2);
+  border: 1px solid rgba(59, 130, 246, 0.3);
+  color: white;
+  width: 26px;
+  height: 26px;
+  min-width: 26px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  flex-shrink: 0;
+  padding: 0;
+  margin-right: 2px;
+}
+
+.toggle-compact-button:hover {
+  background: rgba(59, 130, 246, 0.35);
+  border-color: rgba(59, 130, 246, 0.5);
+  transform: scale(1.05);
+}
+
+.toggle-compact-button:active {
+  transform: scale(0.98);
+}
+
 @media (max-width: 768px) {
   .weather-timeline {
-    bottom: 10px;
+    bottom: 85px;
+    left: 10px;
+    right: 10px;
+    transform: none;
+    padding: 12px 14px;
+    gap: 10px;
+    z-index: 1001;
+    max-width: calc(100vw - 20px);
+    border-radius: 16px;
+  }
+  
+  .weather-timeline.compact {
     padding: 8px 10px;
+    gap: 6px;
+    border-radius: 14px;
+  }
+  
+  .toggle-compact-button {
+    width: 26px;
+    height: 26px;
+    min-width: 26px;
+    font-size: 10px;
+    margin-right: 3px;
+  }
+}
+
+@media (max-width: 480px) {
+  .weather-timeline {
+    bottom: 80px;
+    left: 8px;
+    right: 8px;
+    padding: 10px 12px;
     gap: 8px;
+    max-width: calc(100vw - 16px);
+    border-radius: 14px;
   }
   
   .weather-timeline.compact {
     padding: 6px 8px;
-    gap: 6px;
+    gap: 5px;
+    border-radius: 12px;
   }
   
   .toggle-compact-button {
-    width: 32px;
-    height: 32px;
-    min-width: 32px;
-    font-size: 12px;
+    width: 24px;
+    height: 24px;
+    min-width: 24px;
+    font-size: 9px;
+    margin-right: 2px;
   }
 }
 </style>

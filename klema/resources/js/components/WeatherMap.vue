@@ -124,9 +124,13 @@ const toggleWeatherLayer = (layerId, active) => {
   }
 };
 
-const moveToLocation = (lat, lon, zoom = 10) => {
+const moveToLocation = (lat, lon, zoom = 12) => {
   if (map.value) {
-    map.value.setView([lat, lon], zoom, { animate: false });
+    map.value.setView([lat, lon], zoom, { 
+      animate: true,
+      duration: 0.8,
+      easeLinearity: 0.25
+    });
   }
 };
 

@@ -623,21 +623,198 @@ const weatherEffectClass = computed(() => {
   flex-shrink: 0;
 }
 
+@media (max-width: 1024px) {
+  .weather-summary-card {
+    padding: 24px;
+    margin-bottom: 24px;
+  }
+  
+  .location-info h2 {
+    font-size: 24px;
+  }
+  
+  .temp-value {
+    font-size: 64px;
+  }
+  
+  .weather-description {
+    font-size: 18px;
+  }
+  
+  .forecast-cards {
+    grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+    gap: 12px;
+  }
+}
+
 @media (max-width: 768px) {
   .dashboard-view {
     padding: 20px;
   }
   
+  .weather-summary-card {
+    padding: 20px;
+    margin-bottom: 20px;
+  }
+  
+  .location-info {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+  
+  .location-info h2 {
+    font-size: 20px;
+  }
+  
   .current-weather {
     flex-direction: column;
+    gap: 24px;
+  }
+  
+  .temp-value {
+    font-size: 56px;
+  }
+  
+  .weather-description {
+    font-size: 16px;
+  }
+  
+  .weather-description i {
+    font-size: 28px;
+  }
+  
+  .weather-details {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 12px;
+  }
+  
+  .detail-item {
+    padding: 12px;
+  }
+  
+  .detail-item i {
+    font-size: 20px;
+  }
+  
+  .detail-item span {
+    font-size: 18px;
+  }
+  
+  .forecast-grid h3 {
+    font-size: 20px;
+  }
+  
+  .forecast-cards {
+    grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+    gap: 10px;
+  }
+  
+  .forecast-card {
+    padding: 16px;
+  }
+  
+  .forecast-icon {
+    font-size: 30px;
+  }
+  
+  .tips-section {
+    padding: 20px;
+  }
+  
+  .tips-section h3 {
+    font-size: 18px;
+  }
+}
+
+@media (max-width: 480px) {
+  .dashboard-view {
+    padding: 16px;
+  }
+  
+  .weather-summary-card {
+    padding: 16px;
+    margin-bottom: 16px;
+  }
+  
+  .location-info h2 {
+    font-size: 18px;
+  }
+  
+  .temp-value {
+    font-size: 48px;
+  }
+  
+  .weather-description {
+    font-size: 14px;
+  }
+  
+  .weather-description i {
+    font-size: 24px;
   }
   
   .weather-details {
     grid-template-columns: 1fr;
+    gap: 10px;
+  }
+  
+  .detail-item {
+    padding: 10px;
+  }
+  
+  .detail-item span {
+    font-size: 16px;
+  }
+  
+  .forecast-grid h3 {
+    font-size: 18px;
+    margin-bottom: 16px;
   }
   
   .forecast-cards {
-    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+    grid-template-columns: repeat(2, 1fr);
+    gap: 8px;
+  }
+  
+  .forecast-card {
+    padding: 12px;
+  }
+  
+  .forecast-day {
+    font-size: 12px;
+  }
+  
+  .forecast-date {
+    font-size: 11px;
+  }
+  
+  .forecast-icon {
+    font-size: 24px;
+    margin-bottom: 10px;
+  }
+  
+  .temp-max {
+    font-size: 14px;
+  }
+  
+  .temp-min {
+    font-size: 12px;
+  }
+  
+  .forecast-condition {
+    font-size: 11px;
+  }
+  
+  .tips-section {
+    padding: 16px;
+  }
+  
+  .tips-section h3 {
+    font-size: 16px;
+  }
+  
+  .tip-item {
+    font-size: 13px;
   }
 }
 

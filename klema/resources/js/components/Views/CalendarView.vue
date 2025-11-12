@@ -456,11 +456,14 @@ watch(currentDate, (newDate, oldDate) => {
 
 <style scoped>
 .calendar-view {
-  padding: 40px;
-  max-width: 1200px;
-  margin: 0 auto;
-  height: 100vh;
+  padding: 40px 40px 40px 160px;
+  max-width: 1400px;
+  margin: 0;
+  height: 100%;
   overflow-y: auto;
+  overflow-x: hidden;
+  box-sizing: border-box;
+  width: 100%;
   
   /* Hide scrollbar */
   scrollbar-width: none; /* Firefox */
@@ -582,9 +585,12 @@ watch(currentDate, (newDate, oldDate) => {
 .calendar-grid {
   background: rgba(0, 0, 0, 0.6);
   border-radius: 16px;
-  padding: 20px;
+  padding: 24px;
   border: 1px solid rgba(255, 255, 255, 0.1);
-  margin-bottom: 20px;
+  margin-bottom: 24px;
+  width: 100%;
+  box-sizing: border-box;
+  overflow: hidden;
 }
 
 .calendar-weekdays {
@@ -605,20 +611,26 @@ watch(currentDate, (newDate, oldDate) => {
 .calendar-days {
   display: grid;
   grid-template-columns: repeat(7, 1fr);
-  gap: 10px;
+  gap: 12px;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .calendar-day {
   aspect-ratio: 1;
   background: rgba(255, 255, 255, 0.05);
   border-radius: 12px;
-  padding: 10px;
+  padding: 12px;
   display: flex;
   flex-direction: column;
   justify-content: space-between;
   border: 1px solid rgba(255, 255, 255, 0.05);
   transition: all 0.3s ease;
   cursor: pointer;
+  min-height: 100px;
+  width: 100%;
+  box-sizing: border-box;
+  overflow: hidden;
 }
 
 .calendar-day:hover {
@@ -936,15 +948,24 @@ watch(currentDate, (newDate, oldDate) => {
   background: rgba(148, 163, 184, 0.25);
 }
 
+@media (max-width: 1024px) {
+  .calendar-view {
+    padding: 30px 30px 30px 120px;
+  }
+}
+
 @media (max-width: 768px) {
   .calendar-view {
-    padding: 20px 10px;
+    padding: 20px 15px 20px 15px;
+    overflow-x: hidden;
   }
   
   .calendar-header {
     padding: 15px 20px;
     grid-template-columns: 1fr;
     gap: 12px;
+    width: 100%;
+    box-sizing: border-box;
   }
   
   .calendar-header h2 {
@@ -967,38 +988,53 @@ watch(currentDate, (newDate, oldDate) => {
   }
   
   .calendar-grid {
-    padding: 15px;
+    padding: 12px;
+    width: 100%;
+    box-sizing: border-box;
+  }
+  
+  .calendar-weekdays {
+    gap: 6px;
+    width: 100%;
   }
   
   .weekday {
     font-size: 11px;
-    padding: 8px 4px;
+    padding: 8px 2px;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
   
   .calendar-days {
-    gap: 6px;
+    gap: 4px;
+    width: 100%;
   }
   
   .calendar-day {
-    padding: 6px;
+    padding: 6px 4px;
     border-radius: 8px;
+    min-height: 70px;
+    width: 100%;
+    aspect-ratio: 1;
   }
   
   .day-number {
-    font-size: 12px;
+    font-size: 11px;
   }
   
   .day-weather i {
-    font-size: 18px;
+    font-size: 16px;
   }
   
   .day-temp {
-    font-size: 11px;
+    font-size: 10px;
   }
 
   .activity-chip {
     flex-direction: column;
     align-items: flex-start;
+    font-size: 10px;
+    padding: 4px 6px;
   }
 
   .chip-field {
@@ -1009,6 +1045,8 @@ watch(currentDate, (newDate, oldDate) => {
     flex-direction: column;
     gap: 10px;
     padding: 15px;
+    width: 100%;
+    box-sizing: border-box;
   }
   
   .legend-item {
@@ -1019,12 +1057,15 @@ watch(currentDate, (newDate, oldDate) => {
 @media (max-width: 480px) {
   .calendar-view {
     padding: 15px 8px;
+    overflow-x: hidden;
   }
   
   .calendar-header {
     padding: 12px 15px;
     gap: 10px;
     grid-template-columns: 1fr;
+    width: 100%;
+    box-sizing: border-box;
   }
   
   .calendar-header h2 {
@@ -1047,32 +1088,49 @@ watch(currentDate, (newDate, oldDate) => {
   }
   
   .calendar-grid {
-    padding: 10px;
+    padding: 10px 8px;
+    width: 100%;
+    box-sizing: border-box;
   }
   
-  .weekday {
-    font-size: 10px;
-    padding: 6px 2px;
-  }
-  
-  .calendar-days {
+  .calendar-weekdays {
     gap: 4px;
   }
   
+  .weekday {
+    font-size: 9px;
+    padding: 6px 1px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  
+  .calendar-days {
+    gap: 3px;
+    width: 100%;
+  }
+  
   .calendar-day {
-    padding: 4px;
+    padding: 4px 2px;
+    min-height: 60px;
+    width: 100%;
   }
   
   .day-number {
-    font-size: 11px;
+    font-size: 10px;
   }
   
   .day-weather i {
-    font-size: 16px;
+    font-size: 14px;
   }
   
   .day-temp {
-    font-size: 10px;
+    font-size: 9px;
+  }
+
+  .activity-chip {
+    font-size: 9px;
+    padding: 3px 4px;
   }
 
   .activity-feedback {

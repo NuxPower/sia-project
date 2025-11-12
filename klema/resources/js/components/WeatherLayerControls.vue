@@ -63,14 +63,14 @@ const toggleLayer = (layerId) => {
 <style scoped>
 .weather-layer-controls {
   position: fixed;
-  top: 150px;
-  right: 20px;
+  top: 88px;
+  right: 24px;
   background: rgba(0, 0, 0, 0.85);
   border-radius: 12px;
   border: 1px solid rgba(59, 130, 246, 0.3);
   backdrop-filter: blur(15px);
   z-index: 1000;
-  min-width: 220px;
+  min-width: 240px;
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
 }
 
@@ -200,5 +200,62 @@ input:checked + .slider:before {
 .slide-leave-to {
   max-height: 0;
   opacity: 0;
+}
+
+@media (max-width: 1024px) {
+  .weather-layer-controls {
+    top: 75px;
+    right: 15px;
+    min-width: 200px;
+  }
+}
+
+@media (max-width: 768px) {
+  .weather-layer-controls {
+    top: 68px;
+    right: 15px;
+    left: auto;
+    bottom: auto;
+    min-width: 180px;
+    max-width: calc(100vw - 30px);
+    z-index: 1001;
+  }
+  
+  .controls-header {
+    padding: 10px 14px;
+  }
+  
+  .controls-title {
+    font-size: 13px;
+  }
+  
+  .layer-toggle {
+    padding: 8px 6px;
+  }
+  
+  .layer-name {
+    font-size: 12px;
+  }
+}
+
+@media (max-width: 480px) {
+  .weather-layer-controls {
+    top: 62px;
+    right: 10px;
+    left: 10px;
+    bottom: auto;
+    min-width: auto;
+    width: calc(100% - 20px);
+    max-width: calc(100vw - 20px);
+    z-index: 1001;
+  }
+  
+  .controls-header {
+    padding: 8px 12px;
+  }
+  
+  .controls-title {
+    font-size: 12px;
+  }
 }
 </style>

@@ -98,35 +98,46 @@ defineEmits(['select']);
   flex-direction: column;
   align-items: center;
   color: white;
-  min-width: 75px;
-  padding: 10px 8px;
-  border-radius: 10px;
+  min-width: 85px;
+  padding: 12px 10px;
+  border-radius: 14px;
   transition: all 0.3s ease;
   cursor: pointer;
   position: relative;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(10px);
 }
 
 .weather-card.compact {
-  padding: 8px 6px;
-  min-width: 60px;
+  padding: 10px 8px;
+  min-width: 70px;
+  border-radius: 12px;
 }
 
 .weather-card.history {
-  background: rgba(156, 163, 175, 0.2);
-  border: 1px solid rgba(156, 163, 175, 0.3);
-  opacity: 0.7;
+  background: rgba(156, 163, 175, 0.15);
+  border: 1px solid rgba(156, 163, 175, 0.25);
+  opacity: 0.75;
 }
 
 .weather-card.today {
-  background: rgba(59, 130, 246, 0.3);
-  border: 2px solid rgba(59, 130, 246, 0.6);
-  transform: scale(1.05);
-  box-shadow: 0 4px 16px rgba(59, 130, 246, 0.3);
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.35), rgba(37, 99, 235, 0.25));
+  border: 2px solid rgba(59, 130, 246, 0.7);
+  transform: scale(1.08);
+  box-shadow: 0 6px 20px rgba(59, 130, 246, 0.4), 0 0 0 2px rgba(59, 130, 246, 0.2);
 }
 
 .weather-card.future {
-  background: rgba(34, 197, 94, 0.2);
+  background: rgba(34, 197, 94, 0.15);
   border: 1px solid rgba(34, 197, 94, 0.3);
+}
+
+.weather-card:hover:not(.today) {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(59, 130, 246, 0.4);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
 }
 
 .timeline-indicator {
@@ -141,11 +152,13 @@ defineEmits(['select']);
 }
 
 .day-label {
-  font-size: 12px;
-  margin-bottom: 6px;
-  margin-top: 8px;
-  font-weight: bold;
+  font-size: 13px;
+  margin-bottom: 8px;
+  margin-top: 4px;
+  font-weight: 600;
   text-align: center;
+  color: #e2e8f0;
+  letter-spacing: 0.3px;
 }
 
 .compact .day-label {
@@ -155,16 +168,22 @@ defineEmits(['select']);
 }
 
 .date {
-  font-size: 9px;
-  margin-bottom: 8px;
-  color: #6b7280;
+  font-size: 10px;
+  margin-bottom: 10px;
+  color: #94a3b8;
   text-align: center;
+  font-weight: 500;
 }
 
 .weather-icon {
-  font-size: 20px;
-  margin-bottom: 8px;
-  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.5));
+  font-size: 24px;
+  margin-bottom: 10px;
+  filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.4));
+  transition: transform 0.3s ease;
+}
+
+.weather-card:hover .weather-icon {
+  transform: scale(1.1);
 }
 
 .compact .weather-icon {
@@ -176,7 +195,8 @@ defineEmits(['select']);
   display: flex;
   flex-direction: column;
   align-items: center;
-  font-size: 11px;
+  font-size: 12px;
+  gap: 2px;
 }
 
 .compact .temperature {
@@ -184,14 +204,15 @@ defineEmits(['select']);
 }
 
 .temp-high {
-  font-weight: bold;
+  font-weight: 700;
   color: #ffffff;
-  margin-bottom: 2px;
+  font-size: 13px;
 }
 
 .temp-low {
-  color: #9ca3af;
-  font-size: 10px;
+  color: #94a3b8;
+  font-size: 11px;
+  font-weight: 500;
 }
 
 .compact .temp-low {
@@ -199,32 +220,117 @@ defineEmits(['select']);
 }
 
 .condition {
-  font-size: 8px;
-  margin-top: 4px;
-  color: #6b7280;
+  font-size: 9px;
+  margin-top: 6px;
+  color: #94a3b8;
   text-align: center;
-  max-width: 60px;
+  max-width: 70px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  font-weight: 500;
+  text-transform: capitalize;
 }
 
 @media (max-width: 768px) {
   .weather-card {
+    min-width: 70px;
+    padding: 10px 8px;
+    flex-shrink: 0;
+  }
+  
+  .day-label {
+    font-size: 11px;
+  }
+  
+  .date {
+    font-size: 9px;
+    margin-bottom: 8px;
+  }
+  
+  .weather-icon {
+    font-size: 20px;
+    margin-bottom: 8px;
+  }
+  
+  .temperature {
+    font-size: 11px;
+  }
+  
+  .temp-high {
+    font-size: 12px;
+  }
+  
+  .temp-low {
+    font-size: 10px;
+  }
+  
+  .condition {
+    font-size: 8px;
+    max-width: 65px;
+  }
+}
+
+@media (max-width: 480px) {
+  .weather-card {
+    min-width: 65px;
+    padding: 8px 6px;
+    flex-shrink: 0;
+  }
+  
+  .weather-card.compact {
     min-width: 60px;
     padding: 8px 6px;
   }
   
   .day-label {
     font-size: 10px;
+    margin-bottom: 6px;
+    margin-top: 2px;
+  }
+  
+  .compact .day-label {
+    font-size: 9px;
+  }
+  
+  .date {
+    font-size: 8px;
+    margin-bottom: 6px;
   }
   
   .weather-icon {
+    font-size: 18px;
+    margin-bottom: 6px;
+  }
+  
+  .compact .weather-icon {
     font-size: 16px;
+    margin-bottom: 4px;
   }
   
   .temperature {
     font-size: 10px;
+  }
+  
+  .compact .temperature {
+    font-size: 9px;
+  }
+  
+  .temp-high {
+    font-size: 11px;
+  }
+  
+  .temp-low {
+    font-size: 9px;
+  }
+  
+  .compact .temp-low {
+    font-size: 8px;
+  }
+  
+  .condition {
+    font-size: 8px;
+    max-width: 60px;
   }
 }
 </style>

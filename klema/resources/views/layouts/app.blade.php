@@ -129,38 +129,71 @@
         }
 
         /* Mobile Responsive */
+        @media (max-width: 1024px) {
+            .navbar {
+                left: 12px;
+                width: 80px;
+                padding: 24px 0;
+                gap: 20px;
+            }
+
+            .navbar-icon {
+                width: 52px;
+                height: 52px;
+            }
+
+            .navbar-icon img {
+                width: 26px;
+                height: 26px;
+            }
+        }
+
         @media (max-width: 768px) {
             .navbar {
-                left: 10px;
-                gap: 10px;
+                position: fixed;
+                bottom: 0;
+                left: 0;
+                right: 0;
+                top: auto;
+                transform: none;
+                flex-direction: row;
+                justify-content: space-around;
+                width: 100%;
+                height: 70px;
+                padding: 0;
+                border-radius: 20px 20px 0 0;
+                gap: 0;
+                box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.3);
+                z-index: 998;
             }
 
             .navbar-icon {
                 width: 50px;
                 height: 50px;
-                font-size: 18px;
+                flex: 1;
+                max-width: 60px;
             }
 
-            .sidebar-toggle {
-                left: 10px;
-                top: 10px;
+            .navbar-icon img {
+                width: 24px;
+                height: 24px;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .navbar {
+                height: 65px;
+                border-radius: 15px 15px 0 0;
+            }
+
+            .navbar-icon {
                 width: 45px;
                 height: 45px;
             }
 
-            .logout-button {
-                left: 10px;
-                bottom: 20px;
-                width: 50px;
-                height: 50px;
-            }
-
-            .navbar.hidden {
-                left: -70px;
-            }
-
-            .logout-button.hidden {
-                left: -70px;
+            .navbar-icon img {
+                width: 22px;
+                height: 22px;
             }
         }
 

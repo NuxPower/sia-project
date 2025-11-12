@@ -829,6 +829,16 @@ input:checked + .slider:before {
   transform: translateX(24px);
 }
 
+@media (max-width: 1024px) {
+  .alerts-header h2 {
+    font-size: 24px;
+  }
+  
+  .warnings-grid {
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  }
+}
+
 @media (max-width: 768px) {
   .alerts-view {
     padding: 20px;
@@ -840,8 +850,107 @@ input:checked + .slider:before {
     gap: 15px;
   }
   
+  .alerts-header h2 {
+    font-size: 22px;
+  }
+  
+  .add-alert-button {
+    width: 100%;
+    justify-content: center;
+  }
+  
+  .alerts-section,
+  .warnings-section,
+  .settings-section {
+    padding: 20px;
+    margin-bottom: 20px;
+  }
+  
+  .warnings-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
+  
   .warnings-grid {
     grid-template-columns: 1fr;
+  }
+  
+  .alert-card {
+    flex-direction: column;
+    gap: 15px;
+  }
+  
+  .alert-actions {
+    flex-direction: row;
+    width: 100%;
+    justify-content: flex-end;
+  }
+  
+  .alert-meta {
+    flex-direction: row;
+    gap: 15px;
+  }
+}
+
+@media (max-width: 480px) {
+  .alerts-view {
+    padding: 16px;
+  }
+  
+  .alerts-header h2 {
+    font-size: 20px;
+  }
+  
+  .add-alert-button {
+    padding: 10px 16px;
+    font-size: 13px;
+  }
+  
+  .alerts-section,
+  .warnings-section,
+  .settings-section {
+    padding: 16px;
+    margin-bottom: 16px;
+  }
+  
+  .alerts-section h3,
+  .settings-section h3 {
+    font-size: 18px;
+  }
+  
+  .alert-card {
+    padding: 16px;
+  }
+  
+  .alert-content h4 {
+    font-size: 16px;
+  }
+  
+  .alert-content p {
+    font-size: 13px;
+  }
+  
+  .warning-card {
+    padding: 16px;
+  }
+  
+  .warning-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+  
+  .setting-item {
+    padding: 12px;
+  }
+  
+  .setting-label {
+    font-size: 14px;
+  }
+  
+  .setting-description {
+    font-size: 12px;
   }
 }
 </style>

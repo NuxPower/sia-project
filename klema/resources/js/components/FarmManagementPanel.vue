@@ -651,5 +651,74 @@ watch(() => [editForm.latitude, editForm.longitude], ([lat, lng]) => {
     transform: rotate(360deg);
   }
 }
+
+@media (max-width: 1024px) {
+  .farm-panel--overlay {
+    width: 300px;
+  }
+  
+  .farm-panel--dashboard .farm-panel__grid {
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  }
+}
+
+@media (max-width: 768px) {
+  .farm-panel--overlay {
+    width: 100%;
+    max-width: 100%;
+    max-height: calc(100vh - 100px);
+    padding: 14px 16px;
+  }
+  
+  .farm-panel--dashboard {
+    padding: 20px;
+  }
+  
+  .farm-panel__grid {
+    grid-template-columns: 1fr !important;
+  }
+  
+  .farm-panel__section--card {
+    padding: 10px;
+  }
+  
+  .farm-panel__actions--wrap {
+    flex-direction: column;
+  }
+  
+  .farm-panel__button {
+    width: 100%;
+    justify-content: center;
+  }
+}
+
+@media (max-width: 480px) {
+  .farm-panel--overlay {
+    padding: 12px 14px;
+  }
+  
+  .farm-panel--dashboard {
+    padding: 16px;
+  }
+  
+  .farm-panel h3 {
+    font-size: 16px;
+  }
+  
+  .farm-panel h4 {
+    font-size: 14px;
+  }
+  
+  .farm-panel__label {
+    font-size: 11px;
+  }
+  
+  .farm-panel__input,
+  .farm-panel__select,
+  .farm-panel__textarea {
+    font-size: 13px;
+    padding: 6px 8px;
+  }
+}
 </style>
 
