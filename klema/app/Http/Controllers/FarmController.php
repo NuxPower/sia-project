@@ -11,11 +11,13 @@ class FarmController extends Controller
 {
     public function index()
     {
-        $farms = auth()->user()->farms()->with(['weatherData' => function($query) {
+        $farmsQuery = Farm::with(['weatherData' => function($query) {
             $query->latest('recorded_at')->limit(1);
         }, 'alerts' => function($query) {
             $query->where('resolved', false);
-        }])->get();
+        }, 'user']);
+
+        $farms = $farmsQuery->get();
         
         return view('farms.index', compact('farms'));
     }

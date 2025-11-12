@@ -96,91 +96,6 @@
       </div>
     </div>
 
-    <!-- Sessions & Devices -->
-    <div class="settings-section">
-      <h3>
-        <i class="fas fa-mobile-alt"></i>
-        Sessions & Devices
-      </h3>
-
-      <div class="device-actions-row">
-        <button class="action-button logout ghost" @click="refreshDevices" :disabled="devicesLoading">
-          <i class="fas fa-sync-alt" :class="{ 'fa-spin': devicesLoading }"></i>
-          <span v-if="!devicesLoading">Refresh</span>
-          <span v-else>Loading...</span>
-        </button>
-      </div>
-
-      <div v-if="devicesLoading" class="device-state">
-        <i class="fas fa-spinner fa-spin"></i>
-        <span>Loading active sessions...</span>
-      </div>
-
-      <div v-else-if="deviceError" class="device-state error">
-        <i class="fas fa-exclamation-triangle"></i>
-        <span>{{ deviceError }}</span>
-      </div>
-
-      <div v-else-if="!devices.length" class="device-state">
-        <i class="fas fa-check-circle"></i>
-        <span>You're only signed in on this device.</span>
-      </div>
-
-      <div v-else class="device-list">
-        <div
-          v-for="device in devices"
-          :key="device.id"
-          class="device-card"
-          :class="{ current: device.current }"
-        >
-          <div class="device-card__header">
-            <div class="device-card__title">
-              <strong>{{ device.name || 'Unnamed device' }}</strong>
-              <span v-if="device.current" class="device-badge">
-                <i class="fas fa-star"></i>
-                Current session
-              </span>
-            </div>
-            <button
-              class="action-button danger ghost"
-              @click="revokeDevice(device)"
-              :disabled="isRevoking(device.id)"
-            >
-              <i class="fas fa-sign-out-alt" v-if="!isRevoking(device.id)"></i>
-              <i class="fas fa-spinner fa-spin" v-else></i>
-              <span v-if="!isRevoking(device.id)">Sign out</span>
-              <span v-else>Revoking...</span>
-            </button>
-          </div>
-
-          <div class="device-card__meta">
-            <div>
-              <span class="meta-label">Last used:</span>
-              <span>{{ formatTimestamp(device.last_used_at, 'No activity yet') }}</span>
-            </div>
-            <div>
-              <span class="meta-label">Created:</span>
-              <span>{{ formatTimestamp(device.created_at) }}</span>
-            </div>
-            <div>
-              <span class="meta-label">Expires:</span>
-              <span>{{ formatExpiration(device.expires_at) }}</span>
-            </div>
-          </div>
-
-          <div v-if="device.abilities?.length" class="device-card__abilities">
-            <span
-              v-for="ability in device.abilities"
-              :key="ability"
-              class="ability-chip"
-            >
-              {{ ability }}
-            </span>
-          </div>
-        </div>
-      </div>
-    </div>
-
     <!-- About -->
     <div class="settings-section">
       <h3>
@@ -244,111 +159,8 @@ const defaultSettings = Object.freeze({
 const settings = reactive({ ...defaultSettings });
 const isSaving = ref(false);
 const isClearing = ref(false);
-const devices = ref([]);
-const devicesLoading = ref(true);
-const deviceError = ref(null);
-const revokingTokenIds = ref(new Set());
 
 const { showSuccess, showError } = useGlobalAlerts();
-
-const formatTimestamp = (value, fallback = '—') => {
-  if (!value) {
-    return fallback;
-  }
-
-  const date = new Date(value);
-
-  if (Number.isNaN(date.getTime())) {
-    return fallback;
-  }
-
-  return date.toLocaleString();
-};
-
-const formatExpiration = (value) => formatTimestamp(value, 'No expiry');
-
-const setRevoking = (id, shouldAdd) => {
-  const updated = new Set(revokingTokenIds.value);
-
-  if (shouldAdd) {
-    updated.add(id);
-  } else {
-    updated.delete(id);
-  }
-
-  revokingTokenIds.value = updated;
-};
-
-const isRevoking = (id) => revokingTokenIds.value.has(id);
-
-const fetchDevices = async (notify = false) => {
-  deviceError.value = null;
-  devicesLoading.value = true;
-
-  try {
-    const response = await authorizedFetch('/api/tokens');
-    const data = await response.json().catch(() => null);
-
-    if (!response.ok) {
-      throw new Error(data?.message ?? 'Unable to load active sessions.');
-    }
-
-    devices.value = Array.isArray(data?.tokens) ? data.tokens : [];
-
-    if (notify) {
-      showSuccess('Sessions Refreshed', 'Active devices have been updated.');
-    }
-  } catch (error) {
-    console.error('Load devices error:', error);
-    deviceError.value = error?.message ?? 'Unable to load active sessions.';
-    devices.value = [];
-  } finally {
-    devicesLoading.value = false;
-  }
-};
-
-const refreshDevices = () => fetchDevices(true);
-
-const revokeDevice = async (device) => {
-  if (!device?.id || isRevoking(device.id)) {
-    return;
-  }
-
-  setRevoking(device.id, true);
-
-  let shouldRedirect = false;
-
-  try {
-    const response = await authorizedFetch(`/api/tokens/${device.id}`, { method: 'DELETE' });
-
-    let data = null;
-    if (response.status !== 204) {
-      data = await response.json().catch(() => null);
-    }
-
-    if (!response.ok) {
-      throw new Error(data?.message ?? 'Failed to revoke session.');
-    }
-
-    if (device.current) {
-      shouldRedirect = true;
-      revokeApiToken();
-      showSuccess('Signed Out', 'This session has been ended. Please sign in again.');
-    } else {
-      showSuccess('Device Signed Out', 'The selected session has been revoked.');
-      await fetchDevices();
-    }
-  } catch (error) {
-    console.error('Revoke device error:', error);
-    showError('Revoke Failed', error?.message ?? 'Unable to revoke this session.');
-  } finally {
-    setRevoking(device.id, false);
-
-    if (shouldRedirect && typeof window !== 'undefined') {
-      window.location.href = '/login';
-    }
-  }
-};
 
 const loadSettings = () => {
   if (typeof window === 'undefined') {
@@ -369,7 +181,6 @@ const loadSettings = () => {
 
 onMounted(() => {
   loadSettings();
-  void fetchDevices();
 });
 
 const saveSettings = async () => {
@@ -436,7 +247,7 @@ const getCurrentLocation = () => {
 
 const logout = async () => {
   try {
-    const response = await authorizedFetch('/api/logout', {
+    const response = await authorizedFetch('/api/auth/logout', {
       method: 'POST'
     });
 
@@ -624,120 +435,6 @@ const logout = async () => {
   color: white;
   font-size: 14px;
   font-weight: 500;
-}
-
-.device-actions-row {
-  display: flex;
-  justify-content: flex-end;
-  margin-bottom: 16px;
-  gap: 10px;
-}
-
-.device-state {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 14px 16px;
-  border-radius: 12px;
-  background: rgba(255, 255, 255, 0.06);
-  color: #e5e7eb;
-  font-size: 14px;
-}
-
-.device-state.error {
-  background: rgba(239, 68, 68, 0.15);
-  color: #fecaca;
-}
-
-.device-list {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-
-.device-card {
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(59, 130, 246, 0.25);
-  border-radius: 16px;
-  padding: 18px;
-  color: #e5e7eb;
-  backdrop-filter: blur(6px);
-  transition: border-color 0.3s ease, transform 0.3s ease;
-}
-
-.device-card.current {
-  border-color: rgba(34, 197, 94, 0.5);
-  box-shadow: 0 0 20px rgba(34, 197, 94, 0.15);
-}
-
-.device-card:hover {
-  transform: translateY(-2px);
-}
-
-.device-card__header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 16px;
-  flex-wrap: wrap;
-}
-
-.device-card__title {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 16px;
-}
-
-.device-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 4px 10px;
-  border-radius: 9999px;
-  background: rgba(34, 197, 94, 0.2);
-  color: #bbf7d0;
-  font-size: 12px;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-}
-
-.device-card__meta {
-  display: grid;
-  gap: 6px;
-  margin-top: 14px;
-  font-size: 13px;
-  color: #d1d5db;
-}
-
-.meta-label {
-  color: #9ca3af;
-  margin-right: 6px;
-}
-
-.device-card__abilities {
-  margin-top: 16px;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
-.ability-chip {
-  padding: 6px 10px;
-  border-radius: 9999px;
-  background: rgba(59, 130, 246, 0.2);
-  border: 1px solid rgba(59, 130, 246, 0.35);
-  font-size: 12px;
-  color: #bfdbfe;
-}
-
-.action-button.ghost {
-  background: transparent;
-  border-color: rgba(255, 255, 255, 0.35);
-}
-
-.action-button.ghost:hover {
-  background: rgba(255, 255, 255, 0.1);
 }
 
 .settings-actions {

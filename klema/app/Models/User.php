@@ -45,11 +45,6 @@ class User extends Authenticatable implements MustVerifyEmail
         return $this->hasMany(Activity::class);
     }
 
-    public function isAdmin(): bool
-    {
-        return $this->role === 'admin';
-    }
-
     public function isFarmer(): bool
     {
         return $this->role === 'farmer';
@@ -62,11 +57,8 @@ class User extends Authenticatable implements MustVerifyEmail
      */
     public function defaultTokenAbilities(): array
     {
-        if ($this->isAdmin()) {
-            return ['*', 'role:admin', 'token:refresh', 'tokens:manage'];
-        }
-
         $abilities = [
+            '*',
             'weather:read',
             'weather:write',
             'farms:read',
@@ -75,26 +67,25 @@ class User extends Authenticatable implements MustVerifyEmail
             'alerts:write',
             'activities:read',
             'activities:write',
+            'exports:read',
+            'exports:write',
+            'users:read',
+            'users:write',
             'role:farmer',
-            'token:refresh',
-            'tokens:manage',
         ];
 
-        return array_values(array_unique($abilities));
+        return array_unique($abilities);
     }
 
     /**
      * Issue a scoped personal access token, replacing older tokens with the same name.
-     *
-     * @param  array<int, string>|null  $abilities
      */
-    public function issueToken(string $name = 'klema-api-token', ?int $expirationMinutes = null, ?array $abilities = null): string
+    public function issueToken(string $name = 'klema-api-token', ?int $expirationMinutes = null): string
     {
         $this->tokens()->where('name', $name)->delete();
 
         $expiresAt = $expirationMinutes ? now()->addMinutes($expirationMinutes) : null;
-        $resolvedAbilities = $abilities ?? $this->defaultTokenAbilities();
 
-        return $this->createToken($name, $resolvedAbilities, $expiresAt)->plainTextToken;
+        return $this->createToken($name, $this->defaultTokenAbilities(), $expiresAt)->plainTextToken;
     }
 }

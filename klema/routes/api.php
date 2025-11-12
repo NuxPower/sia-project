@@ -8,25 +8,6 @@ use App\Http\Controllers\API\AlertApiController;
 use App\Http\Controllers\API\AuthApiController;
 use App\Http\Controllers\API\ActivityApiController;
 
-Route::middleware('throttle:login')->post('/login', [AuthApiController::class, 'login'])->name('api.login');
-Route::middleware('throttle:register')->post('/register', [AuthApiController::class, 'register'])->name('api.register');
-
-Route::middleware(['auth:sanctum'])->group(function () {
-    Route::post('/logout', [AuthApiController::class, 'logout'])->name('api.logout');
-    Route::post('/email/verification-notification', [AuthApiController::class, 'sendVerificationEmail'])
-        ->middleware('throttle:6,1');
-    Route::post('/token/refresh', [AuthApiController::class, 'refreshToken'])->name('api.token.refresh');
-    Route::get('/tokens', [AuthApiController::class, 'listTokens'])->name('api.tokens.index');
-    Route::delete('/tokens/{token}', [AuthApiController::class, 'revokeToken'])->name('api.tokens.destroy');
-    Route::get('/me', function (Request $request) {
-        return response()->json([
-            'success' => true,
-            'user' => $request->user()->load('farms'),
-        ]);
-    })->name('api.me');
-});
-
-// Backward compatibility while frontend is being migrated off the /api/auth/* namespace
 Route::prefix('auth')->group(function () {
     Route::middleware('throttle:login')->post('/login', [AuthApiController::class, 'login']);
     Route::middleware('throttle:register')->post('/register', [AuthApiController::class, 'register']);
@@ -47,7 +28,7 @@ Route::prefix('auth')->group(function () {
 // Allow session-authenticated dashboard users to mint SPA tokens
 Route::middleware(['web', 'auth'])->post('/auth/token', [AuthApiController::class, 'issueToken']);
 
-Route::middleware(['auth:sanctum', 'verified', 'role:admin,farmer'])->group(function () {
+Route::middleware(['auth:sanctum', 'verified'])->group(function () {
     // Weather endpoints
     Route::prefix('weather')->group(function () {
         Route::get('/current', [WeatherApiController::class, 'getCurrentWeather']);
@@ -70,4 +51,15 @@ Route::middleware(['auth:sanctum', 'verified', 'role:admin,farmer'])->group(func
 
     // Activity endpoints
     Route::apiResource('activities', ActivityApiController::class)->only(['index', 'store']);
+
+    // Admin endpoints (now accessible to all farmers)
+    Route::prefix('admin')->group(function () {
+        Route::get('/stats', [\App\Http\Controllers\DashboardController::class, 'getSystemStats']);
+        Route::get('/farmers', [\App\Http\Controllers\DashboardController::class, 'getFarmersWithFarms']);
+        Route::post('/weather/update', [WeatherApiController::class, 'manualUpdate']);
+        Route::apiResource('users', \App\Http\Controllers\UserController::class);
+        Route::post('/users/{user}/reset-password', [\App\Http\Controllers\UserController::class, 'resetPassword']);
+        Route::get('/users/{user}/sessions', [\App\Http\Controllers\UserController::class, 'getSessions']);
+        Route::delete('/users/{user}/sessions', [\App\Http\Controllers\UserController::class, 'revokeSessions']);
+    });
 });

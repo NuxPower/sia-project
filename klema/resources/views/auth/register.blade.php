@@ -57,14 +57,7 @@
             @enderror
         </div>
 
-        <div class="auth-form__group">
-            <label class="auth-form__label">Account Type</label>
-            <div class="auth-input-wrapper" style="pointer-events: none; opacity: 0.8;">
-                <i class="fas fa-user-tag"></i>
-                <div class="auth-input" style="padding-right: 20px;">Farmer</div>
-            </div>
-            <input type="hidden" name="role" value="farmer">
-        </div>
+        <input type="hidden" name="role" value="farmer">
 
         <div class="auth-form__group">
             <label for="password" class="auth-form__label">Password</label>

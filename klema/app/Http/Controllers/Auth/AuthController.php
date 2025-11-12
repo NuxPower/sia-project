@@ -70,13 +70,14 @@ class AuthController extends Controller
                     ->symbols()
                     ->uncompromised(),
             ],
+            'role' => ['nullable', 'string', 'in:farmer'],
         ]);
 
         $user = User::create([
             'name' => $request->name,
             'email' => $request->email,
             'password' => Hash::make($request->password),
-            'role' => 'farmer',
+            'role' => $request->role ?? 'farmer',
         ]);
 
         event(new Registered($user));

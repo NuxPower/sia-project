@@ -463,4 +463,63 @@ class WeatherApiController extends Controller
         return Str::lower($trimmed);
     }
 
+    /**
+     * Manually trigger weather update from external API (Admin only).
+     */
+    public function manualUpdate(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'location' => 'nullable|string',
+            'lat' => 'nullable|numeric|between:-90,90',
+            'lon' => 'nullable|numeric|between:-180,180',
+            'farm_id' => 'nullable|exists:farms,farm_id',
+        ]);
+
+        $location = $validated['location'] ?? null;
+        $lat = $validated['lat'] ?? null;
+        $lon = $validated['lon'] ?? null;
+        $farmId = $validated['farm_id'] ?? null;
+
+        try {
+            if ($farmId) {
+                $farm = \App\Models\Farm::findOrFail($farmId);
+                $lat = $farm->latitude;
+                $lon = $farm->longitude;
+                $location = $farm->farm_name;
+            }
+
+            if ($lat && $lon) {
+                $weather = $this->weatherService->getCurrentWeatherByCoordinates($lat, $lon);
+            } elseif ($location) {
+                $weather = $this->weatherService->getCurrentWeather($location);
+            } else {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Either location, lat/lon coordinates, or farm_id is required'
+                ], 400);
+            }
+
+            // Store the weather snapshot
+            $this->weatherService->storeWeatherSnapshot($weather, [
+                'location' => $weather['name'] ?? $location,
+                'lat' => $lat,
+                'lon' => $lon,
+                'farm_id' => $farmId,
+            ]);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Weather data updated successfully',
+                'weather' => $weather
+            ]);
+        } catch (\Throwable $e) {
+            \Log::error('Manual weather update error: ' . $e->getMessage());
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to update weather data: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
 }

@@ -9,22 +9,12 @@ class FarmPolicy
 {
     public function viewAny(User $user): bool
     {
-        if ($user->isAdmin() || $user->isFarmer()) {
-            return true;
-        }
-
-        $token = $user->currentAccessToken();
-
-        if (! $token) {
-            return false;
-        }
-
-        return $token->can('*') || $token->can('farms:read');
+        return true;
     }
 
     public function view(User $user, Farm $farm): bool
     {
-        return $user->id === $farm->user_id || $user->isAdmin();
+        return true;
     }
 
     public function create(User $user): bool
@@ -34,11 +24,11 @@ class FarmPolicy
 
     public function update(User $user, Farm $farm): bool
     {
-        return $user->id === $farm->user_id || $user->isAdmin();
+        return true;
     }
 
     public function delete(User $user, Farm $farm): bool
     {
-        return $user->id === $farm->user_id || $user->isAdmin();
+        return true;
     }
 }

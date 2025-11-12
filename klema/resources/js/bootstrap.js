@@ -7,15 +7,13 @@ import 'bootstrap';
  */
 
 import axios from 'axios';
-import { getApiToken, initializeTokenManager, revokeApiToken } from './services/auth';
+import { getApiToken, revokeApiToken } from './services/auth';
 window.axios = axios;
 
 window.axios.defaults.headers.common['X-Requested-With'] = 'XMLHttpRequest';
 window.axios.defaults.withCredentials = true;
 window.axios.defaults.xsrfHeaderName = 'X-XSRF-TOKEN';
 window.axios.defaults.xsrfCookieName = 'XSRF-TOKEN';
-
-initializeTokenManager();
 
 window.axios.interceptors.request.use((config) => {
     const token = getApiToken();

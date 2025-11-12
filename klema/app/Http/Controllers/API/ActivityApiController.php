@@ -20,8 +20,6 @@ class ActivityApiController extends Controller
      */
     public function index(Request $request): JsonResponse
     {
-        $this->authorize('viewAny', Activity::class);
-
         $month = (int) $request->query('month', now()->month);
         $year = (int) $request->query('year', now()->year);
 
@@ -44,8 +42,6 @@ class ActivityApiController extends Controller
      */
     public function store(Request $request): JsonResponse
     {
-        $this->authorize('create', Activity::class);
-
         $validated = $request->validate([
             'activity_type' => 'required|string|max:255',
             'field' => 'required|string|max:255',

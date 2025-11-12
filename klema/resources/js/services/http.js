@@ -1,4 +1,4 @@
-import { ensureApiToken, getApiToken, refreshApiToken, setApiToken } from './auth';
+import { ensureApiToken, getApiToken, setApiToken } from './auth';
 
 async function performFetch(url, options, token) {
   const headers = new Headers(options.headers || {});
@@ -33,18 +33,6 @@ export async function authorizedFetch(url, options = {}) {
 
   if (response.status !== 401) {
     return response;
-  }
-
-  if (initialToken) {
-    const rotatedToken = await refreshApiToken();
-
-    if (rotatedToken) {
-      response = await performFetch(url, options, rotatedToken);
-
-      if (response.status !== 401) {
-        return response;
-      }
-    }
   }
 
   setApiToken(null);

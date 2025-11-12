@@ -74,7 +74,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, watch, computed } from 'vue';
+import { ref, onMounted, watch, computed, nextTick } from 'vue';
 import axios from 'axios';
 import SearchBar from './SearchBar.vue';
 import ClickInstruction from './ClickInstruction.vue';
@@ -87,6 +87,7 @@ import DashboardView from './Views/DashboardView.vue';
 import CalendarView from './Views/CalendarView.vue';
 import AlertsView from './Views/AlertsView.vue';
 import SettingsView from './Views/SettingsView.vue';
+import ExportView from './Views/ExportView.vue';
 import DayDetailView from './Views/DayDetailView.vue';
 import GlobalAlertNotification from './GlobalAlertNotification.vue';
 import { useWeatherAPI } from '../composables/useWeatherAPI';
@@ -223,6 +224,55 @@ const currentLocationLabel = computed(() => {
   return searchLocation.value;
 });
 
+const currentUser = ref(null);
+const systemStats = ref(null);
+
+// Fetch user info and system stats
+const fetchUserInfo = async () => {
+  try {
+    await ensureApiToken(axios);
+    const response = await axios.get('/api/me');
+    if (response.data?.user) {
+      currentUser.value = response.data.user;
+      
+      // Fetch system stats
+      try {
+        const statsResponse = await axios.get('/api/admin/stats');
+        if (statsResponse.data?.success && statsResponse.data?.stats) {
+          systemStats.value = statsResponse.data.stats;
+        }
+      } catch (err) {
+        console.warn('Could not fetch system stats:', err);
+      }
+    }
+  } catch (error) {
+    console.warn('Could not fetch user info:', error);
+  }
+};
+
+const locateFarm = (farmId) => {
+  const farm = rawFarms.value.find(f => f.farm_id === farmId);
+  if (!farm) return;
+
+  // Switch to map view if not already there
+  if (activeView.value !== 'map') {
+    setActiveView('map');
+    // Wait for the map view to be rendered
+    nextTick(() => {
+      setTimeout(() => {
+        if (weatherMapRef.value) {
+          focusMapOnFarm(farm);
+          updateWeatherForLocation(farm.latitude, farm.longitude, farm.farm_name);
+        }
+      }, 150);
+    });
+  } else {
+    // Map view is already active, focus immediately
+    focusMapOnFarm(farm);
+    updateWeatherForLocation(farm.latitude, farm.longitude, farm.farm_name);
+  }
+};
+
 const overlayViewConfig = computed(() => {
   switch (activeView.value) {
     case 'dashboard':
@@ -239,6 +289,7 @@ const overlayViewConfig = computed(() => {
           farmsLoading: farmMapLoading.value,
           isDrawing: !!boundarySession.value,
           isPlacingPoint: !!pointSession.value,
+          systemStats: systemStats.value,
           onRefreshFarms: refreshFarmLayers,
           onCreateFarm: createFarm,
           onSaveFarm: updateFarmDetails,
@@ -247,7 +298,8 @@ const overlayViewConfig = computed(() => {
           onFinishBoundary: finishBoundaryEditing,
           onCancelBoundary: cancelBoundaryEditing,
           onStartPoint: startPointPlacement,
-          onCancelPoint: cancelPointPlacement
+          onCancelPoint: cancelPointPlacement,
+          onLocateFarm: locateFarm
         }
       };
     case 'calendar':
@@ -290,7 +342,17 @@ const overlayViewConfig = computed(() => {
       return {
         key: 'settings',
         component: SettingsView,
-        props: {}
+        props: {
+          farms: rawFarms.value
+        }
+      };
+    case 'exports':
+      return {
+        key: 'exports',
+        component: ExportView,
+        props: {
+          farms: rawFarms.value
+        }
       };
     default:
       return {
@@ -535,6 +597,27 @@ watch(rawFarms, async (farms, previous) => {
 
 const setActiveView = (view) => {
   activeView.value = view;
+  
+  // Update sidebar active state to match
+  const viewMap = {
+    'dashboard': 0,
+    'map': 1,
+    'calendar': 2,
+    'alerts': 3,
+    'exports': 4,
+    'settings': 5
+  };
+  
+  const sidebar = document.getElementById('sidebar');
+  if (sidebar) {
+    const icons = sidebar.querySelectorAll('.navbar-icon');
+    icons.forEach((icon, index) => {
+      icon.classList.remove('active');
+      if (index === viewMap[view]) {
+        icon.classList.add('active');
+      }
+    });
+  }
 };
 
 const handleLayerToggle = ({ layerId, active }) => {
@@ -717,6 +800,7 @@ const initializeDefaultLocation = async () => {
 };
 
 onMounted(async () => {
+  await fetchUserInfo();
   await ensureApiToken(window.axios);
   const prefilled = await initializeDefaultLocation();
   if (!prefilled) {

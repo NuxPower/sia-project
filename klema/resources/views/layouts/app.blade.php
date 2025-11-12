@@ -128,6 +128,27 @@
             animation-delay: 0.3s;
         }
 
+        .navbar-icon:nth-child(6) {
+            animation-delay: 0.35s;
+        }
+
+        .navbar-icon i {
+            transition: opacity 0.3s ease, filter 0.3s ease, transform 0.3s ease, color 0.3s ease;
+        }
+
+        .navbar-icon:hover i {
+            opacity: 0.85;
+            filter: grayscale(20%) brightness(1.15);
+            transform: scale(1.05);
+            color: rgba(255, 255, 255, 0.85) !important;
+        }
+
+        .navbar-icon.active i {
+            opacity: 1;
+            filter: none;
+            color: rgba(255, 255, 255, 1) !important;
+        }
+
         /* Mobile Responsive */
         @media (max-width: 768px) {
             .navbar {
@@ -168,6 +189,7 @@
         .settings-view,
         .dashboard-view,
         .alerts-view,
+        .exports-view,
         #app {
             /* Firefox */
             scrollbar-width: none;
@@ -181,6 +203,7 @@
         .settings-view::-webkit-scrollbar,
         .dashboard-view::-webkit-scrollbar,
         .alerts-view::-webkit-scrollbar,
+        .exports-view::-webkit-scrollbar,
         #app::-webkit-scrollbar {
             display: none;
         }
@@ -189,7 +212,8 @@
         .calendar-view:hover::-webkit-scrollbar,
         .settings-view:hover::-webkit-scrollbar,
         .dashboard-view:hover::-webkit-scrollbar,
-        .alerts-view:hover::-webkit-scrollbar {
+        .alerts-view:hover::-webkit-scrollbar,
+        .exports-view:hover::-webkit-scrollbar {
             display: block;
             width: 8px;
         }
@@ -197,7 +221,8 @@
         .calendar-view:hover::-webkit-scrollbar-track,
         .settings-view:hover::-webkit-scrollbar-track,
         .dashboard-view:hover::-webkit-scrollbar-track,
-        .alerts-view:hover::-webkit-scrollbar-track {
+        .alerts-view:hover::-webkit-scrollbar-track,
+        .exports-view:hover::-webkit-scrollbar-track {
             background: rgba(0, 0, 0, 0.2);
             border-radius: 10px;
         }
@@ -205,7 +230,8 @@
         .calendar-view:hover::-webkit-scrollbar-thumb,
         .settings-view:hover::-webkit-scrollbar-thumb,
         .dashboard-view:hover::-webkit-scrollbar-thumb,
-        .alerts-view:hover::-webkit-scrollbar-thumb {
+        .alerts-view:hover::-webkit-scrollbar-thumb,
+        .exports-view:hover::-webkit-scrollbar-thumb {
             background: rgba(59, 130, 246, 0.5);
             border-radius: 10px;
             border: 2px solid rgba(0, 0, 0, 0.2);
@@ -214,7 +240,8 @@
         .calendar-view:hover::-webkit-scrollbar-thumb:hover,
         .settings-view:hover::-webkit-scrollbar-thumb:hover,
         .dashboard-view:hover::-webkit-scrollbar-thumb:hover,
-        .alerts-view:hover::-webkit-scrollbar-thumb:hover {
+        .alerts-view:hover::-webkit-scrollbar-thumb:hover,
+        .exports-view:hover::-webkit-scrollbar-thumb:hover {
             background: rgba(59, 130, 246, 0.8);
         }
 
@@ -248,7 +275,8 @@
         .calendar-view,
         .settings-view,
         .dashboard-view,
-        .alerts-view {
+        .alerts-view,
+        .exports-view {
             scroll-behavior: smooth;
         }
     </style>
@@ -268,6 +296,9 @@
         </div>
         <div class="navbar-icon" onclick="setActiveView('alerts', this)" title="Alerts">
             <img src="{{ asset('assets/mingcute_notification-line.png') }}" alt="Alerts icon">
+        </div>
+        <div class="navbar-icon" onclick="setActiveView('exports', this)" title="Exports">
+            <i class="fas fa-download" style="font-size: 24px; color: rgba(255, 255, 255, 0.55);"></i>
         </div>
         <div class="navbar-icon" onclick="setActiveView('settings', this)" title="Settings">
             <img src="{{ asset('assets/uil_setting.png') }}" alt="Settings icon">

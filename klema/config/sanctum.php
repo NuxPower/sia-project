@@ -52,20 +52,7 @@ return [
     |
     */
 
-'expiration' => env('SANCTUM_EXPIRATION', 60),
-
-/*
-|--------------------------------------------------------------------------
-| Remember Me Expiration Minutes
-|--------------------------------------------------------------------------
-|
-| Long-lived tokens issued when a user opts into "remember me" will honor
-| this expiration period. These tokens will still be rotated regularly
-| to limit leakage risks while keeping users signed in across sessions.
-|
-*/
-
-'remember_expiration' => env('SANCTUM_REMEMBER_EXPIRATION', 43200),
+    'expiration' => env('SANCTUM_EXPIRATION', 120),
 
     /*
     |--------------------------------------------------------------------------

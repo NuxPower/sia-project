@@ -18,8 +18,6 @@ class ActivityController extends Controller
 
     public function index()
     {
-        $this->authorize('viewAny', Activity::class);
-
         $activities = Activity::where('user_id', auth()->id())
             ->orderBy('start_date', 'desc')
             ->get();
@@ -29,15 +27,11 @@ class ActivityController extends Controller
 
     public function create()
     {
-        $this->authorize('create', Activity::class);
-
         return view('activities.create');
     }
 
     public function store(Request $request)
     {
-        $this->authorize('create', Activity::class);
-
         $validated = $request->validate([
             'activity_type' => 'required|string|max:255',
             'field' => 'required|string|max:255',
@@ -66,8 +60,6 @@ class ActivityController extends Controller
 
     public function checkSuitability($date)
     {
-        $this->authorize('viewAny', Activity::class);
-
         $weatherCheck = $this->checkWeatherSuitability($date);
         
         return response()->json([

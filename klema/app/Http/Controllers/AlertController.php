@@ -10,8 +10,6 @@ class AlertController extends Controller
 {
     public function index()
     {
-        $this->authorize('viewAny', Alert::class);
-
         $alerts = Alert::whereHas('farm', function($query) {
             $query->where('user_id', auth()->id());
         })->with('farm')
@@ -23,8 +21,6 @@ class AlertController extends Controller
 
     public function store(Request $request)
     {
-        $this->authorize('create', Alert::class);
-
         $validated = $request->validate([
             'farm_id' => 'required|exists:farms,farm_id',
             'alert_type' => 'required|string|max:50',
@@ -51,7 +47,7 @@ class AlertController extends Controller
 
     public function resolve(Alert $alert)
     {
-        $this->authorize('resolve', $alert);
+        $this->authorize('update', $alert->farm);
         
         $alert->update(['resolved' => true]);
 
@@ -63,7 +59,7 @@ class AlertController extends Controller
 
     public function destroy(Alert $alert)
     {
-        $this->authorize('delete', $alert);
+        $this->authorize('delete', $alert->farm);
         
         $alert->delete();
 

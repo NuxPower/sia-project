@@ -68,6 +68,70 @@
       </div>
     </div>
 
+    <!-- System Statistics -->
+    <div v-if="systemStats" class="system-stats-section">
+      <h3>
+        <i class="fas fa-chart-line"></i>
+        System Statistics
+      </h3>
+      <div class="stats-grid">
+        <div class="stat-card">
+          <div class="stat-icon">
+            <i class="fas fa-tractor"></i>
+          </div>
+          <div class="stat-content">
+            <div class="stat-value">{{ systemStats.total_farms }}</div>
+            <div class="stat-label">Total Farms</div>
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon">
+            <i class="fas fa-users"></i>
+          </div>
+          <div class="stat-content">
+            <div class="stat-value">{{ systemStats.total_users }}</div>
+            <div class="stat-label">Total Users</div>
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon">
+            <i class="fas fa-exclamation-triangle"></i>
+          </div>
+          <div class="stat-content">
+            <div class="stat-value">{{ systemStats.active_alerts }}</div>
+            <div class="stat-label">Active Alerts</div>
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon">
+            <i class="fas fa-calendar-check"></i>
+          </div>
+          <div class="stat-content">
+            <div class="stat-value">{{ systemStats.recent_activities }}</div>
+            <div class="stat-label">Recent Activities</div>
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon">
+            <i class="fas fa-cloud-sun"></i>
+          </div>
+          <div class="stat-content">
+            <div class="stat-value">{{ systemStats.weather_data_points }}</div>
+            <div class="stat-label">Weather Data Points</div>
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon">
+            <i class="fas fa-thermometer-half"></i>
+          </div>
+          <div class="stat-content">
+            <div class="stat-value">{{ Math.round(systemStats.avg_temperature || 0) }}°C</div>
+            <div class="stat-label">Avg Temperature</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <FarmManagementPanel
       class="dashboard-farm-panel"
       :farms="farms"
@@ -75,6 +139,7 @@
       :is-drawing="isDrawing"
       :is-placing-point="isPlacingPoint"
       :soil-types="soilTypes"
+      :on-locate-farm="onLocateFarm"
       variant="dashboard"
       @refresh="refresh"
       @create-farm="createFarm"
@@ -143,6 +208,14 @@ const props = defineProps({
   isPlacingPoint: {
     type: Boolean,
     default: false
+  },
+  systemStats: {
+    type: Object,
+    default: null
+  },
+  onLocateFarm: {
+    type: Function,
+    default: null
   }
 });
 
@@ -600,6 +673,73 @@ const weatherEffectClass = computed(() => {
 
 .tips-section h3 i {
   color: #22c55e;
+}
+
+.system-stats-section {
+  background: rgba(59, 130, 246, 0.1);
+  border-radius: 16px;
+  padding: 25px;
+  border: 1px solid rgba(59, 130, 246, 0.3);
+  margin-bottom: 30px;
+}
+
+.system-stats-section h3 {
+  color: white;
+  font-size: 20px;
+  margin-bottom: 20px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.system-stats-section h3 i {
+  color: #3b82f6;
+}
+
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 15px;
+}
+
+.stat-card {
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 12px;
+  padding: 20px;
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  transition: transform 0.3s ease, border-color 0.3s ease;
+}
+
+.stat-card:hover {
+  transform: translateY(-3px);
+  border-color: rgba(59, 130, 246, 0.5);
+}
+
+.stat-icon {
+  font-size: 32px;
+  color: #3b82f6;
+  flex-shrink: 0;
+}
+
+.stat-content {
+  flex: 1;
+}
+
+.stat-value {
+  color: white;
+  font-size: 24px;
+  font-weight: bold;
+  margin-bottom: 4px;
+}
+
+.stat-label {
+  color: #9ca3af;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
 }
 
 .tips-list {

@@ -101,6 +101,15 @@
             <i class="fas fa-save"></i>
             Save details
           </button>
+          <button 
+            v-if="onLocateFarm && selectedFarm && selectedFarm.latitude != null && selectedFarm.longitude != null"
+            class="farm-panel__button farm-panel__button--info" 
+            @click="handleLocateOnMap"
+            title="Locate this farm on the weather map"
+          >
+            <i class="fas fa-map-marker-alt"></i>
+            Locate on Map
+          </button>
         </div>
       </section>
 
@@ -209,6 +218,10 @@ const props = defineProps({
     type: String,
     default: 'overlay',
     validator: value => ['overlay', 'dashboard'].includes(value)
+  },
+  onLocateFarm: {
+    type: Function,
+    default: null
   }
 })
 
@@ -395,6 +408,12 @@ function handleCancelPoint () {
   emit('cancel-point')
   pointForm.label = ''
   pointForm.point_type = ''
+}
+
+function handleLocateOnMap () {
+  if (props.onLocateFarm && selectedFarm.value) {
+    props.onLocateFarm(selectedFarm.value.farm_id)
+  }
 }
 
 watch(createLocation, (value) => {
@@ -634,6 +653,12 @@ watch(() => [editForm.latitude, editForm.longitude], ([lat, lng]) => {
   background: rgba(217, 119, 6, 0.4);
   border-color: rgba(217, 119, 6, 0.5);
   color: #ffedd5;
+}
+
+.farm-panel__button--info {
+  background: rgba(59, 130, 246, 0.4);
+  border-color: rgba(59, 130, 246, 0.5);
+  color: #dbeafe;
 }
 
 .farm-panel__hint {
