@@ -6,7 +6,15 @@ if (!OPENWEATHER_API_KEY) {
   console.error('OpenWeather API key not configured. Add VITE_OPENWEATHER_API_KEY to .env file.');
 }
 
+const getNasaTrueColorDate = (daysAgo = 2) => {
+  const date = new Date();
+  date.setUTCDate(date.getUTCDate() - Math.max(0, daysAgo));
+  return date.toISOString().split('T')[0];
+};
+
 export function createMapLayers() {
+  const nasaTrueColorDate = getNasaTrueColorDate(2);
+
   const baseLayers = {
     "🗺️ Street Map": L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
       attribution: '© OpenStreetMap contributors',
@@ -18,11 +26,17 @@ export function createMapLayers() {
       maxZoom: 19
     }),
     "🌍 NASA True Color": L.tileLayer(
-      'https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/VIIRS_SNPP_CorrectedReflectance_TrueColor/default/default/GoogleMapsCompatible_Level9/{z}/{y}/{x}.jpg',
+      `https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/VIIRS_SNPP_CorrectedReflectance_TrueColor/default/${nasaTrueColorDate}/GoogleMapsCompatible_Level9/{z}/{y}/{x}.jpg`,
       {
         attribution: 'Imagery © NASA EOSDIS GIBS',
         maxZoom: 9,
-        opacity: 0.9
+        minZoom: 2,
+        opacity: 0.9,
+        noWrap: true,
+        bounds: [
+          [-85.05112878, -180],
+          [85.05112878, 180]
+        ]
       }
     )
   };

@@ -9,7 +9,17 @@ class FarmPolicy
 {
     public function viewAny(User $user): bool
     {
-        return true;
+        if ($user->isAdmin() || $user->isFarmer()) {
+            return true;
+        }
+
+        $token = $user->currentAccessToken();
+
+        if (! $token) {
+            return false;
+        }
+
+        return $token->can('*') || $token->can('farms:read');
     }
 
     public function view(User $user, Farm $farm): bool

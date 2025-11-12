@@ -4,7 +4,6 @@ namespace App\Policies;
 
 use App\Models\Activity;
 use App\Models\User;
-use Illuminate\Auth\Access\Response;
 
 class ActivityPolicy
 {
@@ -13,7 +12,7 @@ class ActivityPolicy
      */
     public function viewAny(User $user): bool
     {
-        return false;
+        return $this->hasAbility($user, 'activities:read');
     }
 
     /**
@@ -21,7 +20,7 @@ class ActivityPolicy
      */
     public function view(User $user, Activity $activity): bool
     {
-        return false;
+        return $this->ownsActivity($user, $activity) || $user->isAdmin();
     }
 
     /**
@@ -29,7 +28,7 @@ class ActivityPolicy
      */
     public function create(User $user): bool
     {
-        return false;
+        return $this->hasAbility($user, 'activities:write');
     }
 
     /**
@@ -37,7 +36,7 @@ class ActivityPolicy
      */
     public function update(User $user, Activity $activity): bool
     {
-        return false;
+        return $this->ownsActivity($user, $activity) || $user->isAdmin();
     }
 
     /**
@@ -45,7 +44,7 @@ class ActivityPolicy
      */
     public function delete(User $user, Activity $activity): bool
     {
-        return false;
+        return $this->ownsActivity($user, $activity) || $user->isAdmin();
     }
 
     /**
@@ -53,7 +52,7 @@ class ActivityPolicy
      */
     public function restore(User $user, Activity $activity): bool
     {
-        return false;
+        return $this->ownsActivity($user, $activity) || $user->isAdmin();
     }
 
     /**
@@ -61,6 +60,26 @@ class ActivityPolicy
      */
     public function forceDelete(User $user, Activity $activity): bool
     {
-        return false;
+        return $user->isAdmin();
+    }
+
+    private function ownsActivity(User $user, Activity $activity): bool
+    {
+        return $activity->user_id === $user->id;
+    }
+
+    private function hasAbility(User $user, string $ability): bool
+    {
+        if ($user->isAdmin()) {
+            return true;
+        }
+
+        $token = $user->currentAccessToken();
+
+        if (! $token) {
+            return $user->isFarmer();
+        }
+
+        return $token->can('*') || $token->can($ability) || $token->can('role:farmer');
     }
 }

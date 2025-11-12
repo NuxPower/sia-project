@@ -20,9 +20,7 @@ Route::get('/weather-test', function () {
     return view('dashboard');
 })->middleware(['auth', 'verified'])->name('weather.test');
 
-// Weather API endpoints (no auth required for testing)
-Route::get('/api/weather/current', [WeatherController::class, 'getCurrentWeather']);
-Route::get('/api/weather/forecast', [WeatherController::class, 'getForecast']);
+// Weather API endpoints moved to /routes/api.php with proper authentication
 
 // Test route for weather service
 Route::get('/test-weather', function () {

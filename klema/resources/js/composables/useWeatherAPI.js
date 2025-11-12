@@ -232,6 +232,15 @@ export function useWeatherAPI() {
         entry.temp_min ?? entry.main?.temp_min ?? entry.temp?.min ?? entry.main?.temp
       );
 
+      const sunrise = Number.isFinite(entry.sunrise) ? entry.sunrise : Number(entry.sunrise);
+      const sunset = Number.isFinite(entry.sunset) ? entry.sunset : Number(entry.sunset);
+      const timezoneOffset = Number.isFinite(entry.timezone_offset)
+        ? entry.timezone_offset
+        : Number(entry.timezone_offset);
+
+      const hourlyData = Array.isArray(entry.hourly) ? entry.hourly : [];
+      const dailyPop = entry.precip_probability ?? entry.pop ?? entry.precipitationProbability;
+
       return {
         date: dateKey,
         day: dateObj.toLocaleDateString('en-US', { weekday: 'short' }),
@@ -240,7 +249,12 @@ export function useWeatherAPI() {
         condition: normalized.condition,
         description: normalized.description,
         icon: normalized.icon,
-        isHistory: true
+        isHistory: true,
+        sunrise: Number.isFinite(sunrise) ? sunrise : null,
+        sunset: Number.isFinite(sunset) ? sunset : null,
+        timezone_offset: Number.isFinite(timezoneOffset) ? timezoneOffset : null,
+        hourly: hourlyData,
+        precip_probability: Number.isFinite(dailyPop) ? dailyPop : null
       };
     };
 

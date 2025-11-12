@@ -63,7 +63,7 @@ class User extends Authenticatable implements MustVerifyEmail
     public function defaultTokenAbilities(): array
     {
         if ($this->isAdmin()) {
-            return ['*', 'role:admin'];
+            return ['*', 'role:admin', 'token:refresh', 'tokens:manage'];
         }
 
         $abilities = [
@@ -76,20 +76,25 @@ class User extends Authenticatable implements MustVerifyEmail
             'activities:read',
             'activities:write',
             'role:farmer',
+            'token:refresh',
+            'tokens:manage',
         ];
 
-        return array_unique($abilities);
+        return array_values(array_unique($abilities));
     }
 
     /**
      * Issue a scoped personal access token, replacing older tokens with the same name.
+     *
+     * @param  array<int, string>|null  $abilities
      */
-    public function issueToken(string $name = 'klema-api-token', ?int $expirationMinutes = null): string
+    public function issueToken(string $name = 'klema-api-token', ?int $expirationMinutes = null, ?array $abilities = null): string
     {
         $this->tokens()->where('name', $name)->delete();
 
         $expiresAt = $expirationMinutes ? now()->addMinutes($expirationMinutes) : null;
+        $resolvedAbilities = $abilities ?? $this->defaultTokenAbilities();
 
-        return $this->createToken($name, $this->defaultTokenAbilities(), $expiresAt)->plainTextToken;
+        return $this->createToken($name, $resolvedAbilities, $expiresAt)->plainTextToken;
     }
 }

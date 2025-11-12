@@ -11,7 +11,8 @@
     
     <WeatherLayerControls 
       v-if="activeView === 'map' && !selectedDayDetail"
-      @toggle-layer="handleLayerToggle" 
+      @toggle-layer="handleLayerToggle"
+      @change-base-layer="handleBaseLayerChange" 
     />
 
     <div class="map-wrapper">
@@ -101,7 +102,7 @@ import {
 } from '../composables/useNotificationSettings';
 
 const weatherMapRef = ref(null);
-const DEFAULT_LOCATION = 'Maramag, Northern Mindanao';
+const DEFAULT_LOCATION = 'Northern Mindanao';
 const INITIAL_HISTORY_DAYS = 3;
 const INITIAL_FORECAST_DAYS = 4;
 const MAX_HISTORY_WINDOW = 30;
@@ -445,6 +446,9 @@ const scheduleExtendedHistoryFetch = (source) => {
 
       if (Array.isArray(extendedHistory) && extendedHistory.length) {
         refreshTimeline(extendedHistory, latestForecastData.value, fullForecastTimeline.value);
+        if (selectedDay.value?.date) {
+          hydrateSelectedDay(selectedDay.value.date);
+        }
       }
     })
     .catch((error) => {
@@ -535,6 +539,10 @@ const setActiveView = (view) => {
 
 const handleLayerToggle = ({ layerId, active }) => {
   weatherMapRef.value?.toggleWeatherLayer(layerId, active);
+};
+
+const handleBaseLayerChange = ({ layerId }) => {
+  weatherMapRef.value?.setBaseLayer(layerId);
 };
 
 const handleMapClick = async ({ lat, lng }) => {
@@ -1055,11 +1063,16 @@ const hydrateSelectedDay = (date) => {
     return false;
   });
 
+  const historyDetail = Array.isArray(latestHistoryData.value)
+    ? latestHistoryData.value.find((entry) => entry?.date === date)
+    : null;
+
   const aggregatedEntry = fullForecastTimeline.value?.find?.((entry) => entry?.date === date) || null;
 
-  selectedDayDetail.value = detail || aggregatedEntry || null;
+  selectedDayDetail.value = detail || historyDetail || aggregatedEntry || null;
 
   const hourlySource = detail?.hourly
+    || historyDetail?.hourly
     || detail?.hours
     || detail?.data
     || aggregatedEntry?.hourly

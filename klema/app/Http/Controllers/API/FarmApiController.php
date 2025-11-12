@@ -16,6 +16,8 @@ class FarmApiController extends Controller
      */
     public function index(): JsonResponse
     {
+        $this->authorize('viewAny', Farm::class);
+
         $user = auth()->user();
 
         $farmsQuery = Farm::query()
@@ -45,6 +47,8 @@ class FarmApiController extends Controller
      */
     public function store(Request $request): JsonResponse
     {
+        $this->authorize('create', Farm::class);
+
         $validated = $request->validate([
             'farm_name' => 'required|string|max:100',
             'latitude' => 'required|numeric|between:-90,90',
@@ -83,13 +87,7 @@ class FarmApiController extends Controller
      */
     public function show(Farm $farm): JsonResponse
     {
-        // Check if user owns the farm
-        if ($farm->user_id !== auth()->id()) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Unauthorized access to farm'
-            ], 403);
-        }
+        $this->authorize('view', $farm);
 
         $farm->load([
             'weatherData' => function($query) {
@@ -112,13 +110,7 @@ class FarmApiController extends Controller
      */
     public function update(Request $request, Farm $farm): JsonResponse
     {
-        // Check if user owns the farm
-        if ($farm->user_id !== auth()->id()) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Unauthorized access to farm'
-            ], 403);
-        }
+        $this->authorize('update', $farm);
 
         $validated = $request->validate([
             'farm_name' => 'sometimes|string|max:100',
@@ -157,13 +149,7 @@ class FarmApiController extends Controller
      */
     public function destroy(Farm $farm): JsonResponse
     {
-        // Check if user owns the farm
-        if ($farm->user_id !== auth()->id()) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Unauthorized access to farm'
-            ], 403);
-        }
+        $this->authorize('delete', $farm);
 
         $farm->delete();
 
@@ -178,13 +164,7 @@ class FarmApiController extends Controller
      */
     public function addPoint(Request $request, Farm $farm): JsonResponse
     {
-        // Check if user owns the farm
-        if ($farm->user_id !== auth()->id()) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Unauthorized access to farm'
-            ], 403);
-        }
+        $this->authorize('update', $farm);
 
         $validated = $request->validate([
             'label' => 'required|string|max:100',
@@ -212,13 +192,7 @@ class FarmApiController extends Controller
      */
     public function getWeatherData(Farm $farm): JsonResponse
     {
-        // Check if user owns the farm
-        if ($farm->user_id !== auth()->id()) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Unauthorized access to farm'
-            ], 403);
-        }
+        $this->authorize('view', $farm);
 
         $weatherData = $farm->weatherData()
             ->orderBy('recorded_at', 'desc')
@@ -233,6 +207,8 @@ class FarmApiController extends Controller
 
     public function mapData(): JsonResponse
     {
+        $this->authorize('viewAny', Farm::class);
+
         $user = auth()->user();
 
         $farmsQuery = Farm::with('farmPoints');

@@ -13,6 +13,8 @@ class ExportController extends Controller
 {
     public function index()
     {
+        $this->authorize('viewAny', Export::class);
+
         $exports = auth()->user()->exports()
             ->orderBy('created_at', 'desc')
             ->paginate(10);
@@ -22,6 +24,8 @@ class ExportController extends Controller
 
     public function exportWeatherData(Request $request)
     {
+        $this->authorize('create', Export::class);
+
         $validated = $request->validate([
             'farm_id' => 'nullable|exists:farms,farm_id',
             'start_date' => 'required|date',
@@ -73,6 +77,8 @@ class ExportController extends Controller
 
     public function exportFarmData(Request $request)
     {
+        $this->authorize('create', Export::class);
+
         $farms = auth()->user()->farms()->with(['farmPoints', 'weatherData', 'alerts'])->get();
 
         // Generate CSV

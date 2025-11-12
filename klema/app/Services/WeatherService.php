@@ -192,7 +192,15 @@ class WeatherService
 
     public function fetchHistoricalSnapshotByCoordinates(float $lat, float $lon, Carbon $date): ?array
     {
-        $dateString = $date->format('Y-m-d');
+        $series = $this->fetchHistoricalSeriesByCoordinates($lat, $lon, $date->copy(), $date->copy());
+
+        return $series[$date->format('Y-m-d')] ?? null;
+    }
+
+    public function fetchHistoricalSeriesByCoordinates(float $lat, float $lon, Carbon $startDate, Carbon $endDate): array
+    {
+        $start = $startDate->copy()->format('Y-m-d');
+        $end = $endDate->copy()->format('Y-m-d');
 
         try {
             $response = Http::withOptions([
@@ -200,85 +208,59 @@ class WeatherService
             ])->get('https://archive-api.open-meteo.com/v1/archive', [
                 'latitude' => $lat,
                 'longitude' => $lon,
-                'start_date' => $dateString,
-                'end_date' => $dateString,
-                'daily' => 'temperature_2m_max,temperature_2m_min,weathercode,windspeed_10m_max',
-                'timezone' => 'UTC',
+                'start_date' => $start,
+                'end_date' => $end,
+                'daily' => implode(',', [
+                    'temperature_2m_max',
+                    'temperature_2m_min',
+                    'weathercode',
+                    'windspeed_10m_max',
+                    'precipitation_sum',
+                    'sunrise',
+                    'sunset',
+                    'precipitation_probability_mean',
+                ]),
+                'hourly' => implode(',', [
+                    'temperature_2m',
+                    'apparent_temperature',
+                    'relativehumidity_2m',
+                    'precipitation',
+                    'rain',
+                    'showers',
+                    'snowfall',
+                    'cloudcover',
+                    'wind_speed_10m',
+                    'wind_direction_10m',
+                    'wind_gusts_10m',
+                    'precipitation_probability',
+                ]),
+                'timezone' => 'auto',
             ]);
 
             if (!$response->successful()) {
-                Log::warning('Historical weather fallback failed', [
+                Log::warning('Historical weather range fetch failed', [
                     'lat' => $lat,
                     'lon' => $lon,
-                    'date' => $dateString,
+                    'start' => $start,
+                    'end' => $end,
                     'status' => $response->status(),
                     'body' => $response->body(),
                 ]);
-                return null;
+                return [];
             }
 
             $payload = $response->json();
-            $times = data_get($payload, 'daily.time', []);
-            $index = array_search($dateString, $times, true);
-
-            if ($index === false) {
-                return null;
-            }
-
-            $tempMax = data_get($payload, "daily.temperature_2m_max.{$index}");
-            $tempMin = data_get($payload, "daily.temperature_2m_min.{$index}");
-            $weatherCode = (int) data_get($payload, "daily.weathercode.{$index}", -1);
-            $windSpeed = data_get($payload, "daily.windspeed_10m_max.{$index}");
-
-            if ($tempMax === null && $tempMin === null) {
-                return null;
-            }
-
-            $averageTemp = null;
-            if ($tempMax !== null && $tempMin !== null) {
-                $averageTemp = ($tempMax + $tempMin) / 2;
-            } elseif ($tempMax !== null) {
-                $averageTemp = $tempMax;
-            } elseif ($tempMin !== null) {
-                $averageTemp = $tempMin;
-            }
-
-            $condition = $this->mapWeatherCodeToCondition($weatherCode);
-            $timestamp = $date->copy()->setTimezone('UTC')->setTime(12, 0)->timestamp;
-
-            return [
-                'date' => $dateString,
-                'dt' => $timestamp,
-                'timestamp' => $timestamp,
-                'coord' => [
-                    'lat' => $lat,
-                    'lon' => $lon,
-                ],
-                'main' => [
-                    'temp' => $averageTemp,
-                    'temp_min' => $tempMin,
-                    'temp_max' => $tempMax,
-                    'humidity' => null,
-                    'pressure' => null,
-                ],
-                'weather' => [[
-                    'main' => $condition['main'],
-                    'description' => $condition['description'],
-                    'icon' => $condition['icon'],
-                ]],
-                'wind' => [
-                    'speed' => $windSpeed,
-                ],
-            ];
+            return $this->transformHistoricalSeriesPayload($payload, $lat, $lon);
         } catch (\Throwable $e) {
-            Log::error('Historical weather fallback exception', [
+            Log::error('Historical weather range fetch exception', [
                 'message' => $e->getMessage(),
                 'lat' => $lat,
                 'lon' => $lon,
-                'date' => $dateString,
+                'start' => $start,
+                'end' => $end,
             ]);
 
-            return null;
+            return [];
         }
     }
 
@@ -389,6 +371,162 @@ class WeatherService
         }
 
         return WeatherData::create($payload);
+    }
+
+    private function transformHistoricalSeriesPayload(array $payload, float $lat, float $lon): array
+    {
+        $timezoneName = data_get($payload, 'timezone', 'UTC');
+        $utcOffsetSeconds = (int) data_get($payload, 'utc_offset_seconds', 0);
+
+        $hourlyBuckets = $this->bucketHourlyEntries($payload, $timezoneName, $utcOffsetSeconds);
+
+        $dates = data_get($payload, 'daily.time', []);
+        $series = [];
+
+        foreach ($dates as $index => $dateString) {
+            $entry = $this->buildHistoricalEntryFromPayload(
+                $payload,
+                $index,
+                $dateString,
+                $lat,
+                $lon,
+                $timezoneName,
+                $utcOffsetSeconds,
+                $hourlyBuckets[$dateString] ?? []
+            );
+
+            if ($entry !== null) {
+                $series[$dateString] = $entry;
+            }
+        }
+
+        return $series;
+    }
+
+    private function bucketHourlyEntries(array $payload, string $timezoneName, int $utcOffsetSeconds): array
+    {
+        $times = data_get($payload, 'hourly.time', []);
+        $buckets = [];
+
+        foreach ($times as $index => $timeString) {
+            $dateKey = substr((string) $timeString, 0, 10);
+            if (!isset($buckets[$dateKey])) {
+                $buckets[$dateKey] = [];
+            }
+
+            $hourTimestamp = Carbon::parse($timeString, $timezoneName)->setTimezone('UTC')->timestamp;
+            $temperature = data_get($payload, "hourly.temperature_2m.{$index}");
+            $apparentTemperature = data_get($payload, "hourly.apparent_temperature.{$index}");
+            $humidity = data_get($payload, "hourly.relativehumidity_2m.{$index}");
+            $cloudCover = data_get($payload, "hourly.cloudcover.{$index}");
+            $windSpeedKmh = data_get($payload, "hourly.wind_speed_10m.{$index}");
+            $windGustKmh = data_get($payload, "hourly.wind_gusts_10m.{$index}");
+            $windDirection = data_get($payload, "hourly.wind_direction_10m.{$index}");
+            $precipitation = data_get($payload, "hourly.precipitation.{$index}");
+            $precipProbabilityHourly = data_get($payload, "hourly.precipitation_probability.{$index}");
+
+            $windSpeedMs = $windSpeedKmh !== null ? ((float) $windSpeedKmh) / 3.6 : null;
+            $windGustMs = $windGustKmh !== null ? ((float) $windGustKmh) / 3.6 : null;
+
+            $buckets[$dateKey][] = [
+                'dt' => $hourTimestamp,
+                'timestamp' => $hourTimestamp,
+                'time' => $hourTimestamp,
+                'temp' => $temperature,
+                'temperature' => $temperature,
+                'feels_like' => $apparentTemperature,
+                'humidity' => $humidity,
+                'clouds' => $cloudCover,
+                'cloud_cover' => $cloudCover,
+                'wind_speed' => $windSpeedMs,
+                'wind_gust' => $windGustMs,
+                'wind_deg' => $windDirection,
+                'precipitation' => $precipitation,
+                'precipitationProbability' => $precipProbabilityHourly,
+                'precip_probability' => $precipProbabilityHourly,
+                'rain' => [
+                    'value' => $precipitation,
+                ],
+                'timezone_offset' => $utcOffsetSeconds,
+            ];
+        }
+
+        return $buckets;
+    }
+
+    private function buildHistoricalEntryFromPayload(
+        array $payload,
+        int $index,
+        string $dateString,
+        float $lat,
+        float $lon,
+        string $timezoneName,
+        int $utcOffsetSeconds,
+        array $hourlyData
+    ): ?array {
+        $tempMax = data_get($payload, "daily.temperature_2m_max.{$index}");
+        $tempMin = data_get($payload, "daily.temperature_2m_min.{$index}");
+
+        if ($tempMax === null && $tempMin === null) {
+            return null;
+        }
+
+        $weatherCode = (int) data_get($payload, "daily.weathercode.{$index}", -1);
+        $windSpeed = data_get($payload, "daily.windspeed_10m_max.{$index}");
+        $precipitationSum = data_get($payload, "daily.precipitation_sum.{$index}");
+        $precipProbability = data_get($payload, "daily.precipitation_probability_mean.{$index}");
+
+        $averageTemp = null;
+        if ($tempMax !== null && $tempMin !== null) {
+            $averageTemp = ($tempMax + $tempMin) / 2;
+        } elseif ($tempMax !== null) {
+            $averageTemp = $tempMax;
+        } elseif ($tempMin !== null) {
+            $averageTemp = $tempMin;
+        }
+
+        $condition = $this->mapWeatherCodeToCondition($weatherCode);
+        $timestamp = Carbon::parse($dateString, 'UTC')->setTime(12, 0)->timestamp;
+
+        $sunriseIso = data_get($payload, "daily.sunrise.{$index}");
+        $sunsetIso = data_get($payload, "daily.sunset.{$index}");
+        $sunriseTimestamp = $sunriseIso
+            ? Carbon::parse($sunriseIso, $timezoneName)->setTimezone('UTC')->timestamp
+            : null;
+        $sunsetTimestamp = $sunsetIso
+            ? Carbon::parse($sunsetIso, $timezoneName)->setTimezone('UTC')->timestamp
+            : null;
+
+        return [
+            'date' => $dateString,
+            'dt' => $timestamp,
+            'timestamp' => $timestamp,
+            'coord' => [
+                'lat' => $lat,
+                'lon' => $lon,
+            ],
+            'main' => [
+                'temp' => $averageTemp,
+                'temp_min' => $tempMin,
+                'temp_max' => $tempMax,
+                'humidity' => null,
+                'pressure' => null,
+            ],
+            'weather' => [[
+                'main' => $condition['main'],
+                'description' => $condition['description'],
+                'icon' => $condition['icon'],
+            ]],
+            'wind' => [
+                'speed' => $windSpeed,
+            ],
+            'sunrise' => $sunriseTimestamp,
+            'sunset' => $sunsetTimestamp,
+            'timezone_offset' => $utcOffsetSeconds,
+            'precipitation_sum' => $precipitationSum,
+            'precip_probability' => $precipProbability,
+            'hourly' => $hourlyData,
+        ];
     }
 
     private function processForecastData($data, int $days = 7)

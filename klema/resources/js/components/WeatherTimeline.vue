@@ -1,13 +1,5 @@
 <template>
   <div class="weather-timeline" :class="{ 'compact': isCompact }">
-    <button 
-      class="toggle-compact-button" 
-      @click="toggleCompact"
-      :title="isCompact ? 'Expand timeline' : 'Compact timeline'"
-    >
-      <i :class="isCompact ? 'fas fa-expand-alt' : 'fas fa-compress-alt'"></i>
-    </button>
-    
     <WeatherCard
       v-for="(day, index) in forecast"
       :key="day.date || index"
@@ -32,11 +24,7 @@ const props = defineProps({
 
 const emit = defineEmits(['day-selected']);
 
-const isCompact = ref(false);
-
-const toggleCompact = () => {
-  isCompact.value = !isCompact.value;
-};
+const isCompact = ref(true);
 
 const handleDaySelect = (day) => {
   if (!day) return;
@@ -70,28 +58,6 @@ const handleDaySelect = (day) => {
   gap: 8px;
 }
 
-.toggle-compact-button {
-  background: rgba(59, 130, 246, 0.3);
-  border: 2px solid rgba(59, 130, 246, 0.5);
-  color: white;
-  width: 36px;
-  height: 36px;
-  min-width: 36px;
-  border-radius: 10px;
-  cursor: pointer;
-  transition: all 0.3s ease;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 14px;
-  flex-shrink: 0;
-}
-
-.toggle-compact-button:hover {
-  background: rgba(59, 130, 246, 0.5);
-  transform: scale(1.1);
-}
-
 .weather-timeline::-webkit-scrollbar {
   height: 6px;
 }
@@ -120,13 +86,6 @@ const handleDaySelect = (day) => {
   .weather-timeline.compact {
     padding: 6px 8px;
     gap: 6px;
-  }
-  
-  .toggle-compact-button {
-    width: 32px;
-    height: 32px;
-    min-width: 32px;
-    font-size: 12px;
   }
 }
 </style>

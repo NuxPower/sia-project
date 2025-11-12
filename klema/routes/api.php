@@ -8,6 +8,25 @@ use App\Http\Controllers\API\AlertApiController;
 use App\Http\Controllers\API\AuthApiController;
 use App\Http\Controllers\API\ActivityApiController;
 
+Route::middleware('throttle:login')->post('/login', [AuthApiController::class, 'login'])->name('api.login');
+Route::middleware('throttle:register')->post('/register', [AuthApiController::class, 'register'])->name('api.register');
+
+Route::middleware(['auth:sanctum'])->group(function () {
+    Route::post('/logout', [AuthApiController::class, 'logout'])->name('api.logout');
+    Route::post('/email/verification-notification', [AuthApiController::class, 'sendVerificationEmail'])
+        ->middleware('throttle:6,1');
+    Route::post('/token/refresh', [AuthApiController::class, 'refreshToken'])->name('api.token.refresh');
+    Route::get('/tokens', [AuthApiController::class, 'listTokens'])->name('api.tokens.index');
+    Route::delete('/tokens/{token}', [AuthApiController::class, 'revokeToken'])->name('api.tokens.destroy');
+    Route::get('/me', function (Request $request) {
+        return response()->json([
+            'success' => true,
+            'user' => $request->user()->load('farms'),
+        ]);
+    })->name('api.me');
+});
+
+// Backward compatibility while frontend is being migrated off the /api/auth/* namespace
 Route::prefix('auth')->group(function () {
     Route::middleware('throttle:login')->post('/login', [AuthApiController::class, 'login']);
     Route::middleware('throttle:register')->post('/register', [AuthApiController::class, 'register']);

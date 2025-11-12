@@ -29,12 +29,20 @@ const mapContainer = ref(null);
 const map = ref(null);
 const currentMarker = ref(null);
 const weatherLayers = ref({});
-const layerControl = ref(null);
+const baseMapLayers = ref({});
 const farmBoundaryLayer = ref(null);
 const farmPointLayer = ref(null);
 const interactionMode = ref('weather');
 const boundaryDrawing = ref(null);
 const pointPlacement = ref(null);
+const activeBaseLayer = ref(null);
+const requestedBaseLayer = ref('street');
+
+const baseLayerMap = {
+  street: '🗺️ Street Map',
+  satellite: '🛰️ Satellite View',
+  nasa: '🌍 NASA True Color'
+};
 
 const clampLatitude = (value) => {
   if (!Number.isFinite(value)) {
@@ -49,6 +57,43 @@ const wrapLongitude = (value) => {
   }
   const normalized = ((value + 180) % 360 + 360) % 360;
   return normalized - 180;
+};
+
+const applyBaseLayer = (layerId) => {
+  if (!map.value || !baseMapLayers.value) {
+    return;
+  }
+
+  const targetKey = baseLayerMap[layerId] ? layerId : 'street';
+  const layerName = baseLayerMap[targetKey];
+  const targetLayer = baseMapLayers.value[layerName];
+
+  if (!targetLayer) {
+    return;
+  }
+
+  if (activeBaseLayer.value === targetKey && map.value.hasLayer(targetLayer)) {
+    return;
+  }
+
+  Object.values(baseMapLayers.value).forEach((layer) => {
+    if (map.value.hasLayer(layer)) {
+      map.value.removeLayer(layer);
+    }
+  });
+
+  targetLayer.addTo(map.value);
+  activeBaseLayer.value = targetKey;
+};
+
+const setBaseLayer = (layerId) => {
+  requestedBaseLayer.value = baseLayerMap[layerId] ? layerId : 'street';
+
+  if (!map.value || !Object.keys(baseMapLayers.value).length) {
+    return;
+  }
+
+  applyBaseLayer(requestedBaseLayer.value);
 };
 
 const initMap = async () => {
@@ -75,17 +120,11 @@ const initMap = async () => {
   
   const { baseLayers, overlayLayers } = createMapLayers();
   
+  baseMapLayers.value = baseLayers;
   // Store overlay layers for programmatic control
   weatherLayers.value = overlayLayers;
   
-  // Add default base layer
-  baseLayers['🗺️ Street Map'].addTo(map.value);
-  
-  // Add layer control (now hidden since we have custom controls)
-  layerControl.value = L.control.layers(baseLayers, overlayLayers, {
-    position: 'topright',
-    collapsed: true
-  }).addTo(map.value);
+  applyBaseLayer(requestedBaseLayer.value);
   
   farmBoundaryLayer.value = L.layerGroup().addTo(map.value);
   farmPointLayer.value = L.layerGroup().addTo(map.value);
@@ -402,6 +441,7 @@ defineExpose({
   moveToLocation,
   updateMarker,
   toggleWeatherLayer,
+  setBaseLayer,
   renderFarmOverlays,
   startBoundaryDrawing,
   finishBoundaryDrawing,
