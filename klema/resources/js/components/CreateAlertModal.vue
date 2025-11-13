@@ -394,9 +394,96 @@ textarea.form-control {
   cursor: not-allowed;
 }
 
+/* Responsive Design - Mobile First Approach */
+
+/* Extra Small Devices (phones, up to 480px) */
+@media (max-width: 480px) {
+  .modal-overlay {
+    padding: 0.5rem;
+    align-items: flex-end;
+  }
+  
+  .modal-content {
+    max-height: 95vh;
+    width: 100%;
+    border-radius: 1rem 1rem 0 0;
+    max-width: 100%;
+  }
+  
+  .modal-header, .modal-body {
+    padding-left: 1rem;
+    padding-right: 1rem;
+  }
+
+  .modal-header {
+    padding-top: 1rem;
+    padding-bottom: 0.75rem;
+  }
+
+  .modal-header h3 {
+    font-size: 1.125rem;
+  }
+  
+  .modal-body {
+    padding-top: 0.75rem;
+    padding-bottom: 1rem;
+  }
+
+  .form-group label {
+    font-size: 0.8125rem;
+  }
+
+  .form-control, .form-select {
+    padding: 0.75rem;
+    font-size: 0.8125rem;
+  }
+  
+  .modal-actions {
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+  
+  .cancel-button, .submit-button {
+    width: 100%;
+    justify-content: center;
+    padding: 0.875rem 1rem;
+    font-size: 0.875rem;
+  }
+}
+
+/* Small Devices (landscape phones, 481px to 640px) */
+@media (min-width: 481px) and (max-width: 640px) {
+  .modal-overlay {
+    padding: 0.75rem;
+  }
+  
+  .modal-content {
+    max-height: 90vh;
+    width: 95%;
+  }
+
+  .modal-header, .modal-body {
+    padding-left: 1.25rem;
+    padding-right: 1.25rem;
+  }
+}
+
+/* Medium Devices (tablets, 641px to 768px) */
+@media (min-width: 641px) and (max-width: 768px) {
+  .modal-overlay {
+    padding: 1rem;
+  }
+  
+  .modal-content {
+    max-height: 90vh;
+    width: 90%;
+  }
+}
+
+/* Standard Mobile (up to 768px) */
 @media (max-width: 768px) {
   .modal-overlay {
-    padding: 10px;
+    padding: 0.625rem;
   }
   
   .modal-content {
@@ -404,8 +491,8 @@ textarea.form-control {
   }
   
   .modal-header, .modal-body {
-    padding-left: 20px;
-    padding-right: 20px;
+    padding-left: 1.25rem;
+    padding-right: 1.25rem;
   }
   
   .modal-actions {
@@ -415,6 +502,27 @@ textarea.form-control {
   .cancel-button, .submit-button {
     width: 100%;
     justify-content: center;
+  }
+}
+
+/* Large Devices (desktops, 1024px and up) */
+@media (min-width: 1024px) {
+  .modal-content {
+    max-width: 600px;
+  }
+}
+
+/* Extra Large Devices (large desktops, 1440px and up) */
+@media (min-width: 1440px) {
+  .modal-content {
+    max-width: 700px;
+  }
+}
+
+/* Zoom Support - Ensure proper scaling */
+@media (min-resolution: 192dpi) {
+  .modal-content {
+    border-width: 1px;
   }
 }
 </style>

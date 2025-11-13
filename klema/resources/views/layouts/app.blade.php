@@ -149,7 +149,75 @@
             color: rgba(255, 255, 255, 1) !important;
         }
 
-        /* Mobile Responsive */
+        /* Responsive Design - Mobile First Approach */
+        
+        /* Extra Small Devices (phones, 320px and up) */
+        @media (max-width: 480px) {
+            .navbar {
+                left: 8px;
+                gap: 8px;
+                padding: 20px 0;
+                width: 60px;
+                border-radius: 30px;
+            }
+
+            .navbar-icon {
+                width: 44px;
+                height: 44px;
+                font-size: 16px;
+            }
+
+            .navbar-icon img {
+                width: 24px;
+                height: 24px;
+            }
+
+            .navbar.hidden {
+                left: -68px;
+            }
+        }
+
+        /* Small Devices (landscape phones, 481px and up) */
+        @media (min-width: 481px) and (max-width: 640px) {
+            .navbar {
+                left: 10px;
+                gap: 10px;
+                width: 70px;
+            }
+
+            .navbar-icon {
+                width: 50px;
+                height: 50px;
+                font-size: 18px;
+            }
+
+            .navbar-icon img {
+                width: 26px;
+                height: 26px;
+            }
+        }
+
+        /* Medium Devices (tablets, 641px to 768px) */
+        @media (min-width: 641px) and (max-width: 768px) {
+            .navbar {
+                left: 12px;
+                gap: 12px;
+                width: 80px;
+            }
+
+            .navbar-icon {
+                width: 54px;
+                height: 54px;
+                font-size: 20px;
+            }
+
+            .navbar-icon img {
+                width: 28px;
+                height: 28px;
+            }
+        }
+
+        /* Standard Mobile (up to 768px) */
         @media (max-width: 768px) {
             .navbar {
                 left: 10px;
@@ -182,6 +250,42 @@
 
             .logout-button.hidden {
                 left: -70px;
+            }
+        }
+
+        /* Large Devices (desktops, 1024px and up) */
+        @media (min-width: 1024px) {
+            .navbar {
+                left: 24px;
+                gap: 28px;
+                width: 92px;
+            }
+        }
+
+        /* Extra Large Devices (large desktops, 1440px and up) */
+        @media (min-width: 1440px) {
+            .navbar {
+                left: 32px;
+                gap: 32px;
+                width: 100px;
+            }
+
+            .navbar-icon {
+                width: 62px;
+                height: 62px;
+            }
+
+            .navbar-icon img {
+                width: 32px;
+                height: 32px;
+            }
+        }
+
+        /* Zoom Support - Use relative units for better zoom compatibility */
+        @media (min-resolution: 192dpi) {
+            .navbar-icon img {
+                image-rendering: -webkit-optimize-contrast;
+                image-rendering: crisp-edges;
             }
         }
 

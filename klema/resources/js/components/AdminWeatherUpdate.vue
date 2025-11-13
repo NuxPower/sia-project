@@ -367,6 +367,50 @@ const formatDate = (date) => {
   font-weight: 500;
 }
 
+/* Responsive Design - Mobile First Approach */
+
+/* Extra Small Devices (phones, up to 480px) */
+@media (max-width: 480px) {
+  .form-row {
+    grid-template-columns: 1fr;
+    gap: 0.75rem;
+  }
+  
+  .radio-group {
+    flex-direction: column;
+    gap: 0.625rem;
+  }
+
+  .form-group label {
+    font-size: 0.8125rem;
+  }
+
+  .form-control {
+    padding: 0.75rem;
+    font-size: 0.8125rem;
+  }
+}
+
+/* Small Devices (landscape phones, 481px to 640px) */
+@media (min-width: 481px) and (max-width: 640px) {
+  .form-row {
+    grid-template-columns: 1fr;
+  }
+
+  .radio-group {
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+}
+
+/* Medium Devices (tablets, 641px to 768px) */
+@media (min-width: 641px) and (max-width: 768px) {
+  .form-row {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+/* Standard Mobile (up to 768px) */
 @media (max-width: 768px) {
   .form-row {
     grid-template-columns: 1fr;
@@ -374,7 +418,21 @@ const formatDate = (date) => {
   
   .radio-group {
     flex-direction: column;
-    gap: 10px;
+    gap: 0.625rem;
+  }
+}
+
+/* Large Devices (desktops, 1024px and up) */
+@media (min-width: 1024px) {
+  .form-row {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+/* Zoom Support - Ensure proper scaling */
+@media (min-resolution: 192dpi) {
+  .form-control {
+    border-width: 1px;
   }
 }
 </style>

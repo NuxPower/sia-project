@@ -624,9 +624,116 @@ input:checked + .slider:before {
   transform: translateX(24px);
 }
 
+/* Responsive Design - Mobile First Approach */
+
+/* Extra Small Devices (phones, up to 480px) */
+@media (max-width: 480px) {
+  .settings-view {
+    padding: 1rem;
+  }
+
+  .settings-header h2 {
+    font-size: 1.25rem;
+    margin-bottom: 1.5rem;
+  }
+
+  .settings-section {
+    padding: 1rem;
+    margin-bottom: 1rem;
+    border-radius: 0.75rem;
+  }
+
+  .settings-section h3 {
+    font-size: 1.125rem;
+    margin-bottom: 1rem;
+  }
+
+  .setting-item {
+    margin-bottom: 1rem;
+  }
+
+  .setting-item label {
+    font-size: 0.8125rem;
+  }
+
+  .setting-input, .setting-select {
+    padding: 0.75rem;
+    font-size: 0.8125rem;
+  }
+
+  .radio-group {
+    flex-direction: column;
+    gap: 0.625rem;
+  }
+
+  .radio-label {
+    font-size: 0.8125rem;
+  }
+
+  .toggle-item {
+    padding: 0.75rem;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.75rem;
+  }
+
+  .toggle-info span {
+    font-size: 0.875rem;
+  }
+
+  .toggle-info small {
+    font-size: 0.75rem;
+  }
+
+  .settings-actions {
+    flex-direction: column;
+    gap: 0.75rem;
+    margin-top: 1.5rem;
+  }
+
+  .action-button {
+    width: 100%;
+    padding: 0.875rem 1rem;
+    font-size: 0.875rem;
+  }
+}
+
+/* Small Devices (landscape phones, 481px to 640px) */
+@media (min-width: 481px) and (max-width: 640px) {
+  .settings-view {
+    padding: 1.25rem;
+  }
+
+  .settings-actions {
+    flex-direction: column;
+  }
+
+  .radio-group {
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+}
+
+/* Medium Devices (tablets, 641px to 768px) */
+@media (min-width: 641px) and (max-width: 768px) {
+  .settings-view {
+    padding: 1.5rem;
+  }
+
+  .settings-actions {
+    flex-direction: row;
+    flex-wrap: wrap;
+  }
+
+  .action-button {
+    flex: 1 1 calc(50% - 0.5rem);
+  }
+}
+
+/* Standard Mobile (up to 768px) */
 @media (max-width: 768px) {
   .settings-view {
-    padding: 20px;
+    padding: 1.25rem;
   }
   
   .settings-actions {
@@ -635,7 +742,37 @@ input:checked + .slider:before {
   
   .radio-group {
     flex-direction: column;
-    gap: 10px;
+    gap: 0.625rem;
+  }
+}
+
+/* Large Devices (desktops, 1024px and up) */
+@media (min-width: 1024px) {
+  .settings-view {
+    max-width: 1200px;
+    margin: 0 auto;
+  }
+
+  .settings-actions {
+    flex-direction: row;
+  }
+}
+
+/* Extra Large Devices (large desktops, 1440px and up) */
+@media (min-width: 1440px) {
+  .settings-view {
+    padding: 2rem;
+  }
+
+  .settings-section {
+    padding: 2rem;
+  }
+}
+
+/* Zoom Support - Ensure proper scaling */
+@media (min-resolution: 192dpi) {
+  .settings-section {
+    border-width: 1px;
   }
 }
 </style>

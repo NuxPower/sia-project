@@ -943,5 +943,168 @@ const formatDate = (dateString) => {
   font-size: 12px;
   color: #999;
 }
+
+/* Responsive Design - Mobile First Approach */
+
+/* Extra Small Devices (phones, up to 480px) */
+@media (max-width: 480px) {
+  .users-view {
+    padding: 1rem;
+  }
+
+  .users-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 1rem;
+    margin-bottom: 1rem;
+  }
+
+  .users-header h2 {
+    font-size: 1.25rem;
+  }
+
+  .action-button.primary {
+    width: 100%;
+    padding: 0.875rem 1rem;
+    font-size: 0.875rem;
+  }
+
+  .users-filters {
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+
+  .search-bar {
+    width: 100%;
+  }
+
+  .filter-group {
+    width: 100%;
+  }
+
+  .filter-select {
+    width: 100%;
+  }
+
+  .users-table-container {
+    overflow-x: auto;
+  }
+
+  .users-table {
+    min-width: 600px;
+  }
+
+  .users-table th,
+  .users-table td {
+    padding: 0.5rem;
+    font-size: 0.75rem;
+  }
+
+  .action-buttons {
+    flex-wrap: wrap;
+    gap: 0.25rem;
+  }
+
+  .btn-icon {
+    padding: 0.375rem 0.5rem;
+    font-size: 0.75rem;
+  }
+
+  .modal-content {
+    width: 95%;
+    max-width: none;
+    margin: 0.5rem;
+  }
+
+  .modal-header,
+  .modal-body {
+    padding: 1rem;
+  }
+
+  .form-group {
+    margin-bottom: 1rem;
+  }
+
+  .form-control {
+    padding: 0.75rem;
+    font-size: 0.8125rem;
+  }
+
+  .modal-actions {
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  .action-button {
+    width: 100%;
+  }
+
+  .pagination {
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+
+  .page-button {
+    padding: 0.5rem 0.75rem;
+    font-size: 0.8125rem;
+  }
+}
+
+/* Small Devices (landscape phones, 481px to 640px) */
+@media (min-width: 481px) and (max-width: 640px) {
+  .users-view {
+    padding: 1.25rem;
+  }
+
+  .users-filters {
+    flex-direction: column;
+  }
+
+  .users-table {
+    min-width: 700px;
+  }
+}
+
+/* Medium Devices (tablets, 641px to 768px) */
+@media (min-width: 641px) and (max-width: 768px) {
+  .users-view {
+    padding: 1.5rem;
+  }
+
+  .users-filters {
+    flex-direction: row;
+    flex-wrap: wrap;
+  }
+
+  .users-table {
+    min-width: 800px;
+  }
+}
+
+/* Large Devices (desktops, 1024px and up) */
+@media (min-width: 1024px) {
+  .users-view {
+    max-width: 1400px;
+    margin: 0 auto;
+  }
+
+  .users-table {
+    min-width: auto;
+  }
+}
+
+/* Extra Large Devices (large desktops, 1440px and up) */
+@media (min-width: 1440px) {
+  .users-view {
+    padding: 2rem;
+  }
+}
+
+/* Zoom Support - Ensure proper scaling */
+@media (min-resolution: 192dpi) {
+  .users-table-container {
+    border-width: 1px;
+  }
+}
 </style>
 

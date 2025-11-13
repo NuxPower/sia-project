@@ -1008,19 +1008,192 @@ watch(currentDate, (newDate, oldDate) => {
   background: rgba(148, 163, 184, 0.25);
 }
 
-@media (max-width: 768px) {
+/* Responsive Design - Mobile First Approach */
+
+/* Extra Small Devices (phones, up to 480px) */
+@media (max-width: 480px) {
   .calendar-view {
-    padding: 20px 10px;
+    padding: 0.9375rem 0.5rem;
   }
   
   .calendar-header {
-    padding: 15px 20px;
+    padding: 0.75rem 0.9375rem;
+    gap: 0.625rem;
     grid-template-columns: 1fr;
-    gap: 12px;
+    border-radius: 0.75rem;
   }
   
   .calendar-header h2 {
-    font-size: 20px;
+    font-size: 1.125rem;
+  }
+  
+  .calendar-nav {
+    justify-content: space-between;
+  }
+
+  .add-activity-button {
+    font-size: 0.8125rem;
+    padding: 0.625rem;
+    width: 100%;
+    justify-content: center;
+  }
+  
+  .nav-button {
+    width: 2.25rem;
+    height: 2.25rem;
+    font-size: 0.8125rem;
+  }
+  
+  .calendar-grid {
+    padding: 0.625rem;
+    border-radius: 0.75rem;
+  }
+  
+  .weekday {
+    font-size: 0.625rem;
+    padding: 0.375rem 0.125rem;
+  }
+  
+  .calendar-days {
+    gap: 0.25rem;
+  }
+  
+  .calendar-day {
+    padding: 0.25rem;
+    border-radius: 0.5rem;
+  }
+  
+  .day-number {
+    font-size: 0.6875rem;
+  }
+  
+  .day-weather i {
+    font-size: 1rem;
+  }
+  
+  .day-temp {
+    font-size: 0.625rem;
+  }
+
+  .activity-chip {
+    padding: 0.375rem 0.5rem;
+    font-size: 0.6875rem;
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .chip-field {
+    margin-left: 0;
+    font-size: 0.625rem;
+  }
+
+  .activity-feedback {
+    flex-direction: column;
+    align-items: flex-start;
+    padding: 0.75rem;
+    font-size: 0.8125rem;
+  }
+  
+  .legend {
+    flex-direction: column;
+    gap: 0.625rem;
+    padding: 0.9375rem;
+  }
+  
+  .legend-item {
+    font-size: 0.8125rem;
+  }
+
+  .modal-content {
+    width: 95%;
+    max-width: none;
+    margin: 0.5rem;
+  }
+
+  .modal-header {
+    padding: 1rem;
+  }
+
+  .modal-body {
+    padding: 1rem;
+  }
+}
+
+/* Small Devices (landscape phones, 481px to 640px) */
+@media (min-width: 481px) and (max-width: 640px) {
+  .calendar-view {
+    padding: 1.25rem 0.75rem;
+  }
+
+  .calendar-header {
+    padding: 1rem 1.25rem;
+  }
+
+  .calendar-header h2 {
+    font-size: 1.25rem;
+  }
+
+  .nav-button {
+    width: 2.5rem;
+    height: 2.5rem;
+  }
+
+  .calendar-grid {
+    padding: 1rem;
+  }
+
+  .weekday {
+    font-size: 0.75rem;
+    padding: 0.5rem 0.25rem;
+  }
+
+  .calendar-days {
+    gap: 0.375rem;
+  }
+
+  .calendar-day {
+    padding: 0.5rem;
+  }
+
+  .day-number {
+    font-size: 0.875rem;
+  }
+}
+
+/* Medium Devices (tablets, 641px to 768px) */
+@media (min-width: 641px) and (max-width: 768px) {
+  .calendar-view {
+    padding: 1.5rem 1rem;
+  }
+
+  .calendar-header {
+    padding: 1.25rem 1.5rem;
+  }
+
+  .calendar-header h2 {
+    font-size: 1.375rem;
+  }
+
+  .nav-button {
+    width: 2.75rem;
+    height: 2.75rem;
+  }
+}
+
+/* Standard Mobile (up to 768px) */
+@media (max-width: 768px) {
+  .calendar-view {
+    padding: 1.25rem 0.625rem;
+  }
+  
+  .calendar-header {
+    padding: 0.9375rem 1.25rem;
+    grid-template-columns: 1fr;
+    gap: 0.75rem;
+  }
+  
+  .calendar-header h2 {
+    font-size: 1.25rem;
   }
   
   .calendar-nav {
@@ -1033,39 +1206,39 @@ watch(currentDate, (newDate, oldDate) => {
   }
 
   .nav-button {
-    width: 40px;
-    height: 40px;
-    font-size: 14px;
+    width: 2.5rem;
+    height: 2.5rem;
+    font-size: 0.875rem;
   }
   
   .calendar-grid {
-    padding: 15px;
+    padding: 0.9375rem;
   }
   
   .weekday {
-    font-size: 11px;
-    padding: 8px 4px;
+    font-size: 0.6875rem;
+    padding: 0.5rem 0.25rem;
   }
   
   .calendar-days {
-    gap: 6px;
+    gap: 0.375rem;
   }
   
   .calendar-day {
-    padding: 6px;
-    border-radius: 8px;
+    padding: 0.375rem;
+    border-radius: 0.5rem;
   }
   
   .day-number {
-    font-size: 12px;
+    font-size: 0.75rem;
   }
   
   .day-weather i {
-    font-size: 18px;
+    font-size: 1.125rem;
   }
   
   .day-temp {
-    font-size: 11px;
+    font-size: 0.6875rem;
   }
 
   .activity-chip {
@@ -1079,77 +1252,45 @@ watch(currentDate, (newDate, oldDate) => {
   
   .legend {
     flex-direction: column;
-    gap: 10px;
-    padding: 15px;
+    gap: 0.625rem;
+    padding: 0.9375rem;
   }
   
   .legend-item {
-    font-size: 13px;
+    font-size: 0.8125rem;
   }
 }
 
-@media (max-width: 480px) {
+/* Large Devices (desktops, 1024px and up) */
+@media (min-width: 1024px) {
   .calendar-view {
-    padding: 15px 8px;
+    max-width: 1200px;
   }
-  
+
   .calendar-header {
-    padding: 12px 15px;
-    gap: 10px;
-    grid-template-columns: 1fr;
+    grid-template-columns: auto 1fr auto;
   }
-  
+}
+
+/* Extra Large Devices (large desktops, 1440px and up) */
+@media (min-width: 1440px) {
+  .calendar-view {
+    padding: 2.5rem;
+  }
+
+  .calendar-header {
+    padding: 1.875rem 2.5rem;
+  }
+
   .calendar-header h2 {
-    font-size: 18px;
+    font-size: 1.75rem;
   }
-  
-  .calendar-nav {
-    justify-content: space-between;
-  }
+}
 
-  .add-activity-button {
-    font-size: 13px;
-    padding: 10px;
-  }
-  
-  .nav-button {
-    width: 36px;
-    height: 36px;
-    font-size: 13px;
-  }
-  
-  .calendar-grid {
-    padding: 10px;
-  }
-  
-  .weekday {
-    font-size: 10px;
-    padding: 6px 2px;
-  }
-  
-  .calendar-days {
-    gap: 4px;
-  }
-  
+/* Zoom Support - Ensure proper scaling */
+@media (min-resolution: 192dpi) {
   .calendar-day {
-    padding: 4px;
-  }
-  
-  .day-number {
-    font-size: 11px;
-  }
-  
-  .day-weather i {
-    font-size: 16px;
-  }
-  
-  .day-temp {
-    font-size: 10px;
-  }
-
-  .activity-feedback {
-    flex-direction: column;
-    align-items: flex-start;
+    border-width: 1px;
   }
 }
 </style>

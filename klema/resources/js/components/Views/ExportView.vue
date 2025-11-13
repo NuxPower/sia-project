@@ -463,9 +463,106 @@ const formatDate = (dateString) => {
   font-size: 13px;
 }
 
+/* Responsive Design - Mobile First Approach */
+
+/* Extra Small Devices (phones, up to 480px) */
+@media (max-width: 480px) {
+  .exports-view {
+    padding: 1rem;
+  }
+
+  .export-header h2 {
+    font-size: 1.25rem;
+    margin-bottom: 0.625rem;
+  }
+
+  .export-description {
+    font-size: 0.8125rem;
+  }
+
+  .export-section {
+    padding: 1rem;
+    margin-bottom: 1rem;
+    border-radius: 0.75rem;
+  }
+
+  .export-section h3 {
+    font-size: 1.125rem;
+    margin-bottom: 1rem;
+  }
+
+  .form-row {
+    grid-template-columns: 1fr;
+    gap: 0.75rem;
+  }
+
+  .form-group label {
+    font-size: 0.8125rem;
+  }
+
+  .form-control {
+    padding: 0.75rem;
+    font-size: 0.8125rem;
+  }
+
+  .action-button {
+    width: 100%;
+    padding: 0.875rem 1rem;
+    font-size: 0.875rem;
+  }
+
+  .export-item {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.75rem;
+    padding: 1rem;
+  }
+
+  .export-name {
+    font-size: 0.875rem;
+  }
+
+  .export-meta {
+    font-size: 0.75rem;
+    flex-direction: column;
+    gap: 0.25rem;
+  }
+}
+
+/* Small Devices (landscape phones, 481px to 640px) */
+@media (min-width: 481px) and (max-width: 640px) {
+  .exports-view {
+    padding: 1.25rem;
+  }
+
+  .form-row {
+    grid-template-columns: 1fr;
+  }
+
+  .export-item {
+    flex-direction: column;
+  }
+}
+
+/* Medium Devices (tablets, 641px to 768px) */
+@media (min-width: 641px) and (max-width: 768px) {
+  .exports-view {
+    padding: 1.5rem;
+  }
+
+  .form-row {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .export-item {
+    flex-direction: row;
+  }
+}
+
+/* Standard Mobile (up to 768px) */
 @media (max-width: 768px) {
   .exports-view {
-    padding: 20px;
+    padding: 1.25rem;
   }
   
   .form-row {
@@ -475,11 +572,41 @@ const formatDate = (dateString) => {
   .export-item {
     flex-direction: column;
     align-items: flex-start;
-    gap: 12px;
+    gap: 0.75rem;
   }
   
   .action-button {
     width: 100%;
+  }
+}
+
+/* Large Devices (desktops, 1024px and up) */
+@media (min-width: 1024px) {
+  .exports-view {
+    max-width: 1200px;
+    margin: 0 auto;
+  }
+
+  .form-row {
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  }
+}
+
+/* Extra Large Devices (large desktops, 1440px and up) */
+@media (min-width: 1440px) {
+  .exports-view {
+    padding: 2rem 2.5rem;
+  }
+
+  .export-section {
+    padding: 2rem;
+  }
+}
+
+/* Zoom Support - Ensure proper scaling */
+@media (min-resolution: 192dpi) {
+  .export-section {
+    border-width: 1px;
   }
 }
 </style>

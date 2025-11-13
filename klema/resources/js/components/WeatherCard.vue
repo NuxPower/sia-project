@@ -212,22 +212,108 @@ defineEmits(['select']);
   white-space: nowrap;
 }
 
-@media (max-width: 768px) {
+/* Responsive Design - Mobile First Approach */
+
+/* Extra Small Devices (phones, up to 480px) */
+@media (max-width: 480px) {
   .weather-card {
-    min-width: 60px;
-    padding: 8px 6px;
+    min-width: 3.5rem;
+    padding: 0.5rem 0.375rem;
   }
   
   .day-label {
-    font-size: 10px;
+    font-size: 0.625rem;
   }
   
   .weather-icon {
-    font-size: 16px;
+    font-size: 0.875rem;
   }
   
   .temperature {
-    font-size: 10px;
+    font-size: 0.625rem;
+  }
+
+  .temp-high {
+    font-size: 0.75rem;
+  }
+
+  .temp-low {
+    font-size: 0.625rem;
+  }
+
+  .condition {
+    font-size: 0.5rem;
+    max-width: 3rem;
+  }
+}
+
+/* Small Devices (landscape phones, 481px to 640px) */
+@media (min-width: 481px) and (max-width: 640px) {
+  .weather-card {
+    min-width: 3.75rem;
+    padding: 0.5rem 0.5rem;
+  }
+
+  .day-label {
+    font-size: 0.6875rem;
+  }
+
+  .weather-icon {
+    font-size: 1rem;
+  }
+
+  .temperature {
+    font-size: 0.6875rem;
+  }
+}
+
+/* Medium Devices (tablets, 641px to 768px) */
+@media (min-width: 641px) and (max-width: 768px) {
+  .weather-card {
+    min-width: 4rem;
+    padding: 0.625rem 0.5rem;
+  }
+
+  .day-label {
+    font-size: 0.75rem;
+  }
+
+  .weather-icon {
+    font-size: 1.125rem;
+  }
+}
+
+/* Standard Mobile (up to 768px) */
+@media (max-width: 768px) {
+  .weather-card {
+    min-width: 3.75rem;
+    padding: 0.5rem 0.375rem;
+  }
+  
+  .day-label {
+    font-size: 0.625rem;
+  }
+  
+  .weather-icon {
+    font-size: 1rem;
+  }
+  
+  .temperature {
+    font-size: 0.625rem;
+  }
+}
+
+/* Large Devices (desktops, 1024px and up) */
+@media (min-width: 1024px) {
+  .weather-card {
+    min-width: 5rem;
+  }
+}
+
+/* Zoom Support - Ensure proper scaling */
+@media (min-resolution: 192dpi) {
+  .weather-card {
+    border-width: 1px;
   }
 }
 </style>

@@ -757,21 +757,217 @@ const weatherEffectClass = computed(() => {
   flex-shrink: 0;
 }
 
+/* Responsive Design - Mobile First Approach */
+
+/* Extra Small Devices (phones, up to 480px) */
+@media (max-width: 480px) {
+  .dashboard-view {
+    padding: 1rem;
+  }
+
+  .weather-summary-card {
+    padding: 1.25rem;
+    margin-bottom: 1.25rem;
+    border-radius: 1rem;
+  }
+
+  .location-info h2 {
+    font-size: 1.25rem;
+  }
+
+  .location-info i {
+    font-size: 1.125rem;
+  }
+
+  .temp-value {
+    font-size: 3rem;
+  }
+
+  .weather-description {
+    font-size: 0.875rem;
+  }
+
+  .weather-description i {
+    font-size: 1.5rem;
+  }
+
+  .current-weather {
+    flex-direction: column;
+    gap: 1.5rem;
+  }
+
+  .weather-details {
+    grid-template-columns: 1fr;
+    gap: 0.75rem;
+  }
+
+  .detail-item {
+    padding: 0.75rem;
+  }
+
+  .detail-item i {
+    font-size: 1.125rem;
+  }
+
+  .detail-item span {
+    font-size: 1rem;
+  }
+
+  .forecast-grid h3 {
+    font-size: 1.125rem;
+    margin-bottom: 1rem;
+  }
+
+  .forecast-cards {
+    grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
+    gap: 0.75rem;
+  }
+
+  .forecast-card {
+    padding: 1rem;
+  }
+
+  .forecast-icon {
+    font-size: 1.5rem;
+  }
+
+  .temp-max {
+    font-size: 0.875rem;
+  }
+
+  .temp-min {
+    font-size: 0.75rem;
+  }
+
+  .system-stats-section,
+  .tips-section {
+    padding: 1rem;
+    margin-bottom: 1.25rem;
+  }
+
+  .stats-grid {
+    grid-template-columns: 1fr;
+    gap: 0.75rem;
+  }
+
+  .stat-card {
+    padding: 1rem;
+  }
+
+  .stat-icon {
+    font-size: 1.5rem;
+  }
+
+  .stat-value {
+    font-size: 1.125rem;
+  }
+}
+
+/* Small Devices (landscape phones, 481px to 640px) */
+@media (min-width: 481px) and (max-width: 640px) {
+  .dashboard-view {
+    padding: 1.25rem;
+  }
+
+  .weather-summary-card {
+    padding: 1.5rem;
+  }
+
+  .temp-value {
+    font-size: 3.5rem;
+  }
+
+  .weather-details {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .forecast-cards {
+    grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+  }
+
+  .stats-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+/* Medium Devices (tablets, 641px to 768px) */
+@media (min-width: 641px) and (max-width: 768px) {
+  .dashboard-view {
+    padding: 1.5rem;
+  }
+
+  .weather-summary-card {
+    padding: 1.75rem;
+  }
+
+  .temp-value {
+    font-size: 4rem;
+  }
+
+  .forecast-cards {
+    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  }
+
+  .stats-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+/* Standard Mobile (up to 768px) */
 @media (max-width: 768px) {
   .dashboard-view {
-    padding: 20px;
+    padding: 1.25rem;
   }
   
   .current-weather {
     flex-direction: column;
+    gap: 1.5rem;
   }
   
   .weather-details {
     grid-template-columns: 1fr;
+    gap: 1rem;
   }
   
   .forecast-cards {
     grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  }
+}
+
+/* Large Devices (desktops, 1024px and up) */
+@media (min-width: 1024px) {
+  .weather-details {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .forecast-cards {
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  }
+
+  .stats-grid {
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  }
+}
+
+/* Extra Large Devices (large desktops, 1440px and up) */
+@media (min-width: 1440px) {
+  .dashboard-view {
+    padding: 2.5rem;
+  }
+
+  .weather-summary-card {
+    padding: 2rem;
+  }
+
+  .forecast-cards {
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  }
+}
+
+/* Zoom Support - Use relative units for better scaling */
+@media (min-resolution: 192dpi) {
+  .weather-summary-card {
+    border-width: 1px;
   }
 }
 

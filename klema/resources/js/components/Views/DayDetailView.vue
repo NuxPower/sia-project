@@ -971,44 +971,161 @@ const precipitationTooltip = (hour) => {
   }
 }
 
-@media (max-width: 1024px) {
+/* Responsive Design - Mobile First Approach */
+
+/* Extra Small Devices (phones, up to 480px) */
+@media (max-width: 480px) {
   .detail-header {
     flex-direction: column;
-    padding: 24px;
+    padding: 1rem;
+    gap: 1rem;
   }
 
   .header-top {
     flex-direction: column;
     align-items: flex-start;
-    gap: 16px;
+    gap: 0.75rem;
+  }
+
+  .detail-title {
+    font-size: 1.125rem;
+  }
+
+  .summary-cards {
+    grid-template-columns: 1fr;
+    gap: 0.75rem;
+  }
+
+  .summary-card {
+    padding: 0.75rem;
+  }
+
+  .summary-value {
+    font-size: 1.25rem;
+  }
+
+  .detail-content {
+    padding: 1rem;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .temperature-table .table-row {
+    grid-template-columns: repeat(2, 1fr);
+    row-gap: 0.5rem;
+    font-size: 0.75rem;
+  }
+
+  .temperature-table .table-row span:nth-child(n + 5) {
+    display: none;
+  }
+}
+
+/* Small Devices (landscape phones, 481px to 640px) */
+@media (min-width: 481px) and (max-width: 640px) {
+  .detail-header {
+    padding: 1.25rem;
+  }
+
+  .summary-cards {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .detail-content {
+    padding: 1.25rem;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .summary-card {
+    padding: 0.875rem;
+  }
+
+  .temperature-table .table-row {
+    grid-template-columns: repeat(3, minmax(80px, 1fr));
+  }
+}
+
+/* Medium Devices (tablets, 641px to 768px) */
+@media (min-width: 641px) and (max-width: 768px) {
+  .detail-header {
+    padding: 1.5rem;
+  }
+
+  .summary-cards {
+    grid-template-columns: repeat(3, 1fr);
+  }
+
+  .detail-content {
+    padding: 1.5rem;
+  }
+}
+
+/* Standard Tablet (769px to 1024px) */
+@media (min-width: 769px) and (max-width: 1024px) {
+  .detail-header {
+    flex-direction: column;
+    padding: 1.5rem;
+  }
+
+  .header-top {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 1rem;
+  }
+
+  .summary-cards {
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  }
+
+  .detail-content {
+    padding: 1.5rem;
+  }
+
+  .temperature-table .table-row {
+    grid-template-columns: repeat(4, minmax(100px, 1fr));
+    row-gap: 0.5rem;
+  }
+
+  .temperature-table .table-row span:nth-child(n + 5) {
+    display: none;
+  }
+}
+
+/* Large Devices (desktops, 1024px and up) */
+@media (min-width: 1024px) {
+  .detail-header {
+    flex-direction: row;
+  }
+
+  .header-top {
+    flex-direction: row;
   }
 
   .summary-cards {
     grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
   }
 
-  .detail-content {
-    padding: 24px;
-  }
-
   .temperature-table .table-row {
-    grid-template-columns: repeat(3, minmax(100px, 1fr));
-    row-gap: 8px;
-  }
-
-  .temperature-table .table-row span:nth-child(n + 4) {
-    display: none;
+    grid-template-columns: repeat(6, minmax(100px, 1fr));
   }
 }
 
-@media (max-width: 640px) {
-  .detail-content {
-    display: flex;
-    flex-direction: column;
+/* Extra Large Devices (large desktops, 1440px and up) */
+@media (min-width: 1440px) {
+  .detail-header {
+    padding: 2rem;
   }
 
+  .detail-content {
+    padding: 2rem;
+  }
+}
+
+/* Zoom Support - Ensure proper scaling */
+@media (min-resolution: 192dpi) {
   .summary-card {
-    padding: 12px 14px;
+    border-width: 1px;
   }
 }
 </style>

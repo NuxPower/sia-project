@@ -149,20 +149,24 @@ import {
 } from '../composables/useNotificationSettings';
 
 const weatherMapRef = ref(null);
-const DEFAULT_LOCATION = (typeof window !== 'undefined' && 'geolocation' in navigator)
-  ? new Promise((resolve) => {
+const DEFAULT_LOCATION_STRING = 'Northern Mindanao'; // Default fallback string
+const getDefaultLocation = () => {
+  if (typeof window !== 'undefined' && 'geolocation' in navigator) {
+    return new Promise((resolve) => {
       navigator.geolocation.getCurrentPosition(
         pos => resolve(`${pos.coords.latitude},${pos.coords.longitude}`),
-        () => resolve(''),
+        () => resolve(DEFAULT_LOCATION_STRING),
         { enableHighAccuracy: true, maximumAge: 30000, timeout: 15000 }
       );
-    })
-  : Promise.resolve('');
+    });
+  }
+  return Promise.resolve(DEFAULT_LOCATION_STRING);
+};
 const INITIAL_HISTORY_DAYS = 3;
 const INITIAL_FORECAST_DAYS = 4;
 const MAX_HISTORY_WINDOW = 90; // Increased from 30 to 90 days
 const MAX_FORECAST_WINDOW = 16;
-const searchLocation = ref(DEFAULT_LOCATION);
+const searchLocation = ref(DEFAULT_LOCATION_STRING);
 const forecast = ref([]);
 const fullForecastTimeline = ref([]);
 const currentWeather = ref(null);
@@ -815,11 +819,16 @@ const handleMapClick = async ({ lat, lng }) => {
 };
 
 const searchWeather = async () => {
-  if (!searchLocation.value.trim()) return;
+  // Ensure searchLocation is a string
+  const location = typeof searchLocation.value === 'string' 
+    ? searchLocation.value 
+    : String(searchLocation.value || DEFAULT_LOCATION_STRING);
+  
+  if (!location.trim()) return;
   
   isLoadingWeather.value = true;
   try {
-    const trimmed = searchLocation.value.trim();
+    const trimmed = location.trim();
     const farmMatch = farmCoordinateMap.value[trimmed.toLowerCase()];
 
     let current, history, forecastData;
@@ -931,7 +940,7 @@ const initializeDefaultLocation = async () => {
     if (appSettings.locationType === 'farm' && appSettings.selectedFarmId && rawFarms.value?.length) {
       const selectedFarm = rawFarms.value.find(f => f.farm_id === appSettings.selectedFarmId);
       if (selectedFarm) {
-        const name = selectedFarm?.farm_name || DEFAULT_LOCATION;
+        const name = selectedFarm?.farm_name || DEFAULT_LOCATION_STRING;
         searchLocation.value = name;
 
         const lat = parseFloat(selectedFarm?.latitude);
@@ -984,7 +993,7 @@ const initializeDefaultLocation = async () => {
   // Fallback to first farm if available
   if (rawFarms.value?.length) {
     const firstFarm = rawFarms.value[0];
-    const name = firstFarm?.farm_name || DEFAULT_LOCATION;
+    const name = firstFarm?.farm_name || DEFAULT_LOCATION_STRING;
     searchLocation.value = name;
 
     const lat = parseFloat(firstFarm?.latitude);
@@ -1028,7 +1037,7 @@ const initializeDefaultLocation = async () => {
     }
   }
 
-  searchLocation.value = DEFAULT_LOCATION;
+  searchLocation.value = DEFAULT_LOCATION_STRING;
   return false;
 };
 
@@ -1640,7 +1649,93 @@ const getLoadingSubtitle = () => {
   font-size: 14px;
 }
 
-/* Responsive: Move to bottom on smaller screens */
+/* Responsive Design - Mobile First Approach */
+
+/* Extra Small Devices (phones, up to 480px) */
+@media (max-width: 480px) {
+  .drawing-controls {
+    top: auto;
+    bottom: 10px;
+    right: 10px;
+    left: 10px;
+    max-width: none;
+    min-width: auto;
+    padding: 12px;
+    border-radius: 12px;
+    animation: slideInUp 0.3s ease-out;
+  }
+
+  .drawing-controls__header h3 {
+    font-size: 16px;
+  }
+
+  .drawing-controls__info p {
+    font-size: 12px;
+  }
+
+  .drawing-controls__button {
+    padding: 8px 12px;
+    font-size: 12px;
+  }
+
+  .overlay-wrapper {
+    padding: 10px;
+  }
+
+  .overlay-panel {
+    border-radius: 16px;
+    height: calc(100vh - 20px);
+  }
+
+  .overlay-content :deep(.dashboard-view),
+  .overlay-content :deep(.settings-view),
+  .overlay-content :deep(.alerts-view),
+  .overlay-content :deep(.calendar-view) {
+    padding: 16px;
+  }
+}
+
+/* Small Devices (landscape phones, 481px to 640px) */
+@media (min-width: 481px) and (max-width: 640px) {
+  .drawing-controls {
+    top: auto;
+    bottom: 15px;
+    right: 15px;
+    left: 15px;
+    max-width: none;
+    min-width: auto;
+    padding: 16px;
+  }
+
+  .overlay-wrapper {
+    padding: 15px;
+  }
+
+  .overlay-content :deep(.dashboard-view),
+  .overlay-content :deep(.settings-view),
+  .overlay-content :deep(.alerts-view),
+  .overlay-content :deep(.calendar-view) {
+    padding: 20px;
+  }
+}
+
+/* Medium Devices (tablets, 641px to 768px) */
+@media (min-width: 641px) and (max-width: 768px) {
+  .drawing-controls {
+    top: auto;
+    bottom: 20px;
+    right: 20px;
+    left: 20px;
+    max-width: none;
+    padding: 18px;
+  }
+
+  .overlay-wrapper {
+    padding: 20px 20px 20px 100px;
+  }
+}
+
+/* Standard Mobile (up to 768px) */
 @media (max-width: 768px) {
   .drawing-controls {
     top: auto;
@@ -1649,6 +1744,10 @@ const getLoadingSubtitle = () => {
     left: 20px;
     max-width: none;
     animation: slideInUp 0.3s ease-out;
+  }
+
+  .overlay-wrapper {
+    padding: 20px 20px 20px 80px;
   }
 
   @keyframes slideInUp {
@@ -1660,6 +1759,32 @@ const getLoadingSubtitle = () => {
       opacity: 1;
       transform: translateY(0);
     }
+  }
+}
+
+/* Large Devices (desktops, 1024px and up) */
+@media (min-width: 1024px) {
+  .overlay-wrapper {
+    padding: 40px 40px 40px 140px;
+  }
+}
+
+/* Extra Large Devices (large desktops, 1440px and up) */
+@media (min-width: 1440px) {
+  .drawing-controls {
+    min-width: 300px;
+    max-width: 360px;
+  }
+
+  .overlay-wrapper {
+    padding: 50px 50px 50px 160px;
+  }
+}
+
+/* Zoom Support - Ensure elements scale properly */
+@media (min-resolution: 192dpi) {
+  .drawing-controls {
+    border-width: 1.5px;
   }
 }
 

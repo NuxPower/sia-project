@@ -829,19 +829,160 @@ input:checked + .slider:before {
   transform: translateX(24px);
 }
 
-@media (max-width: 768px) {
+/* Responsive Design - Mobile First Approach */
+
+/* Extra Small Devices (phones, up to 480px) */
+@media (max-width: 480px) {
   .alerts-view {
-    padding: 20px;
+    padding: 1rem;
   }
   
   .alerts-header {
     flex-direction: column;
     align-items: flex-start;
-    gap: 15px;
+    gap: 0.9375rem;
+    margin-bottom: 1.5rem;
+  }
+
+  .alerts-header h2 {
+    font-size: 1.25rem;
+  }
+
+  .add-alert-button {
+    width: 100%;
+    justify-content: center;
+    padding: 0.75rem 1rem;
+    font-size: 0.8125rem;
+  }
+  
+  .alerts-section, .warnings-section, .settings-section {
+    padding: 1rem;
+    margin-bottom: 1rem;
+  }
+
+  .alerts-section h3, .settings-section h3 {
+    font-size: 1.125rem;
+    margin-bottom: 1rem;
+  }
+
+  .warnings-header h3 {
+    font-size: 1.125rem;
+  }
+
+  .warnings-grid {
+    grid-template-columns: 1fr;
+    gap: 0.75rem;
+  }
+
+  .warning-card {
+    padding: 1rem;
+  }
+
+  .alert-card {
+    padding: 1rem;
+    gap: 0.75rem;
+    flex-direction: column;
+  }
+
+  .alert-icon {
+    font-size: 1.5rem;
+  }
+
+  .alert-content h4 {
+    font-size: 1rem;
+  }
+
+  .alert-actions {
+    flex-direction: row;
+    width: 100%;
+    justify-content: flex-end;
+  }
+
+  .settings-list {
+    gap: 0.75rem;
+  }
+
+  .setting-item {
+    padding: 0.75rem;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.75rem;
+  }
+
+  .setting-info {
+    width: 100%;
+  }
+}
+
+/* Small Devices (landscape phones, 481px to 640px) */
+@media (min-width: 481px) and (max-width: 640px) {
+  .alerts-view {
+    padding: 1.25rem;
+  }
+
+  .warnings-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .alert-card {
+    flex-direction: row;
+  }
+}
+
+/* Medium Devices (tablets, 641px to 768px) */
+@media (min-width: 641px) and (max-width: 768px) {
+  .alerts-view {
+    padding: 1.5rem;
+  }
+
+  .warnings-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+/* Standard Mobile (up to 768px) */
+@media (max-width: 768px) {
+  .alerts-view {
+    padding: 1.25rem;
+  }
+  
+  .alerts-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.9375rem;
   }
   
   .warnings-grid {
     grid-template-columns: 1fr;
+  }
+}
+
+/* Large Devices (desktops, 1024px and up) */
+@media (min-width: 1024px) {
+  .warnings-grid {
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  }
+}
+
+/* Extra Large Devices (large desktops, 1440px and up) */
+@media (min-width: 1440px) {
+  .alerts-view {
+    padding: 2rem;
+  }
+
+  .alerts-section, .warnings-section, .settings-section {
+    padding: 1.875rem;
+  }
+}
+
+/* Zoom Support - Ensure proper scaling */
+@media (min-resolution: 192dpi) {
+  .alert-card {
+    border-left-width: 3px;
+  }
+
+  .warning-card {
+    border-left-width: 3px;
   }
 }
 </style>
