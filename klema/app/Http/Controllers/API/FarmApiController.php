@@ -137,14 +137,23 @@ class FarmApiController extends Controller
 
         if ($request->exists('boundary')) {
             $farm->boundary = $request->input('boundary');
+            // Area is automatically calculated when boundary is set (see Farm model)
         }
 
         $farm->save();
+        
+        // Refresh to get calculated area if boundary was set
+        $farm->refresh();
+
+        $message = 'Farm updated successfully!';
+        if ($request->exists('boundary') && $request->input('boundary') !== null && $farm->size_hectares) {
+            $message .= sprintf(' Farm area calculated: %.2f hectares.', $farm->size_hectares);
+        }
 
         return response()->json([
             'success' => true,
             'farm' => $farm->load('user'), // Include user relationship
-            'message' => 'Farm updated successfully!'
+            'message' => $message
         ]);
     }
 

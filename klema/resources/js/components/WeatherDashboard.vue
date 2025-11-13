@@ -1,19 +1,65 @@
 <template>
   <div class="weather-dashboard">
     <SearchBar 
-      v-if="activeView === 'map' && !selectedDayDetail"
+      v-if="activeView === 'map' && !selectedDayDetail && !isDrawingBoundary"
       v-model="searchLocation"
       @search="searchWeather"
       :is-loading="isLoadingWeather"
     />
     
-    <ClickInstruction v-if="activeView === 'map' && !selectedDayDetail" />
+    <ClickInstruction v-if="activeView === 'map' && !selectedDayDetail && !isDrawingBoundary" />
     
     <WeatherLayerControls 
-      v-if="activeView === 'map' && !selectedDayDetail"
+      v-if="activeView === 'map' && !selectedDayDetail && !isDrawingBoundary"
       @toggle-layer="handleLayerToggle"
       @change-base-layer="handleBaseLayerChange" 
     />
+    
+    <!-- Drawing Mode Controls -->
+    <div v-if="isDrawingBoundary" class="drawing-controls">
+      <div class="drawing-controls__header">
+        <i class="fas fa-draw-polygon"></i>
+        <h3>Drawing Boundary</h3>
+      </div>
+      <div class="drawing-controls__info">
+        <p>
+          <i class="fas fa-mouse-pointer"></i>
+          Click on the map to add vertices to the boundary
+        </p>
+        <p class="point-count">
+          Points: <strong>{{ boundaryPointCount }}</strong>
+          <span v-if="boundaryPointCount < 3" class="warning"> (minimum 3 required)</span>
+        </p>
+      </div>
+      <div class="drawing-controls__actions">
+        <button 
+          class="drawing-controls__button drawing-controls__button--danger"
+          @click="deleteLastBoundaryPoint"
+          :disabled="boundaryPointCount === 0"
+          title="Delete last point"
+        >
+          <i class="fas fa-undo"></i>
+          Delete Last Point
+        </button>
+        <button 
+          class="drawing-controls__button drawing-controls__button--success"
+          @click="finishBoundaryEditing"
+          :disabled="boundaryPointCount < 3"
+          title="Finish drawing (requires at least 3 points)"
+        >
+          <i class="fas fa-check"></i>
+          Finish Drawing
+        </button>
+        <button 
+          class="drawing-controls__button drawing-controls__button--cancel"
+          @click="cancelBoundaryEditing"
+          title="Cancel drawing"
+        >
+          <i class="fas fa-times"></i>
+          Cancel
+        </button>
+      </div>
+    </div>
 
     <div class="map-wrapper">
       <WeatherMap
@@ -34,14 +80,14 @@
     </div>
     
     <WeatherTimeline
-      v-if="activeView === 'map' && !selectedDayDetail"
+      v-if="activeView === 'map' && !selectedDayDetail && !isDrawingBoundary"
       :forecast="forecastTimeline"
       :get-day-label="getDayLabel"
       :get-weather-icon="getWeatherIcon"
       @day-selected="handleTimelineSelection"
     />
     
-    <TimelineLegend v-if="activeView === 'map' && !selectedDayDetail" />
+    <TimelineLegend v-if="activeView === 'map' && !selectedDayDetail && !isDrawingBoundary" />
 
     <transition name="overlay-fade">
       <div v-if="activeView !== 'map' && !selectedDayDetail" class="overlay-wrapper">
@@ -117,6 +163,8 @@ const isLoadingWeather = ref(false);
 const activeView = ref('map');
 const boundarySession = ref(null);
 const pointSession = ref(null);
+const isDrawingBoundary = computed(() => !!boundarySession.value);
+const boundaryPointCount = ref(0);
 let suppressNextLocationUpdate = false;
 const latestHistoryData = ref([]);
 const latestForecastData = ref([]);
@@ -683,6 +731,19 @@ const handleBaseLayerChange = ({ layerId }) => {
 };
 
 const handleMapClick = async ({ lat, lng }) => {
+  // If drawing boundary, update point count after a small delay to allow point to be added
+  if (isDrawingBoundary.value) {
+    setTimeout(() => {
+      updateBoundaryPointCount();
+    }, 50);
+    return;
+  }
+  
+  // If placing point, don't update weather
+  if (pointSession.value) {
+    return;
+  }
+  
   isLoadingWeather.value = true;
   try {
     const { current, history, forecastData } = await fetchWeatherByCoordinates(
@@ -823,15 +884,96 @@ const searchWeather = async () => {
 const handleMapReady = async () => {
   mapLoading.value = false;
   await ensureApiToken(window.axios);
-  const prefilled = await initializeDefaultLocation();
-  if (!prefilled) {
-    await searchWeather();
+  
+  // If we haven't initialized location yet (farms might not be loaded), try now
+  if (!farmPrefillComplete.value) {
+    const prefilled = await initializeDefaultLocation();
+    if (!prefilled) {
+      await searchWeather();
+    }
   }
-  await refreshFarmLayers();
+  
   await initializeAlertsPanel();
 };
 
+const loadAppSettings = () => {
+  if (typeof window === 'undefined') {
+    return null;
+  }
+  
+  try {
+    const stored = window.localStorage?.getItem('appSettings');
+    if (stored) {
+      return JSON.parse(stored);
+    }
+  } catch (error) {
+    console.error('Failed to load app settings:', error);
+  }
+  
+  return null;
+};
+
 const initializeDefaultLocation = async () => {
+  // Load saved settings
+  const appSettings = loadAppSettings();
+  
+  // Check if user has saved location preferences
+  if (appSettings) {
+    // If location type is 'farm' and a farm is selected
+    if (appSettings.locationType === 'farm' && appSettings.selectedFarmId && rawFarms.value?.length) {
+      const selectedFarm = rawFarms.value.find(f => f.farm_id === appSettings.selectedFarmId);
+      if (selectedFarm) {
+        const name = selectedFarm?.farm_name || DEFAULT_LOCATION;
+        searchLocation.value = name;
+
+        const lat = parseFloat(selectedFarm?.latitude);
+        const lon = parseFloat(selectedFarm?.longitude);
+        if (!Number.isNaN(lat) && !Number.isNaN(lon)) {
+          try {
+            await updateWeatherForLocation(lat, lon, name);
+            if (weatherMapRef.value) {
+              weatherMapRef.value.moveToLocation(lat, lon, 12);
+            }
+            farmPrefillComplete.value = true;
+            return true;
+          } catch (error) {
+            console.error('Failed to load weather for selected farm:', error);
+          }
+        }
+      }
+    }
+    
+    // If location type is 'custom' and defaultLocation is set
+    if (appSettings.locationType === 'custom' && appSettings.defaultLocation) {
+      const location = appSettings.defaultLocation.trim();
+      if (location) {
+        searchLocation.value = location;
+        // Check if it's coordinates (format: "lat, lng" or "lat,lng")
+        const coordMatch = location.match(/^(-?\d+\.?\d*),\s*(-?\d+\.?\d*)$/);
+        if (coordMatch) {
+          const lat = parseFloat(coordMatch[1]);
+          const lon = parseFloat(coordMatch[2]);
+          if (!Number.isNaN(lat) && !Number.isNaN(lon)) {
+            try {
+              await updateWeatherForLocation(lat, lon);
+              if (weatherMapRef.value) {
+                weatherMapRef.value.moveToLocation(lat, lon, 12);
+              }
+              farmPrefillComplete.value = true;
+              return true;
+            } catch (error) {
+              console.error('Failed to load weather for coordinates:', error);
+            }
+          }
+        } else {
+          // It's a location name, use searchWeather
+          return false; // Let searchWeather handle it
+        }
+      }
+    }
+  }
+  
+  // Fallback to first farm if available
   if (rawFarms.value?.length) {
     const firstFarm = rawFarms.value[0];
     const name = firstFarm?.farm_name || DEFAULT_LOCATION;
@@ -885,16 +1027,22 @@ const initializeDefaultLocation = async () => {
 onMounted(async () => {
   await fetchUserInfo();
   await ensureApiToken(window.axios);
+  
+  // Load farms first so we can use saved farm selection
+  await refreshFarmLayers({ reloadData: true });
+  
+  // Now initialize default location (which can use saved settings)
   const prefilled = await initializeDefaultLocation();
   if (!prefilled) {
     await searchWeather();
   }
+  
   window.vueApp = {
     setActiveView,
     searchWeather,
     searchLocation
   };
-  await refreshFarmLayers();
+  
   await initializeAlertsPanel();
 });
 
@@ -905,6 +1053,8 @@ watch([farmFeatures, pointFeatures], () => {
 const refreshFarmLayers = async ({ reloadData = true } = {}) => {
   if (reloadData) {
     await loadMapData();
+    // After loading farms, try to initialize default location if not done yet
+    // This ensures saved farm selection works even if farms load after initial mount
     if (!farmPrefillComplete.value) {
       const prefilled = await initializeDefaultLocation();
       if (!prefilled) {
@@ -959,11 +1109,18 @@ const startBoundaryEditing = (farmId) => {
     onComplete: async (coords) => {
       await axios.patch(`/api/farms/${farmId}`, { boundary: coords });
       boundarySession.value = null;
+      boundaryPointCount.value = 0;
       await refreshFarmLayers();
     },
     onCancel: () => {
       boundarySession.value = null;
+      boundaryPointCount.value = 0;
     }
+  });
+  
+  // Update point count immediately after starting
+  nextTick(() => {
+    updateBoundaryPointCount();
   });
 };
 
@@ -1069,12 +1226,55 @@ const updateWeatherForLocation = async (lat, lng, name = null) => {
 
 const finishBoundaryEditing = () => {
   boundarySession.value?.finish?.();
+  boundaryPointCount.value = 0;
 };
 
 const cancelBoundaryEditing = () => {
   boundarySession.value?.cancel?.();
   boundarySession.value = null;
+  boundaryPointCount.value = 0;
 };
+
+const deleteLastBoundaryPoint = () => {
+  if (weatherMapRef.value?.deleteLastBoundaryVertex) {
+    weatherMapRef.value.deleteLastBoundaryVertex();
+    updateBoundaryPointCount();
+  }
+};
+
+const updateBoundaryPointCount = () => {
+  if (weatherMapRef.value?.getBoundaryPointCount) {
+    boundaryPointCount.value = weatherMapRef.value.getBoundaryPointCount();
+  }
+};
+
+// Watch for boundary point changes - update count periodically while drawing
+let boundaryPointInterval = null;
+watch(isDrawingBoundary, (isDrawing) => {
+  if (isDrawing) {
+    updateBoundaryPointCount();
+    
+    // Update point count periodically while drawing
+    if (boundaryPointInterval) {
+      clearInterval(boundaryPointInterval);
+    }
+    boundaryPointInterval = setInterval(() => {
+      if (isDrawingBoundary.value) {
+        updateBoundaryPointCount();
+      } else {
+        clearInterval(boundaryPointInterval);
+        boundaryPointInterval = null;
+      }
+    }, 200);
+  } else {
+    if (boundaryPointInterval) {
+      clearInterval(boundaryPointInterval);
+      boundaryPointInterval = null;
+    }
+    boundaryPointCount.value = 0;
+  }
+}, { immediate: true });
+
 
 const extractBoundaryCoordinates = (boundary) => {
   if (!boundary?.coordinates?.[0]) {
@@ -1283,6 +1483,176 @@ const getLoadingSubtitle = () => {
   height: 100vh;
   background: linear-gradient(135deg, #0f172a, #1e293b);
   overflow: hidden;
+}
+
+/* Drawing Controls */
+.drawing-controls {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  z-index: 2000;
+  background: rgba(15, 23, 42, 0.95);
+  backdrop-filter: blur(20px);
+  border: 2px solid rgba(59, 130, 246, 0.5);
+  border-radius: 16px;
+  padding: 20px;
+  min-width: 280px;
+  max-width: 320px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+  animation: slideInRight 0.3s ease-out;
+}
+
+@keyframes slideInRight {
+  from {
+    opacity: 0;
+    transform: translateX(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.drawing-controls__header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 14px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid rgba(59, 130, 246, 0.3);
+}
+
+.drawing-controls__header i {
+  font-size: 20px;
+  color: #3b82f6;
+}
+
+.drawing-controls__header h3 {
+  margin: 0;
+  color: #fff;
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.drawing-controls__info {
+  margin-bottom: 16px;
+}
+
+.drawing-controls__info p {
+  margin: 0 0 8px 0;
+  color: #cbd5e1;
+  font-size: 13px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  line-height: 1.4;
+}
+
+.drawing-controls__info p i {
+  color: #60a5fa;
+  font-size: 14px;
+  flex-shrink: 0;
+}
+
+.drawing-controls__info .point-count {
+  font-size: 14px;
+  font-weight: 500;
+  color: #e2e8f0;
+  margin-top: 8px;
+}
+
+.drawing-controls__info .point-count strong {
+  color: #3b82f6;
+  font-size: 16px;
+}
+
+.drawing-controls__info .point-count .warning {
+  color: #fbbf24;
+  font-size: 12px;
+  font-weight: 400;
+}
+
+.drawing-controls__actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.drawing-controls__button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 10px 16px;
+  border: none;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  color: white;
+}
+
+.drawing-controls__button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none !important;
+}
+
+.drawing-controls__button:not(:disabled):hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.drawing-controls__button--success {
+  background: linear-gradient(135deg, #22c55e, #16a34a);
+}
+
+.drawing-controls__button--success:not(:disabled):hover {
+  background: linear-gradient(135deg, #16a34a, #15803d);
+}
+
+.drawing-controls__button--danger {
+  background: linear-gradient(135deg, #ef4444, #dc2626);
+}
+
+.drawing-controls__button--danger:not(:disabled):hover {
+  background: linear-gradient(135deg, #dc2626, #b91c1c);
+}
+
+.drawing-controls__button--cancel {
+  background: linear-gradient(135deg, #64748b, #475569);
+}
+
+.drawing-controls__button--cancel:not(:disabled):hover {
+  background: linear-gradient(135deg, #475569, #334155);
+}
+
+.drawing-controls__button i {
+  font-size: 14px;
+}
+
+/* Responsive: Move to bottom on smaller screens */
+@media (max-width: 768px) {
+  .drawing-controls {
+    top: auto;
+    bottom: 20px;
+    right: 20px;
+    left: 20px;
+    max-width: none;
+    animation: slideInUp 0.3s ease-out;
+  }
+
+  @keyframes slideInUp {
+    from {
+      opacity: 0;
+      transform: translateY(20px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
 }
 
 .map-wrapper {

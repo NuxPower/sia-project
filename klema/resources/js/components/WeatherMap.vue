@@ -336,6 +336,30 @@ const addBoundaryVertex = (lat, lng) => {
   boundaryDrawing.value.polygonLayer.setLatLngs([boundaryDrawing.value.points]);
 };
 
+const deleteLastBoundaryVertex = () => {
+  if (!boundaryDrawing.value || !boundaryDrawing.value.points.length) return;
+
+  boundaryDrawing.value.points.pop();
+
+  if (!map.value) return;
+
+  if (boundaryDrawing.value.points.length < 3) {
+    // Remove polygon if less than 3 points (minimum for a polygon)
+    if (map.value.hasLayer(boundaryDrawing.value.polygonLayer)) {
+      map.value.removeLayer(boundaryDrawing.value.polygonLayer);
+    }
+  } else {
+    boundaryDrawing.value.polygonLayer.setLatLngs([boundaryDrawing.value.points]);
+    if (!map.value.hasLayer(boundaryDrawing.value.polygonLayer)) {
+      boundaryDrawing.value.polygonLayer.addTo(map.value);
+    }
+  }
+};
+
+const getBoundaryPointCount = () => {
+  return boundaryDrawing.value?.points?.length ?? 0;
+};
+
 const finishBoundaryDrawing = () => {
   if (!boundaryDrawing.value) return;
 
@@ -438,6 +462,8 @@ defineExpose({
   finishBoundaryDrawing,
   cancelBoundaryDrawing,
   resetBoundaryDrawing,
+  deleteLastBoundaryVertex,
+  getBoundaryPointCount,
   startPointPlacement,
   cancelPointPlacement
 });

@@ -115,41 +115,47 @@
 
       <section class="farm-panel__section farm-panel__section--card">
         <h4>Boundary</h4>
-        <p class="farm-panel__hint" v-if="isDrawing">
-          Drawing active: click on the map to add vertices, then finish or cancel.
-        </p>
-        <div class="farm-panel__actions farm-panel__actions--wrap">
+        <div class="farm-panel__benefits" v-if="!isDrawing">
+          <p class="farm-panel__hint">
+            <i class="fas fa-info-circle"></i>
+            <strong>Benefits:</strong> Drawing your farm boundary helps with:
+          </p>
+          <ul class="farm-panel__benefits-list">
+            <li><i class="fas fa-calculator"></i> Automatic area calculation</li>
+            <li><i class="fas fa-map-marked-alt"></i> Precise farm visualization</li>
+            <li><i class="fas fa-cloud-sun-rain"></i> Better weather data accuracy</li>
+            <li><i class="fas fa-clipboard-check"></i> Planning and resource management</li>
+          </ul>
+        </div>
+        <div v-if="selectedFarm?.boundary && !isDrawing" class="farm-panel__calculated-area">
+          <i class="fas fa-ruler-combined"></i>
+          <span>Calculated area: <strong>{{ formatArea(selectedFarm.size_hectares) }}</strong></span>
+        </div>
+        <div class="farm-panel__actions farm-panel__actions--wrap" v-if="!isDrawing">
           <button
             class="farm-panel__button"
             @click="handleStartBoundary"
-            :disabled="isDrawing"
           >
             <i class="fas fa-draw-polygon"></i>
             Draw boundary
           </button>
           <button
-            class="farm-panel__button farm-panel__button--success"
-            @click="$emit('finish-boundary')"
-            :disabled="!isDrawing"
-          >
-            <i class="fas fa-check"></i>
-            Finish
-          </button>
-          <button
-            class="farm-panel__button farm-panel__button--danger"
-            @click="$emit('cancel-boundary')"
-            :disabled="!isDrawing"
-          >
-            <i class="fas fa-times"></i>
-            Cancel
-          </button>
-          <button
             class="farm-panel__button farm-panel__button--warning"
             @click="$emit('clear-boundary', selectedFarmId)"
+            v-if="selectedFarm?.boundary"
           >
             <i class="fas fa-eraser"></i>
             Clear boundary
           </button>
+        </div>
+        <div v-if="isDrawing" class="farm-panel__drawing-notice">
+          <p class="farm-panel__hint">
+            <i class="fas fa-draw-polygon"></i>
+            <strong>Drawing Mode Active</strong>
+          </p>
+          <p class="farm-panel__hint" style="margin-top: 8px;">
+            Use the drawing controls on the map to manage your boundary.
+          </p>
         </div>
       </section>
 
@@ -287,6 +293,11 @@ const titleCase = (value) => {
     .split(/\s|_/)
     .map(segment => segment.charAt(0).toUpperCase() + segment.slice(1))
     .join(' ')
+}
+
+const formatArea = (hectares) => {
+  if (!hectares && hectares !== 0) return 'Not calculated'
+  return `${Number(hectares).toFixed(2)} ha`
 }
 
 const selectedFarm = computed(() =>
@@ -665,6 +676,71 @@ watch(() => [editForm.latitude, editForm.longitude], ([lat, lng]) => {
   margin: 0;
   font-size: 12px;
   color: #cbd5f5;
+}
+
+.farm-panel__hint i {
+  margin-right: 6px;
+  color: #60a5fa;
+}
+
+.farm-panel__benefits {
+  margin-bottom: 12px;
+  padding: 10px;
+  background: rgba(59, 130, 246, 0.08);
+  border-radius: 8px;
+  border-left: 3px solid rgba(59, 130, 246, 0.4);
+}
+
+.farm-panel__benefits-list {
+  margin: 8px 0 0 0;
+  padding-left: 20px;
+  list-style: none;
+}
+
+.farm-panel__benefits-list li {
+  font-size: 11px;
+  color: #cbd5f5;
+  margin-bottom: 6px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.farm-panel__benefits-list li i {
+  color: #60a5fa;
+  font-size: 10px;
+  flex-shrink: 0;
+}
+
+.farm-panel__calculated-area {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px;
+  margin-bottom: 12px;
+  background: rgba(34, 197, 94, 0.1);
+  border-radius: 8px;
+  border: 1px solid rgba(34, 197, 94, 0.3);
+  font-size: 13px;
+  color: #dcfce7;
+}
+
+.farm-panel__calculated-area i {
+  color: #22c55e;
+  font-size: 14px;
+}
+
+.farm-panel__calculated-area strong {
+  color: #86efac;
+  font-weight: 600;
+}
+
+.farm-panel__drawing-notice {
+  padding: 12px;
+  background: rgba(59, 130, 246, 0.15);
+  border-radius: 8px;
+  border-left: 3px solid rgba(59, 130, 246, 0.5);
+  margin-top: 12px;
 }
 
 .farm-panel__section--card .mini-map-picker {

@@ -14,15 +14,44 @@
         Location Settings
       </h3>
       <div class="setting-item">
-        <label>Default Location</label>
-        <input type="text" v-model="settings.defaultLocation" class="setting-input">
+        <label>Location Type</label>
+        <div class="radio-group">
+          <label class="radio-label">
+            <input type="radio" name="locationType" value="custom" v-model="settings.locationType">
+            <span>Custom Location</span>
+          </label>
+          <label class="radio-label">
+            <input type="radio" name="locationType" value="farm" v-model="settings.locationType">
+            <span>Farm Location</span>
+          </label>
+        </div>
       </div>
-      <div class="setting-item">
-        <label>Use Current Location</label>
-        <button class="action-button" @click="getCurrentLocation">
+      
+      <!-- Custom Location Input -->
+      <div class="setting-item" v-if="settings.locationType === 'custom'">
+        <label>Default Location</label>
+        <input type="text" v-model="settings.defaultLocation" class="setting-input" placeholder="Enter location (e.g., Northern Mindanao)">
+        <button class="action-button" @click="getCurrentLocation" style="margin-top: 10px;">
           <i class="fas fa-crosshairs"></i>
           Detect Location
         </button>
+      </div>
+      
+      <!-- Farm Location Dropdown -->
+      <div class="setting-item" v-if="settings.locationType === 'farm'">
+        <label>Select Farm</label>
+        <select v-model="settings.selectedFarmId" class="setting-select" :disabled="farmsLoading">
+          <option value="">-- Select a Farm --</option>
+          <option v-for="farm in farms" :key="farm.farm_id" :value="farm.farm_id">
+            {{ farm.farm_name }}
+          </option>
+        </select>
+        <small v-if="farmsLoading" style="color: #9ca3af; margin-top: 8px; display: block;">
+          Loading farms...
+        </small>
+        <small v-else-if="farms.length === 0" style="color: #9ca3af; margin-top: 8px; display: block;">
+          No farms available. Create a farm first.
+        </small>
       </div>
     </div>
 
@@ -139,16 +168,21 @@
 </template>
 
 <script setup>
-import { reactive, ref, onMounted } from 'vue';
+import { reactive, ref, onMounted, watch } from 'vue';
 import { authorizedFetch } from '../../services/http';
 import { revokeApiToken } from '../../services/auth';
 import { useGlobalAlerts } from '../../composables/useGlobalAlerts';
+import { useFarms } from '../../composables/useFarms';
+import { ensureApiToken } from '../../services/auth';
+import axios from 'axios';
 
 const STORAGE_KEY = 'appSettings';
 const NOTIFICATION_SETTINGS_KEY = 'notificationSettings';
 
 const defaultSettings = Object.freeze({
+  locationType: 'custom', // 'custom' or 'farm'
   defaultLocation: 'Northern Mindanao',
+  selectedFarmId: '',
   temperatureUnit: 'celsius',
   windSpeedUnit: 'ms',
   timeFormat: '24h',
@@ -161,6 +195,7 @@ const isSaving = ref(false);
 const isClearing = ref(false);
 
 const { showSuccess, showError } = useGlobalAlerts();
+const { farms, loading: farmsLoading, fetchFarms } = useFarms();
 
 const loadSettings = () => {
   if (typeof window === 'undefined') {
@@ -179,8 +214,23 @@ const loadSettings = () => {
   }
 };
 
-onMounted(() => {
+onMounted(async () => {
+  await ensureApiToken(axios);
+  await fetchFarms();
   loadSettings();
+  
+  // If location type is farm but no farm is selected, and farms are available, select first farm
+  if (settings.locationType === 'farm' && !settings.selectedFarmId && farms.value.length > 0) {
+    settings.selectedFarmId = farms.value[0].farm_id;
+  }
+});
+
+// Watch for location type changes
+watch(() => settings.locationType, (newType) => {
+  // When switching to farm location, auto-select first farm if available and none selected
+  if (newType === 'farm' && !settings.selectedFarmId && farms.value.length > 0) {
+    settings.selectedFarmId = farms.value[0].farm_id;
+  }
 });
 
 const saveSettings = async () => {
@@ -357,6 +407,23 @@ const logout = async () => {
   color: white;
   font-size: 14px;
   cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.setting-select:focus {
+  outline: none;
+  border-color: #3b82f6;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.setting-select:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.setting-select option {
+  color: black;
+  background: white;
 }
 
 .radio-group {

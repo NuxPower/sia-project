@@ -65,6 +65,15 @@ class Farm extends Model
     {
         $geoJson = $this->normalizeBoundary($value);
         $this->attributes['boundary_geojson'] = $geoJson ? json_encode($geoJson) : null;
+        
+        // Auto-calculate area from boundary if boundary is set
+        // Only update size_hectares if it hasn't been manually set in this request
+        if ($geoJson && !$this->isDirty('size_hectares')) {
+            $calculatedArea = $this->calculateAreaFromBoundary($geoJson);
+            if ($calculatedArea !== null) {
+                $this->attributes['size_hectares'] = $calculatedArea;
+            }
+        }
     }
 
     public function getBoundaryAttribute(): ?array
@@ -156,5 +165,68 @@ class Farm extends Model
         }
 
         return true;
+    }
+
+    /**
+     * Calculate the area of a polygon in hectares using spherical geometry.
+     * Uses the spherical excess formula for accurate area calculation on Earth's surface.
+     * 
+     * @param array $geoJson GeoJSON polygon format
+     * @return float|null Area in hectares, or null if calculation fails
+     */
+    public function calculateAreaFromBoundary(?array $geoJson): ?float
+    {
+        if (!$geoJson || !isset($geoJson['coordinates']) || !isset($geoJson['coordinates'][0])) {
+            return null;
+        }
+
+        $coordinates = $geoJson['coordinates'][0];
+        
+        // Need at least 3 points to form a polygon
+        if (count($coordinates) < 3) {
+            return null;
+        }
+
+        // Earth's radius in meters (WGS84)
+        $earthRadius = 6378137.0;
+        
+        $area = 0.0;
+        $n = count($coordinates);
+        
+        // Ensure polygon is closed
+        if ($coordinates[0] !== $coordinates[$n - 1]) {
+            $coordinates[] = $coordinates[0];
+            $n++;
+        }
+        
+        // Calculate area using spherical excess formula
+        // This accounts for Earth's curvature and works well for polygons of any size
+        for ($i = 0; $i < $n - 1; $i++) {
+            $lon1 = deg2rad($coordinates[$i][0]);
+            $lat1 = deg2rad($coordinates[$i][1]);
+            $lon2 = deg2rad($coordinates[$i + 1][0]);
+            $lat2 = deg2rad($coordinates[$i + 1][1]);
+            
+            $area += ($lon2 - $lon1) * (2 + sin($lat1) + sin($lat2));
+        }
+        
+        // Calculate absolute area in square meters
+        $area = abs($area) * $earthRadius * $earthRadius / 2.0;
+        
+        // Convert from square meters to hectares (1 hectare = 10,000 square meters)
+        $areaHectares = $area / 10000.0;
+        
+        return round($areaHectares, 2);
+    }
+
+    /**
+     * Get the calculated area from boundary if available.
+     * 
+     * @return float|null Area in hectares
+     */
+    public function getCalculatedAreaAttribute(): ?float
+    {
+        $boundary = $this->getBoundaryAttribute();
+        return $this->calculateAreaFromBoundary($boundary);
     }
 }
