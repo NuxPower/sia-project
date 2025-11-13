@@ -529,10 +529,12 @@ watch(currentDate, (newDate, oldDate) => {
 <style scoped>
 .calendar-view {
   padding: 40px;
-  max-width: 1200px;
-  margin: 0 auto;
+  width: 100%;
+  max-width: none;
+  margin: 0;
   height: 100vh;
   overflow-y: auto;
+  box-sizing: border-box;
   
   /* Hide scrollbar */
   scrollbar-width: none; /* Firefox */
@@ -1014,6 +1016,12 @@ watch(currentDate, (newDate, oldDate) => {
 @media (max-width: 480px) {
   .calendar-view {
     padding: 0.9375rem 0.5rem;
+    width: 100%;
+    max-width: 100%;
+    min-width: 100%;
+    margin-left: 0;
+    margin-right: 0;
+    align-self: stretch;
   }
   
   .calendar-header {
@@ -1123,6 +1131,12 @@ watch(currentDate, (newDate, oldDate) => {
 @media (min-width: 481px) and (max-width: 640px) {
   .calendar-view {
     padding: 1.25rem 0.75rem;
+    width: 100%;
+    max-width: 100%;
+    min-width: 100%;
+    margin-left: 0;
+    margin-right: 0;
+    align-self: stretch;
   }
 
   .calendar-header {
@@ -1164,6 +1178,12 @@ watch(currentDate, (newDate, oldDate) => {
 @media (min-width: 641px) and (max-width: 768px) {
   .calendar-view {
     padding: 1.5rem 1rem;
+    width: 100%;
+    max-width: 100%;
+    min-width: 100%;
+    margin-left: 0;
+    margin-right: 0;
+    align-self: stretch;
   }
 
   .calendar-header {
@@ -1184,6 +1204,12 @@ watch(currentDate, (newDate, oldDate) => {
 @media (max-width: 768px) {
   .calendar-view {
     padding: 1.25rem 0.625rem;
+    width: 100%;
+    max-width: 100%;
+    min-width: 100%;
+    margin-left: 0;
+    margin-right: 0;
+    align-self: stretch;
   }
   
   .calendar-header {
@@ -1264,7 +1290,9 @@ watch(currentDate, (newDate, oldDate) => {
 /* Large Devices (desktops, 1024px and up) */
 @media (min-width: 1024px) {
   .calendar-view {
-    max-width: 1200px;
+    width: 100%;
+    max-width: none;
+    margin: 0;
   }
 
   .calendar-header {
@@ -1276,6 +1304,9 @@ watch(currentDate, (newDate, oldDate) => {
 @media (min-width: 1440px) {
   .calendar-view {
     padding: 2.5rem;
+    width: 100%;
+    max-width: none;
+    margin: 0;
   }
 
   .calendar-header {

@@ -1690,8 +1690,15 @@ const getLoadingSubtitle = () => {
   .overlay-content :deep(.dashboard-view),
   .overlay-content :deep(.settings-view),
   .overlay-content :deep(.alerts-view),
+  .overlay-content :deep(.exports-view) {
+    padding: 16px;
+  }
+
   .overlay-content :deep(.calendar-view) {
     padding: 16px;
+    width: 100%;
+    max-width: none;
+    margin: 0;
   }
 }
 
@@ -1714,8 +1721,15 @@ const getLoadingSubtitle = () => {
   .overlay-content :deep(.dashboard-view),
   .overlay-content :deep(.settings-view),
   .overlay-content :deep(.alerts-view),
+  .overlay-content :deep(.exports-view) {
+    padding: 20px;
+  }
+
   .overlay-content :deep(.calendar-view) {
     padding: 20px;
+    width: 100%;
+    max-width: none;
+    margin: 0;
   }
 }
 
@@ -1765,7 +1779,7 @@ const getLoadingSubtitle = () => {
 /* Large Devices (desktops, 1024px and up) */
 @media (min-width: 1024px) {
   .overlay-wrapper {
-    padding: 40px 40px 40px 140px;
+    padding: clamp(30px, 3vw, 40px) clamp(30px, 3vw, 40px) clamp(30px, 3vw, 40px) clamp(100px, 10vw, 140px);
   }
 }
 
@@ -1777,7 +1791,7 @@ const getLoadingSubtitle = () => {
   }
 
   .overlay-wrapper {
-    padding: 50px 50px 50px 160px;
+    padding: clamp(40px, 3.5vw, 50px) clamp(40px, 3.5vw, 50px) clamp(40px, 3.5vw, 50px) clamp(120px, 11vw, 160px);
   }
 }
 
@@ -1821,7 +1835,7 @@ const getLoadingSubtitle = () => {
   display: flex;
   justify-content: center;
   align-items: center;
-  padding: 40px 40px 40px 140px;
+  padding: clamp(20px, 3vw, 40px) clamp(20px, 3vw, 40px) clamp(20px, 3vw, 40px) clamp(80px, 10vw, 140px);
   z-index: 3;
   pointer-events: none;
 }
@@ -1845,17 +1859,29 @@ const getLoadingSubtitle = () => {
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  align-items: stretch;
 }
 
 .overlay-content :deep(.dashboard-view),
 .overlay-content :deep(.settings-view),
 .overlay-content :deep(.alerts-view),
-.overlay-content :deep(.calendar-view) {
+.overlay-content :deep(.exports-view) {
   flex: 1;
   width: 100%;
+  max-width: none;
   margin: 0;
   overflow-y: auto;
   padding: 28px 36px 48px;
+}
+
+.overlay-content :deep(.calendar-view) {
+  flex: 1;
+  width: 100%;
+  max-width: none;
+  margin: 0;
+  overflow-y: auto;
+  padding: 28px 36px 48px;
+  box-sizing: border-box;
 }
 
 .overlay-fade-enter-active,

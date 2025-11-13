@@ -10,6 +10,7 @@ use App\Models\Farm;
 use App\Models\Alert;
 use App\Models\User;
 use App\Models\Activity;
+use App\Models\WeatherData;
 use Illuminate\Support\Str;
 use Carbon\Carbon;
 
@@ -135,11 +136,18 @@ class DashboardController extends Controller
         $totalAlerts = Alert::where('resolved', false)->count();
         $totalActivities = Activity::where('start_date', '>=', Carbon::now()->subDays(30))->count();
         
+        // Weather data statistics
+        $weatherDataPoints = WeatherData::count();
+        $avgTemperature = WeatherData::whereNotNull('temperature')
+            ->avg('temperature');
+        
         return [
             'total_farms' => $totalFarms,
             'total_users' => $totalUsers,
             'active_alerts' => $totalAlerts,
             'recent_activities' => $totalActivities,
+            'weather_data_points' => $weatherDataPoints,
+            'avg_temperature' => $avgTemperature ? round($avgTemperature, 2) : null,
         ];
     }
 

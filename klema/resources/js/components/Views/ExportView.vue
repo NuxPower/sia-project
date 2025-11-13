@@ -284,7 +284,7 @@ const formatDate = (dateString) => {
 .exports-view {
   width: 100%;
   margin: 0;
-  padding: 20px 40px;
+  padding: 20px clamp(20px, 4vw, 40px);
   overflow-y: auto;
   height: 100%;
   scrollbar-width: none;
@@ -583,8 +583,9 @@ const formatDate = (dateString) => {
 /* Large Devices (desktops, 1024px and up) */
 @media (min-width: 1024px) {
   .exports-view {
-    max-width: 1200px;
+    max-width: min(1200px, 95vw);
     margin: 0 auto;
+    padding: 20px clamp(20px, 4vw, 40px);
   }
 
   .form-row {
@@ -595,7 +596,7 @@ const formatDate = (dateString) => {
 /* Extra Large Devices (large desktops, 1440px and up) */
 @media (min-width: 1440px) {
   .exports-view {
-    padding: 2rem 2.5rem;
+    padding: 2rem clamp(2rem, 5vw, 2.5rem);
   }
 
   .export-section {
