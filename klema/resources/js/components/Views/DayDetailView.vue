@@ -142,13 +142,6 @@ const { getDayLabel, getWeatherIcon } = useWeatherUtils();
 
 const isFiniteNumber = (value) => typeof value === 'number' && Number.isFinite(value);
 
-const timeFormatter = new Intl.DateTimeFormat('en-US', {
-  hour: '2-digit',
-  minute: '2-digit',
-  hour12: true,
-  timeZone: 'UTC'
-});
-
 const pickNumber = (...values) => {
   for (const value of values) {
     if (isFiniteNumber(value)) {
@@ -156,6 +149,28 @@ const pickNumber = (...values) => {
     }
   }
   return null;
+};
+
+// Helper function to format time in local timezone using offset
+// timestamp: UTC Unix timestamp in seconds
+// offset: timezone offset in seconds (positive = ahead of UTC, negative = behind UTC)
+const formatLocalTime = (timestamp, offset, options = {}) => {
+  if (timestamp === null || offset === null) return '';
+  
+  // Convert UTC timestamp to local time by adding the offset
+  // Then create a Date object treating it as UTC (since we've already adjusted)
+  const localTimestamp = timestamp + offset;
+  const localDate = new Date(localTimestamp * 1000);
+  
+  // Format the date as if it were UTC (because we've already adjusted for offset)
+  const formatOptions = {
+    hour: 'numeric',
+    hour12: true,
+    timeZone: 'UTC',
+    ...options
+  };
+  
+  return localDate.toLocaleTimeString('en-US', formatOptions);
 };
 
 const resolvePrecipitationAmount = (point) => {
@@ -285,21 +300,25 @@ const rawSunsetTimestamp = computed(() => {
   );
 });
 
-const createSolarDate = (timestamp) => {
+const sunriseDate = computed(() => {
+  const timestamp = rawSunriseTimestamp.value;
   if (timestamp === null || timestamp === undefined) return null;
-  const offset = timezoneOffsetSeconds.value;
-  const adjusted = timestamp + offset;
-  if (!Number.isFinite(adjusted)) return null;
-  return new Date(adjusted * 1000);
-};
+  // Create Date object from UTC timestamp (don't adjust here)
+  return new Date(timestamp * 1000);
+});
 
-const sunriseDate = computed(() => createSolarDate(rawSunriseTimestamp.value));
-const sunsetDate = computed(() => createSolarDate(rawSunsetTimestamp.value));
+const sunsetDate = computed(() => {
+  const timestamp = rawSunsetTimestamp.value;
+  if (timestamp === null || timestamp === undefined) return null;
+  // Create Date object from UTC timestamp (don't adjust here)
+  return new Date(timestamp * 1000);
+});
 
 const normalizedSunsetDate = computed(() => {
   const sunrise = sunriseDate.value;
   const sunset = sunsetDate.value;
   if (!sunrise || !sunset) return sunset;
+  // If sunset appears to be before sunrise, it's likely on the next day
   if (sunset <= sunrise) {
     return new Date(sunset.getTime() + 24 * 60 * 60 * 1000);
   }
@@ -307,13 +326,31 @@ const normalizedSunsetDate = computed(() => {
 });
 
 const sunriseTime = computed(() => {
-  const value = sunriseDate.value;
-  return value ? timeFormatter.format(value) : null;
+  const timestamp = rawSunriseTimestamp.value;
+  if (timestamp === null || timestamp === undefined) return null;
+  
+  // Format the UTC timestamp using the timezone offset
+  const timezoneOffset = timezoneOffsetSeconds.value;
+  return formatLocalTime(timestamp, timezoneOffset, {
+    hour: '2-digit',
+    minute: '2-digit'
+  });
 });
 
 const sunsetTime = computed(() => {
-  const value = normalizedSunsetDate.value;
-  return value ? timeFormatter.format(value) : null;
+  const normalized = normalizedSunsetDate.value;
+  if (!normalized) return null;
+  
+  // Convert the normalized Date object back to UTC timestamp (seconds)
+  // The Date object represents UTC time, so getTime() gives us UTC milliseconds
+  const utcTimestamp = Math.floor(normalized.getTime() / 1000);
+  
+  // Format the UTC timestamp using the timezone offset
+  const timezoneOffset = timezoneOffsetSeconds.value;
+  return formatLocalTime(utcTimestamp, timezoneOffset, {
+    hour: '2-digit',
+    minute: '2-digit'
+  });
 });
 
 const daylightDuration = computed(() => {
@@ -329,29 +366,64 @@ const daylightDuration = computed(() => {
   return `${hours}h ${minutes}m`;
 });
 
-const parseHourlyData = (entry) => {
+const parseHourlyData = (entry, selectedDate = null) => {
   if (!entry) return [];
 
   const source = entry.hourly || entry.hours || entry.data || [];
   const timezoneOffset = resolveTimezoneOffset(entry);
   if (!Array.isArray(source)) return [];
 
+  // Note: We'll filter by comparing local calendar days instead of UTC timestamp ranges
+  // This is more reliable and handles timezone boundaries correctly
+
   return source
     .map((point, index) => {
       if (!point) return null;
 
       const timestamp = pickNumber(point.dt, point.timestamp, point.time);
-      const adjustedTimestamp = timestamp !== null ? timestamp + timezoneOffset : null;
-      const adjustedDate = adjustedTimestamp !== null ? new Date(adjustedTimestamp * 1000) : null;
+      if (timestamp === null) return null;
 
-      const fallbackLabel = point.displayTime || point.display_time || point.label || point.time || '';
-      const displayTime = adjustedDate
-        ? adjustedDate.toLocaleTimeString('en-PH', { hour: '2-digit', minute: '2-digit' })
-        : fallbackLabel;
+      // Create Date object from UTC timestamp (Unix timestamp in seconds)
+      // Weather API timestamps are in UTC
+      const utcDate = new Date(timestamp * 1000);
+      
+      // Filter to selected day if provided
+      // Convert UTC timestamp to local time components to determine which calendar day it belongs to
+      if (selectedDate) {
+        const dateStr = typeof selectedDate === 'string' ? selectedDate : selectedDate.date;
+        if (dateStr) {
+          const [selectedYear, selectedMonth, selectedDay] = dateStr.split('-').map(Number);
+          
+          // Convert UTC timestamp to local time by adding the offset
+          // Then create a Date object - since we've adjusted for offset, we can use UTC methods
+          // to get the local calendar day components
+          const localTimestampSeconds = timestamp + timezoneOffset;
+          const localDate = new Date(localTimestampSeconds * 1000);
+          
+          // Extract calendar day components from the local time
+          // Using UTC methods because the Date object is already adjusted for local time
+          const localYear = localDate.getUTCFullYear();
+          const localMonth = localDate.getUTCMonth() + 1; // getUTCMonth() returns 0-11
+          const localDay = localDate.getUTCDate();
+          
+          // Check if this hour belongs to the selected calendar day in local timezone
+          if (localYear !== selectedYear || localMonth !== selectedMonth || localDay !== selectedDay) {
+            return null; // Skip this hour if it's not in the selected day
+          }
+        }
+      }
 
-      const hourLabel = adjustedDate
-        ? adjustedDate.toLocaleTimeString('en-PH', { hour: 'numeric' })
-        : fallbackLabel;
+      // Format time in local timezone using the timezone offset
+      // The timestamp is in UTC, and we have the timezone offset
+      const displayTime = formatLocalTime(timestamp, timezoneOffset, {
+        hour: '2-digit',
+        minute: '2-digit'
+      });
+
+      // Format hour label with AM/PM (just the hour)
+      const hourLabel = formatLocalTime(timestamp, timezoneOffset, {
+        hour: 'numeric'
+      });
 
       const temperature = pickNumber(point.temp, point.temperature, point.main?.temp, point.details?.temperature);
       const feelsLike = pickNumber(point.feels_like, point.main?.feels_like);
@@ -380,8 +452,9 @@ const parseHourlyData = (entry) => {
         : (precipitationProbability ?? 0);
 
       return {
-        time: adjustedTimestamp ?? timestamp ?? point.time ?? point.label ?? index,
+        time: timestamp,
         timestamp,
+        utcDate,
         displayTime,
         timeLabel: hourLabel,
         precipitationDisplay,
@@ -400,18 +473,28 @@ const parseHourlyData = (entry) => {
         wind: windDisplay
       };
     })
-    .filter(Boolean);
+    .filter(Boolean)
+    .sort((a, b) => {
+      // Sort by timestamp to ensure correct chronological order
+      if (a.timestamp && b.timestamp) {
+        return a.timestamp - b.timestamp;
+      }
+      return 0;
+    });
 };
 
 const hourlySeries = computed(() => {
+  // Pass the selected day's date to filter hourly data to that day only
+  const selectedDate = props.day?.date || props.detail?.date;
+  
   if (props.hourlyData.length) {
     return parseHourlyData({
       hourly: props.hourlyData,
       timezone_offset: props.detail?.timezone_offset ?? 0
-    });
+    }, selectedDate ? { date: selectedDate } : null);
   }
 
-  return parseHourlyData(props.detail);
+  return parseHourlyData(props.detail, selectedDate ? { date: selectedDate } : null);
 });
 
 const detailStatistics = computed(() => {

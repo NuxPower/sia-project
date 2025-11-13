@@ -18,16 +18,16 @@
     <div class="map-wrapper">
       <WeatherMap
         ref="weatherMapRef"
-        :is-loading="mapLoading"
         @map-click="handleMapClick"
         @map-ready="handleMapReady"
         @location-update="handleLocationUpdate"
       />
 
       <LoadingIndicator
-        v-if="isLoadingWeather && activeView === 'map'"
-        message="Fetching weather data..."
-        subtitle="Loading forecast for pinned location"
+        v-if="(mapLoading || isLoadingWeather) && activeView === 'map'"
+        :message="getLoadingMessage()"
+        :subtitle="getLoadingSubtitle()"
+        icon="🌤️"
       />
 
       <div v-if="activeView !== 'map' || selectedDayDetail" class="map-overlay"></div>
@@ -35,7 +35,7 @@
     
     <WeatherTimeline
       v-if="activeView === 'map' && !selectedDayDetail"
-      :forecast="forecast"
+      :forecast="forecastTimeline"
       :get-day-label="getDayLabel"
       :get-weather-icon="getWeatherIcon"
       @day-selected="handleTimelineSelection"
@@ -106,7 +106,7 @@ const weatherMapRef = ref(null);
 const DEFAULT_LOCATION = 'Northern Mindanao';
 const INITIAL_HISTORY_DAYS = 3;
 const INITIAL_FORECAST_DAYS = 4;
-const MAX_HISTORY_WINDOW = 30;
+const MAX_HISTORY_WINDOW = 90; // Increased from 30 to 90 days
 const MAX_FORECAST_WINDOW = 16;
 const searchLocation = ref(DEFAULT_LOCATION);
 const forecast = ref([]);
@@ -231,7 +231,7 @@ const systemStats = ref(null);
 const fetchUserInfo = async () => {
   try {
     await ensureApiToken(axios);
-    const response = await axios.get('/api/me');
+    const response = await axios.get('/api/auth/me');
     if (response.data?.user) {
       currentUser.value = response.data.user;
       
@@ -391,14 +391,30 @@ const buildBaseSource = ({ lat, lon, location }) => {
   };
 };
 
-const buildHistorySource = ({ lat, lon, location, initialHistoryLength = 0 }) => {
+const buildHistorySource = ({ lat, lon, location, farmId, initialHistoryLength = 0 }) => {
   const base = buildBaseSource({ lat, lon, location });
   if (!base) {
     return null;
   }
 
+  // If farmId not provided but we have coordinates, try to find matching farm
+  let resolvedFarmId = farmId;
+  if (!resolvedFarmId && base.lat !== null && base.lon !== null && rawFarms.value?.length) {
+    const matchingFarm = rawFarms.value.find(farm => {
+      const farmLat = parseFloat(farm.latitude);
+      const farmLon = parseFloat(farm.longitude);
+      if (Number.isNaN(farmLat) || Number.isNaN(farmLon)) return false;
+      // Match if within ~0.1 degrees (roughly 11km)
+      return Math.abs(farmLat - base.lat) < 0.1 && Math.abs(farmLon - base.lon) < 0.1;
+    });
+    if (matchingFarm) {
+      resolvedFarmId = matchingFarm.farm_id;
+    }
+  }
+
   return {
     ...base,
+    farmId: resolvedFarmId,
     initialHistoryLength
   };
 };
@@ -461,6 +477,43 @@ const refreshTimeline = (history, forecastData, reuseTimeline = fullForecastTime
   );
 };
 
+// Computed property for bottom panel timeline - use fullForecastTimeline but slice to 7 days for display
+// This ensures the bottom panel shows the same data as calendar and dashboard
+const forecastTimeline = computed(() => {
+  if (!Array.isArray(fullForecastTimeline.value) || fullForecastTimeline.value.length === 0) {
+    return [];
+  }
+  
+  // Find today's index
+  const todayIndex = fullForecastTimeline.value.findIndex(entry => entry?.isToday);
+  if (todayIndex === -1) {
+    // If today not found, return first 7 days
+    return fullForecastTimeline.value.slice(0, 7);
+  }
+  
+  // Return 7 days centered around today
+  // We want 3 days before, today, and 3 days after (total 7)
+  const halfWindow = 3; // Days before/after today
+  const totalDays = 7;
+  
+  // Calculate start position to center today
+  let start = todayIndex - halfWindow;
+  
+  // Adjust if we're too close to the beginning
+  if (start < 0) {
+    start = 0;
+  }
+  
+  // Adjust if we're too close to the end
+  const maxStart = fullForecastTimeline.value.length - totalDays;
+  if (maxStart > 0 && start > maxStart) {
+    start = maxStart;
+  }
+  
+  const end = Math.min(fullForecastTimeline.value.length, start + totalDays);
+  return fullForecastTimeline.value.slice(start, end);
+});
+
 const scheduleExtendedHistoryFetch = (source) => {
   if (!source) {
     currentHistoryContext.value = null;
@@ -499,6 +552,7 @@ const scheduleExtendedHistoryFetch = (source) => {
     lat: source.lat ?? undefined,
     lon: source.lon ?? undefined,
     location: source.location ?? undefined,
+    farmId: source.farmId ?? undefined,
     days: MAX_HISTORY_WINDOW
   })
     .then((extendedHistory) => {
@@ -643,10 +697,26 @@ const handleMapClick = async ({ lat, lng }) => {
       searchLocation.value = `${current.name}, ${current.sys.country}`;
     }
 
+    // Try to find matching farm by coordinates
+    let clickedFarmId = null;
+    if (rawFarms.value?.length) {
+      const matchingFarm = rawFarms.value.find(farm => {
+        const farmLat = parseFloat(farm.latitude);
+        const farmLon = parseFloat(farm.longitude);
+        if (Number.isNaN(farmLat) || Number.isNaN(farmLon)) return false;
+        // Match if within ~0.1 degrees (roughly 11km)
+        return Math.abs(farmLat - lat) < 0.1 && Math.abs(farmLon - lng) < 0.1;
+      });
+      if (matchingFarm) {
+        clickedFarmId = matchingFarm.farm_id;
+      }
+    }
+
     const historySource = buildHistorySource({
       lat,
       lon: lng,
       location: current?.name ?? searchLocation.value,
+      farmId: clickedFarmId,
       initialHistoryLength: Array.isArray(history) ? history.length : 0
     });
     scheduleExtendedHistoryFetch(historySource);
@@ -701,10 +771,22 @@ const searchWeather = async () => {
     currentWeather.value = current;
     refreshTimeline(history, forecastData, fullForecastTimeline.value);
 
+    // Find farm_id if we matched a farm
+    let matchedFarmId = null;
+    if (farmMatch && rawFarms.value?.length) {
+      const matchedFarm = rawFarms.value.find(f => 
+        f.farm_name?.toLowerCase() === trimmed.toLowerCase()
+      );
+      if (matchedFarm) {
+        matchedFarmId = matchedFarm.farm_id;
+      }
+    }
+
     const historySource = buildHistorySource({
       lat: farmMatch ? farmMatch.lat : current?.coord?.lat,
       lon: farmMatch ? farmMatch.lon : current?.coord?.lon,
       location: trimmed,
+      farmId: matchedFarmId,
       initialHistoryLength: Array.isArray(history) ? history.length : 0
     });
     scheduleExtendedHistoryFetch(historySource);
@@ -770,6 +852,7 @@ const initializeDefaultLocation = async () => {
           lat,
           lon,
           location: name,
+          farmId: firstFarm?.farm_id,
           initialHistoryLength: Array.isArray(history) ? history.length : 0
         });
         scheduleExtendedHistoryFetch(historySource);
@@ -1168,6 +1251,28 @@ const closeDayDetail = () => {
   selectedDay.value = null;
   selectedDayDetail.value = null;
   selectedDayHourly.value = [];
+};
+
+const getLoadingMessage = () => {
+  if (mapLoading.value && isLoadingWeather.value) {
+    return 'Loading map and weather data...';
+  } else if (mapLoading.value) {
+    return 'Loading Interactive Weather Map...';
+  } else if (isLoadingWeather.value) {
+    return 'Fetching weather data...';
+  }
+  return 'Loading...';
+};
+
+const getLoadingSubtitle = () => {
+  if (mapLoading.value && isLoadingWeather.value) {
+    return 'Initializing map layers and fetching forecast...';
+  } else if (mapLoading.value) {
+    return 'Enhanced weather layers loading...';
+  } else if (isLoadingWeather.value) {
+    return 'Loading forecast for pinned location';
+  }
+  return '';
 };
 </script>
 

@@ -376,6 +376,11 @@ const formatDate = (dateString) => {
   background: rgba(255, 255, 255, 0.08);
 }
 
+.form-control option {
+  color: black;
+  background: white;
+}
+
 .action-button {
   background: rgba(59, 130, 246, 0.2);
   border: 1px solid rgba(59, 130, 246, 0.4);

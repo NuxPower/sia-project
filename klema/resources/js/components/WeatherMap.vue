@@ -1,12 +1,6 @@
 <template>
   <div class="weather-map-container">
     <div ref="mapContainer" class="map"></div>
-    <LoadingIndicator
-      v-if="isLoading"
-      message="Loading Interactive Weather Map..."
-      subtitle="Enhanced weather layers loading..."
-      icon="🗺️"
-    />
   </div>
 </template>
 
@@ -14,14 +8,11 @@
 import { ref, onMounted, nextTick } from 'vue';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
-import LoadingIndicator from './LoadingIndicator.vue';
 import { initLeafletIcons } from '../utils/leafletConfig';
 import { createMapLayers } from '../utils/mapLayers';
 import { applyMapStyles } from '../utils/mapStyles';
 
-const props = defineProps({
-  isLoading: Boolean
-});
+// Props removed - loading state is now handled by parent component
 
 const emit = defineEmits(['map-click', 'map-ready', 'location-update']);
 

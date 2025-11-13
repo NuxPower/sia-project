@@ -15,7 +15,12 @@ class AlertApiController extends Controller
      */
     public function index(): JsonResponse
     {
-        $alerts = Alert::with('farm')
+        $user = auth()->user();
+        
+        $alerts = Alert::with(['farm', 'farm.user'])
+            ->whereHas('farm', function($query) use ($user) {
+                $query->where('user_id', $user->id);
+            })
             ->orderBy('issued_at', 'desc')
             ->get();
         
@@ -150,9 +155,14 @@ class AlertApiController extends Controller
      */
     public function active(): JsonResponse
     {
+        $user = auth()->user();
+        
         $alerts = Alert::query()
             ->where('resolved', false)
-            ->with('farm')
+            ->with(['farm', 'farm.user'])
+            ->whereHas('farm', function($query) use ($user) {
+                $query->where('user_id', $user->id);
+            })
             ->orderBy('issued_at', 'desc')
             ->get();
         
@@ -202,6 +212,9 @@ class AlertApiController extends Controller
         ]);
     }
 
+    /**
+     * Check if the authenticated user can manage the given farm.
+     */
     private function canManageFarm(Farm $farm): bool
     {
         $user = auth()->user();
@@ -210,6 +223,7 @@ class AlertApiController extends Controller
             return false;
         }
 
-        return true;
+        // Users can only manage their own farms
+        return $farm->user_id === $user->id;
     }
 }

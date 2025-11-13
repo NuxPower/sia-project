@@ -181,6 +181,7 @@
 <script setup>
 import { ref, computed, onMounted, watch } from 'vue';
 import axios from 'axios';
+import { ensureApiToken } from '../../services/auth';
 
 const props = defineProps({
   getWeatherIcon: {
@@ -393,11 +394,17 @@ const fetchActivities = async () => {
   isLoadingActivities.value = true;
   activityError.value = '';
   try {
+    // Ensure API token is available before making the request
+    await ensureApiToken();
+    
     const params = {
       month: currentDate.value.getMonth() + 1,
       year: currentDate.value.getFullYear()
     };
-    const { data } = await axios.get('/api/activities', { params });
+    
+    // Use window.axios to ensure we're using the configured instance with interceptors
+    const axiosInstance = window.axios || axios;
+    const { data } = await axiosInstance.get('/api/activities', { params });
     const fetched = Array.isArray(data?.activities) ? [...data.activities] : [];
     fetched.sort((a, b) => {
       const aTime = toDateOnly(a.start_date)?.getTime() ?? 0;
@@ -429,6 +436,69 @@ const openActivityModal = (dateKey = formatDateKey(currentDate.value)) => {
 
 const closeActivityModal = () => {
   showActivityModal.value = false;
+};
+
+const submitActivity = async () => {
+  if (isSubmittingActivity.value) {
+    return;
+  }
+
+  isSubmittingActivity.value = true;
+  formErrors.value = {};
+  formSubmitError.value = '';
+  activityFeedback.value = '';
+  activityFeedbackType.value = 'success';
+
+  try {
+    // Ensure API token is available before making the request
+    await ensureApiToken();
+
+    const payload = {
+      activity_type: form.value.activity_type.trim(),
+      field: form.value.field.trim(),
+      start_date: form.value.start_date,
+      notes: form.value.notes?.trim() || null,
+      status: form.value.status || 'pending'
+    };
+
+    // Use window.axios to ensure we're using the configured instance with interceptors
+    const axiosInstance = window.axios || axios;
+    const { data } = await axiosInstance.post('/api/activities', payload);
+
+    if (data?.success) {
+      activityFeedback.value = data.message || 'Activity saved successfully!';
+      activityFeedbackType.value = data.suitable !== false ? 'success' : 'warning';
+      
+      // Refresh activities list
+      await fetchActivities();
+      
+      // Close modal after a short delay
+      setTimeout(() => {
+        closeActivityModal();
+        activityFeedback.value = '';
+      }, 1500);
+    } else {
+      formSubmitError.value = data?.message || 'Failed to save activity';
+      activityFeedbackType.value = 'error';
+    }
+  } catch (error) {
+    console.error('Failed to save activity', error);
+    
+    if (error.response?.status === 422) {
+      // Validation errors
+      formErrors.value = error.response.data.errors || {};
+      formSubmitError.value = 'Please fix the errors below';
+    } else if (error.response?.status === 401) {
+      // Unauthorized - token might be missing or invalid
+      formSubmitError.value = 'Authentication required. Please refresh the page and try again.';
+    } else {
+      formSubmitError.value = error.response?.data?.message || 'Failed to save activity. Please try again.';
+    }
+    
+    activityFeedbackType.value = 'error';
+  } finally {
+    isSubmittingActivity.value = false;
+  }
 };
 
 const handleDayClick = (day) => {

@@ -123,30 +123,30 @@ const resolveIconFromCondition = (condition) => {
 
 export function useWeatherUtils() {
   const getDayLabel = (day) => {
+    // If day already has a label (like "Today" or "Tomorrow"), use it
+    // This is set by createWeatherTimeline based on location timezone
+    if (day.day && (day.day === 'Today' || day.day === 'Tomorrow')) {
+      return day.day;
+    }
+    
     if (!day.date) return day.day || 'Unknown';
     
-    const today = new Date();
-    const tomorrow = new Date(today);
-    tomorrow.setDate(tomorrow.getDate() + 1);
+    // If isToday flag is set, return "Today" (this is set by createWeatherTimeline)
+    if (day.isToday) {
+      return 'Today';
+    }
     
-    // Helper function to format date in local timezone (avoiding UTC conversion issues)
-    const formatLocalDate = (date) => {
-      const year = date.getFullYear();
-      const month = String(date.getMonth() + 1).padStart(2, '0');
-      const day = String(date.getDate()).padStart(2, '0');
-      return `${year}-${month}-${day}`;
-    };
+    // Parse the day's date string - it's in YYYY-MM-DD format
+    // Create a Date object from it in local timezone for weekday display
+    const dayDateStr = day.date;
+    const dayDate = new Date(dayDateStr + 'T00:00:00');
     
-    const dayDate = new Date(day.date);
-    const todayStr = formatLocalDate(today);
-    const tomorrowStr = formatLocalDate(tomorrow);
-    const dayStr = day.date;
-    
-    if (dayStr === todayStr) return 'Today';
-    if (dayStr === tomorrowStr) return 'Tomorrow';
-    
+    // For other days, return the weekday name
     const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-    return dayNames[dayDate.getDay()];
+    const weekday = dayNames[dayDate.getDay()];
+    
+    // Use weekday name if available, otherwise fall back to day.day or 'Unknown'
+    return weekday || day.day || 'Unknown';
   };
   
   const getWeatherIcon = (payload) => {

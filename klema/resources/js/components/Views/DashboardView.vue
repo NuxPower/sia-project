@@ -86,15 +86,6 @@
         </div>
         <div class="stat-card">
           <div class="stat-icon">
-            <i class="fas fa-users"></i>
-          </div>
-          <div class="stat-content">
-            <div class="stat-value">{{ systemStats.total_users }}</div>
-            <div class="stat-label">Total Users</div>
-          </div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-icon">
             <i class="fas fa-exclamation-triangle"></i>
           </div>
           <div class="stat-content">

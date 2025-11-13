@@ -7,6 +7,7 @@ use App\Http\Controllers\API\WeatherApiController;
 use App\Http\Controllers\API\AlertApiController;
 use App\Http\Controllers\API\AuthApiController;
 use App\Http\Controllers\API\ActivityApiController;
+use App\Http\Controllers\API\ExportApiController;
 
 Route::prefix('auth')->group(function () {
     Route::middleware('throttle:login')->post('/login', [AuthApiController::class, 'login']);
@@ -51,6 +52,12 @@ Route::middleware(['auth:sanctum', 'verified'])->group(function () {
 
     // Activity endpoints
     Route::apiResource('activities', ActivityApiController::class)->only(['index', 'store']);
+
+    // Export endpoints
+    Route::get('/exports', [ExportApiController::class, 'index']);
+    Route::post('/exports/weather', [ExportApiController::class, 'exportWeatherData']);
+    Route::post('/exports/farms', [ExportApiController::class, 'exportFarmData']);
+    Route::post('/exports/activities', [ExportApiController::class, 'exportActivityData']);
 
     // Admin endpoints (now accessible to all farmers)
     Route::prefix('admin')->group(function () {

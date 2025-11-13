@@ -16,17 +16,17 @@ class FarmApiController extends Controller
      */
     public function index(): JsonResponse
     {
-        $farmsQuery = Farm::query()
+        $user = auth()->user();
+        
+        $farms = Farm::query()
+            ->where('user_id', $user->id)
             ->with([
-                'weatherData' => function ($query) {
-                    $query->latest('recorded_at')->limit(1);
-                },
                 'alerts' => function ($query) {
                     $query->where('resolved', false);
                 },
-            ]);
-
-        $farms = $farmsQuery->get();
+                'user',
+            ])
+            ->get();
         
         return response()->json([
             'success' => true,
@@ -77,14 +77,22 @@ class FarmApiController extends Controller
      */
     public function show(Farm $farm): JsonResponse
     {
+        $user = auth()->user();
+        
+        // Check authorization: users can only view their own farms
+        if ($farm->user_id !== $user->id) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Unauthorized. You can only view your own farms.'
+            ], 403);
+        }
+        
         $farm->load([
-            'weatherData' => function($query) {
-                $query->latest('recorded_at')->limit(10);
-            },
             'farmPoints',
             'alerts' => function($query) {
                 $query->latest('issued_at');
-            }
+            },
+            'user' // Include user relationship for owner information
         ]);
 
         return response()->json([
@@ -98,6 +106,16 @@ class FarmApiController extends Controller
      */
     public function update(Request $request, Farm $farm): JsonResponse
     {
+        $user = auth()->user();
+        
+        // Check authorization: users can only update their own farms
+        if ($farm->user_id !== $user->id) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Unauthorized. You can only update your own farms.'
+            ], 403);
+        }
+        
         $validated = $request->validate([
             'farm_name' => 'sometimes|string|max:100',
             'latitude' => 'sometimes|numeric|between:-90,90',
@@ -125,7 +143,7 @@ class FarmApiController extends Controller
 
         return response()->json([
             'success' => true,
-            'farm' => $farm,
+            'farm' => $farm->load('user'), // Include user relationship
             'message' => 'Farm updated successfully!'
         ]);
     }
@@ -135,6 +153,16 @@ class FarmApiController extends Controller
      */
     public function destroy(Farm $farm): JsonResponse
     {
+        $user = auth()->user();
+        
+        // Check authorization: users can only delete their own farms
+        if ($farm->user_id !== $user->id) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Unauthorized. You can only delete your own farms.'
+            ], 403);
+        }
+        
         $farm->delete();
 
         return response()->json([
@@ -148,6 +176,16 @@ class FarmApiController extends Controller
      */
     public function addPoint(Request $request, Farm $farm): JsonResponse
     {
+        $user = auth()->user();
+        
+        // Check authorization: users can only add points to their own farms
+        if ($farm->user_id !== $user->id) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Unauthorized. You can only add points to your own farms.'
+            ], 403);
+        }
+        
         $validated = $request->validate([
             'label' => 'required|string|max:100',
             'latitude' => 'required|numeric|between:-90,90',
@@ -171,24 +209,48 @@ class FarmApiController extends Controller
 
     /**
      * Get weather data for a specific farm.
+     * Now fetches from API instead of database.
      */
     public function getWeatherData(Farm $farm): JsonResponse
     {
-        $weatherData = $farm->weatherData()
-            ->orderBy('recorded_at', 'desc')
-            ->limit(24) // Last 24 hours
-            ->get();
+        $user = auth()->user();
+        
+        // Check authorization: users can only view weather for their own farms
+        if ($farm->user_id !== $user->id) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Unauthorized. You can only view weather data for your own farms.'
+            ], 403);
+        }
+        
+        // Fetch current weather from API
+        try {
+            $weatherService = app(\App\Services\WeatherService::class);
+            $currentWeather = $weatherService->getCurrentWeatherByCoordinates(
+                (float) $farm->latitude,
+                (float) $farm->longitude
+            );
 
-        return response()->json([
-            'success' => true,
-            'weather_data' => $weatherData
-        ]);
+            return response()->json([
+                'success' => true,
+                'weather_data' => $currentWeather
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to fetch weather data: ' . $e->getMessage()
+            ], 500);
+        }
     }
 
     public function mapData(): JsonResponse
     {
-        $farmsQuery = Farm::with('farmPoints');
-        $farms = $farmsQuery->get();
+        $user = auth()->user();
+        
+        // Get farms for the logged-in user only
+        $farms = Farm::with(['farmPoints', 'user'])
+            ->where('user_id', $user->id)
+            ->get();
 
         $farmFeatures = [];
         $pointFeatures = [];
