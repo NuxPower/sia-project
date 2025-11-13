@@ -24,7 +24,10 @@
         </div>
         <div class="summary-card">
           <span class="label">High / Low</span>
-          <span class="value">{{ detail?.temp_max ?? '—' }}° / {{ detail?.temp_min ?? '—' }}°</span>
+          <span class="value">
+            {{ detail?.temp_max !== null && detail?.temp_max !== undefined ? formatTemperature(detail.temp_max, { decimals: 0 }).replace('°C', '°').replace('°F', '°') : '—' }} / 
+            {{ detail?.temp_min !== null && detail?.temp_min !== undefined ? formatTemperature(detail.temp_min, { decimals: 0 }).replace('°C', '°').replace('°F', '°') : '—' }}
+          </span>
         </div>
         <div class="summary-card">
           <span class="label">Humidity</span>
@@ -116,6 +119,7 @@
 <script setup>
 import { computed } from 'vue';
 import { useWeatherUtils } from '../../composables/useWeatherUtils';
+import { useDisplaySettings } from '../../composables/useDisplaySettings';
 
 const props = defineProps({
   day: {
@@ -139,6 +143,7 @@ const props = defineProps({
 defineEmits(['close']);
 
 const { getDayLabel, getWeatherIcon } = useWeatherUtils();
+const { formatTemperature, formatWindSpeed, formatTime, settings: displaySettings } = useDisplaySettings();
 
 const isFiniteNumber = (value) => typeof value === 'number' && Number.isFinite(value);
 
@@ -162,10 +167,16 @@ const formatLocalTime = (timestamp, offset, options = {}) => {
   const localTimestamp = timestamp + offset;
   const localDate = new Date(localTimestamp * 1000);
   
+  // Get time format from settings
+  const timeFormat = displaySettings.value?.timeFormat || '24h';
+  const hour12 = timeFormat === '12h';
+  
   // Format the date as if it were UTC (because we've already adjusted for offset)
   const formatOptions = {
-    hour: 'numeric',
-    hour12: true,
+    hour: options.hour || (hour12 ? 'numeric' : '2-digit'),
+    minute: options.minute || '2-digit',
+    second: options.second,
+    hour12: hour12,
     timeZone: 'UTC',
     ...options
   };
@@ -226,11 +237,14 @@ const degreeToCompass = (degree) => {
   return directions[index];
 };
 
-const formatWindSpeed = (speed, direction) => {
+const formatWindSpeedWithDirection = (speed, direction) => {
   if (!isFiniteNumber(speed)) return '—';
-  const speedKmh = Math.round(speed * 3.6);
+  const formattedSpeed = formatWindSpeed(speed, { decimals: 0 });
   const cardinal = degreeToCompass(direction);
-  return `${speedKmh} km/h${cardinal ? ` ${cardinal}` : ''}`;
+  // Remove the unit from formatWindSpeed and add direction
+  const speedValue = formattedSpeed.replace(/ (m\/s|km\/h|mph)/, '');
+  const unit = formattedSpeed.match(/(m\/s|km\/h|mph)/)?.[0] || '';
+  return `${speedValue} ${unit}${cardinal ? ` ${cardinal}` : ''}`;
 };
 
 const resolveTimezoneOffset = (entry) => {
@@ -434,7 +448,7 @@ const parseHourlyData = (entry, selectedDate = null) => {
       const windSpeed = pickNumber(point.wind_speed, point.wind?.speed);
       const windGust = pickNumber(point.wind_gust, point.wind?.gust);
       const windDeg = pickNumber(point.wind_deg, point.wind?.deg);
-      const windDisplay = formatWindSpeed(windSpeed, windDeg);
+      const windDisplay = formatWindSpeedWithDirection(windSpeed, windDeg);
 
       const precipitationAmount = resolvePrecipitationAmount(point);
       const precipitationMm = precipitationAmount !== null ? Number(precipitationAmount) : null;
@@ -461,8 +475,8 @@ const parseHourlyData = (entry, selectedDate = null) => {
         precipitationMm,
         precipitationProbability,
         precipIntensity,
-        temperature: isFiniteNumber(temperature) ? Math.round(temperature) : null,
-        feelsLike: isFiniteNumber(feelsLike) ? Math.round(feelsLike) : null,
+        temperature: isFiniteNumber(temperature) ? formatTemperature(temperature, { decimals: 0 }).replace('°C', '°').replace('°F', '°') : null,
+        feelsLike: isFiniteNumber(feelsLike) ? formatTemperature(feelsLike, { decimals: 0 }).replace('°C', '°').replace('°F', '°') : null,
         clouds: isFiniteNumber(clouds) ? Math.round(clouds) : null,
         humidity: isFiniteNumber(humidity) ? Math.round(humidity) : null,
         pressure: isFiniteNumber(pressure) ? Math.round(pressure) : null,
@@ -599,8 +613,10 @@ const windSummary = computed(() => {
     degreeToCompass(pickNumber(props.detail?.wind_deg, props.detail?.wind?.deg)) ??
     detailStatistics.value.dominantWind;
 
-  const speedKmh = Math.round(windSpeed * 3.6);
-  return `${speedKmh} km/h${windDirection ? ` ${windDirection}` : ''}`;
+  const formattedSpeed = formatWindSpeed(windSpeed, { decimals: 0 });
+  const speedValue = formattedSpeed.replace(/ (m\/s|km\/h|mph)/, '');
+  const unit = formattedSpeed.match(/(m\/s|km\/h|mph)/)?.[0] || '';
+  return `${speedValue} ${unit}${windDirection ? ` ${windDirection}` : ''}`;
 });
 
 const precipitationTotal = computed(() => {
@@ -855,25 +871,28 @@ const precipitationTooltip = (hour) => {
 
 .precip-chart {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(40px, 1fr));
+  grid-template-columns: repeat(24, 1fr);
   align-items: end;
-  gap: 12px;
-  padding: 12px 8px 0;
+  gap: 4px;
+  padding: 12px 4px 0;
   min-height: 160px;
+  overflow-x: auto;
 }
 
 .precip-hour {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
+  min-width: 0;
 }
 
 .bar-wrapper {
-  width: 16px;
+  width: 100%;
+  max-width: 20px;
   height: 120px;
   background: rgba(59, 130, 246, 0.1);
-  border-radius: 10px;
+  border-radius: 8px;
   display: flex;
   align-items: flex-end;
   overflow: hidden;
@@ -883,13 +902,18 @@ const precipitationTooltip = (hour) => {
 .precip-bar {
   width: 100%;
   background: linear-gradient(180deg, rgba(59, 130, 246, 0.9), rgba(96, 165, 250, 0.4));
-  border-radius: 10px;
+  border-radius: 8px;
   transition: height 0.3s ease;
 }
 
 .precip-label {
-  font-size: 11px;
+  font-size: 9px;
   color: #d1d5db;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  width: 100%;
+  text-align: center;
 }
 
 .temperature-table {

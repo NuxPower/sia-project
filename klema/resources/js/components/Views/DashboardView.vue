@@ -13,7 +13,7 @@
       
       <div class="current-weather" v-if="currentWeather">
         <div class="temperature-display">
-          <span class="temp-value">{{ Math.round(currentWeather.main.temp) }}°C</span>
+          <span class="temp-value">{{ formatTemperature(currentWeather.main.temp) }}</span>
           <div class="weather-description">
             <i :class="getWeatherIcon({ condition: currentWeather.weather?.[0]?.main, icon: currentWeather.weather?.[0]?.icon })"></i>
             <span>{{ currentWeather.weather[0].description }}</span>
@@ -28,7 +28,7 @@
           </div>
           <div class="detail-item">
             <i class="fas fa-wind"></i>
-            <span>{{ currentWeather.wind.speed }} m/s</span>
+            <span>{{ formatWindSpeed(currentWeather.wind.speed) }}</span>
             <small>Wind Speed</small>
           </div>
           <div class="detail-item">
@@ -60,8 +60,8 @@
             <i :class="getWeatherIcon(day)"></i>
           </div>
           <div class="forecast-temp">
-            <span class="temp-max">{{ day.temp_max }}°</span>
-            <span class="temp-min">{{ day.temp_min }}°</span>
+            <span class="temp-max">{{ formatTemperature(day.temp_max, { decimals: 0 }).replace('°C', '°').replace('°F', '°') }}</span>
+            <span class="temp-min">{{ formatTemperature(day.temp_min, { decimals: 0 }).replace('°C', '°').replace('°F', '°') }}</span>
           </div>
           <div class="forecast-condition">{{ day.condition }}</div>
         </div>
@@ -116,7 +116,7 @@
             <i class="fas fa-thermometer-half"></i>
           </div>
           <div class="stat-content">
-            <div class="stat-value">{{ Math.round(systemStats.avg_temperature || 0) }}°C</div>
+            <div class="stat-value">{{ formatTemperature(systemStats.avg_temperature || 0) }}</div>
             <div class="stat-label">Avg Temperature</div>
           </div>
         </div>
@@ -174,6 +174,7 @@ import CLOUDS from 'vanta/dist/vanta.clouds.min.js';
 import FOG from 'vanta/dist/vanta.fog.min.js';
 import WAVES from 'vanta/dist/vanta.waves.min.js';
 import FarmManagementPanel from '../FarmManagementPanel.vue';
+import { useDisplaySettings } from '../../composables/useDisplaySettings';
 
 const props = defineProps({
   currentWeather: Object,
@@ -209,6 +210,8 @@ const props = defineProps({
     default: null
   }
 });
+
+const { formatTemperature, formatWindSpeed } = useDisplaySettings();
 
 const emit = defineEmits([
   'refresh-farms',

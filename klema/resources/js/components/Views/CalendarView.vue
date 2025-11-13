@@ -53,7 +53,7 @@
           <div class="day-number">{{ day.date }}</div>
           <div v-if="day.hasWeather" class="day-weather">
             <i :class="getWeatherIcon({ condition: day.weather.condition, icon: day.weather.icon })"></i>
-            <span class="day-temp">{{ day.weather.temp !== null && day.weather.temp !== undefined ? `${day.weather.temp}°` : '—' }}</span>
+            <span class="day-temp">{{ day.weather.temp !== null && day.weather.temp !== undefined ? formatTemperature(day.weather.temp, { decimals: 0 }).replace('°C', '°').replace('°F', '°') : '—' }}</span>
           </div>
           <div v-else-if="day.weather?.noData" class="day-no-data">
             <span>No data available</span>
@@ -182,6 +182,7 @@
 import { ref, computed, onMounted, watch } from 'vue';
 import axios from 'axios';
 import { ensureApiToken } from '../../services/auth';
+import { useDisplaySettings } from '../../composables/useDisplaySettings';
 
 const props = defineProps({
   getWeatherIcon: {
@@ -215,6 +216,7 @@ const formSubmitError = ref('');
 const forecastDays = computed(() => Array.isArray(props.timeline) ? props.timeline : []);
 
 const { getWeatherIcon } = props;
+const { formatTemperature } = useDisplaySettings();
 
 function toDateOnly(value) {
   if (!value) return null;
@@ -347,7 +349,7 @@ const calendarDays = computed(() => {
           ?? forecastEntry.main?.temp
           ?? forecastEntry.temperature
           ?? null;
-        const temperature = rawTemp !== null && rawTemp !== undefined ? Math.round(rawTemp) : null;
+        const temperature = rawTemp !== null && rawTemp !== undefined ? rawTemp : null;
 
         weatherSummary = {
           condition: forecastEntry.condition,

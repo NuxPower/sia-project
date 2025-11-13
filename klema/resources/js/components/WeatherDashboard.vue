@@ -149,7 +149,15 @@ import {
 } from '../composables/useNotificationSettings';
 
 const weatherMapRef = ref(null);
-const DEFAULT_LOCATION = 'Northern Mindanao';
+const DEFAULT_LOCATION = (typeof window !== 'undefined' && 'geolocation' in navigator)
+  ? new Promise((resolve) => {
+      navigator.geolocation.getCurrentPosition(
+        pos => resolve(`${pos.coords.latitude},${pos.coords.longitude}`),
+        () => resolve(''),
+        { enableHighAccuracy: true, maximumAge: 30000, timeout: 15000 }
+      );
+    })
+  : Promise.resolve('');
 const INITIAL_HISTORY_DAYS = 3;
 const INITIAL_FORECAST_DAYS = 4;
 const MAX_HISTORY_WINDOW = 90; // Increased from 30 to 90 days

@@ -11,6 +11,7 @@ import 'leaflet/dist/leaflet.css';
 import { initLeafletIcons } from '../utils/leafletConfig';
 import { createMapLayers } from '../utils/mapLayers';
 import { applyMapStyles } from '../utils/mapStyles';
+import { useDisplaySettings } from '../composables/useDisplaySettings';
 
 // Props removed - loading state is now handled by parent component
 
@@ -28,6 +29,8 @@ const boundaryDrawing = ref(null);
 const pointPlacement = ref(null);
 const activeBaseLayer = ref(null);
 const requestedBaseLayer = ref('street');
+
+const { formatTemperature, formatWindSpeed } = useDisplaySettings();
 
 const baseLayerMap = {
   street: '🗺️ Street Map',
@@ -180,18 +183,21 @@ const updateMarker = (lat, lon, weatherData) => {
 };
 
 const createPopupContent = (lat, lon, weatherData) => {
+  const temp = formatTemperature(weatherData.main.temp, { decimals: 0 });
+  const wind = formatWindSpeed(weatherData.wind.speed, { decimals: 1 });
+  
   return `
     <div style="text-align: center; min-width: 200px; font-family: Arial, sans-serif;">
       <h3 style="margin: 0 0 10px 0; color: #333;">${weatherData.name}</h3>
       <div style="font-size: 28px; font-weight: bold; margin: 10px 0; color: #2563eb;">
-        ${Math.round(weatherData.main.temp)}°C
+        ${temp}
       </div>
       <div style="text-transform: capitalize; margin-bottom: 10px; color: #666; font-size: 16px;">
         ${weatherData.weather[0].description}
       </div>
       <div style="font-size: 12px; color: #888; line-height: 1.5;">
         <div>💧 Humidity: ${weatherData.main.humidity}%</div>
-        <div>💨 Wind: ${weatherData.wind.speed} m/s</div>
+        <div>💨 Wind: ${wind}</div>
         <div>📊 Pressure: ${weatherData.main.pressure} mb</div>
       </div>
     </div>

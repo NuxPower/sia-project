@@ -17,8 +17,8 @@
     </div>
     
     <div class="temperature">
-      <span class="temp-high">H: {{ day.temp_max }}°</span>
-      <span class="temp-low">L: {{ day.temp_min }}°</span>
+      <span class="temp-high">H: {{ formatTemperature(day.temp_max, { decimals: 0 }).replace('°C', '°').replace('°F', '°') }}</span>
+      <span class="temp-low">L: {{ formatTemperature(day.temp_min, { decimals: 0 }).replace('°C', '°').replace('°F', '°') }}</span>
     </div>
     
     <div v-if="!isCompact" class="condition">{{ day.condition || '' }}</div>
@@ -27,6 +27,7 @@
 
 <script setup>
 import { computed } from 'vue';
+import { useDisplaySettings } from '../composables/useDisplaySettings';
 
 const props = defineProps({
   day: Object,
@@ -37,6 +38,8 @@ const props = defineProps({
     default: false
   }
 });
+
+const { formatTemperature } = useDisplaySettings();
 
 const cardClass = computed(() => ({
   'history': props.day.isHistory,

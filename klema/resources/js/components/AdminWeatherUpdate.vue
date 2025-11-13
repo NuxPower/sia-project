@@ -96,7 +96,7 @@
       <div v-if="lastUpdate.weather" class="weather-preview">
         <div class="weather-item">
           <span class="label">Temperature:</span>
-          <span class="value">{{ Math.round(lastUpdate.weather.main?.temp || 0) }}°C</span>
+          <span class="value">{{ formatTemperature(lastUpdate.weather.main?.temp || 0, { decimals: 0 }) }}</span>
         </div>
         <div class="weather-item">
           <span class="label">Condition:</span>
@@ -117,6 +117,7 @@ import axios from 'axios';
 import { ensureApiToken } from '../services/auth';
 import { useGlobalAlerts } from '../composables/useGlobalAlerts';
 import { useFarms } from '../composables/useFarms';
+import { useDisplaySettings } from '../composables/useDisplaySettings';
 
 const props = defineProps({
   farms: {
@@ -127,6 +128,7 @@ const props = defineProps({
 
 const { showSuccess, showError } = useGlobalAlerts();
 const { farms: allFarms, fetchFarms } = useFarms();
+const { formatTemperature } = useDisplaySettings();
 
 const updateMethod = ref('location');
 const loading = ref(false);

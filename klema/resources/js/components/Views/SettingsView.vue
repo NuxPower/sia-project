@@ -241,13 +241,23 @@ const saveSettings = async () => {
 
     if (typeof window !== 'undefined') {
       window.localStorage?.setItem(STORAGE_KEY, JSON.stringify(settings));
+      
+      // Trigger storage event so other components can update
+      window.dispatchEvent(new Event('storage'));
+      
+      // Also trigger a custom event for immediate updates in the same window
+      window.dispatchEvent(new CustomEvent('appSettingsUpdated', { detail: settings }));
     }
 
-    showSuccess('Settings Saved', 'Your preferences have been updated.');
+    showSuccess('Settings Saved', 'Your preferences have been updated. Reloading...');
+    
+    // Reload the page after a short delay to ensure settings are applied
+    setTimeout(() => {
+      window.location.reload();
+    }, 1000);
   } catch (error) {
     console.error('Save settings error:', error);
     showError('Save Failed', 'Unable to save your settings. Please try again.');
-  } finally {
     isSaving.value = false;
   }
 };
