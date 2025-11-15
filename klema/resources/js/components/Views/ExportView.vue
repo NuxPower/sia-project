@@ -27,11 +27,11 @@
           </div>
           <div class="form-group">
             <label>Start Date</label>
-            <input type="date" v-model="weatherForm.start_date" required class="form-control">
+            <input type="date" v-model="weatherForm.start_date" :max="todayIsoString" required class="form-control">
           </div>
           <div class="form-group">
             <label>End Date</label>
-            <input type="date" v-model="weatherForm.end_date" required class="form-control">
+            <input type="date" v-model="weatherForm.end_date" :max="todayIsoString" required class="form-control">
           </div>
           <div class="form-group">
             <label>Format</label>
@@ -126,10 +126,20 @@
               <span v-if="exportItem.file_size">{{ exportItem.file_size }}</span>
             </div>
           </div>
-          <a :href="exportItem.download_url" class="action-button small">
-            <i class="fas fa-download"></i>
-            Download
-          </a>
+          <button
+            type="button"
+            class="action-button small"
+            :disabled="downloadingExportId === exportItem.export_id"
+            @click="downloadExportFile(exportItem)"
+          >
+            <i
+              class="fas"
+              :class="downloadingExportId === exportItem.export_id ? 'fa-spinner fa-spin' : 'fa-download'"
+            ></i>
+            <span>
+              {{ downloadingExportId === exportItem.export_id ? 'Downloading...' : 'Download' }}
+            </span>
+          </button>
         </div>
       </div>
     </div>
@@ -137,7 +147,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted } from 'vue';
+import { ref, reactive, onMounted, watch } from 'vue';
 import axios from 'axios';
 import { ensureApiToken } from '../../services/auth';
 import { useGlobalAlerts } from '../../composables/useGlobalAlerts';
@@ -145,6 +155,8 @@ import { useFarms } from '../../composables/useFarms';
 
 const { showSuccess, showError } = useGlobalAlerts();
 const { farms, fetchFarms } = useFarms();
+
+const todayIsoString = new Date().toISOString().split('T')[0];
 
 const weatherForm = reactive({
   farm_id: '',
@@ -167,6 +179,46 @@ const weatherLoading = ref(false);
 const farmLoading = ref(false);
 const activityLoading = ref(false);
 const exports = ref([]);
+const downloadingExportId = ref(null);
+
+const clampToToday = (value) => {
+  if (!value) return value;
+  return value > todayIsoString ? todayIsoString : value;
+};
+
+const syncWeatherRangeOrder = (changedField) => {
+  if (!weatherForm.start_date || !weatherForm.end_date) {
+    return;
+  }
+
+  if (weatherForm.start_date > weatherForm.end_date) {
+    if (changedField === 'start') {
+      weatherForm.end_date = weatherForm.start_date;
+    } else {
+      weatherForm.start_date = weatherForm.end_date;
+    }
+  }
+};
+
+watch(() => weatherForm.start_date, (newValue) => {
+  if (newValue === undefined) return;
+  const clamped = clampToToday(newValue);
+  if (clamped !== newValue) {
+    weatherForm.start_date = clamped;
+    return;
+  }
+  syncWeatherRangeOrder('start');
+});
+
+watch(() => weatherForm.end_date, (newValue) => {
+  if (newValue === undefined) return;
+  const clamped = clampToToday(newValue);
+  if (clamped !== newValue) {
+    weatherForm.end_date = clamped;
+    return;
+  }
+  syncWeatherRangeOrder('end');
+});
 
 onMounted(async () => {
   await ensureApiToken(axios);
@@ -193,6 +245,56 @@ const fetchExports = async () => {
   } catch (error) {
     console.error('Failed to fetch exports:', error);
     exports.value = [];
+  }
+};
+
+const extractFilename = (contentDisposition) => {
+  if (!contentDisposition) return null;
+  const match = /filename\*?=(?:UTF-8''|)([^;]+)/i.exec(contentDisposition);
+  if (match && match[1]) {
+    return decodeURIComponent(match[1].replace(/['"]/g, '').trim());
+  }
+  return null;
+};
+
+const downloadExportFile = async (exportItem) => {
+  if (!exportItem?.download_url) {
+    showError('Download Failed', 'Download link is unavailable.');
+    return;
+  }
+
+  downloadingExportId.value = exportItem.export_id;
+  try {
+    await ensureApiToken(axios);
+    const response = await axios.get(exportItem.download_url, {
+      responseType: 'blob',
+      headers: {
+        Accept: 'application/octet-stream',
+      },
+    });
+
+    const filename =
+      extractFilename(response.headers['content-disposition']) ||
+      exportItem.file_name ||
+      'export.dat';
+
+    const blob = new Blob([response.data], {
+      type: response.headers['content-type'] || 'application/octet-stream',
+    });
+
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    window.URL.revokeObjectURL(url);
+  } catch (error) {
+    console.error('Failed to download export:', error);
+    showError('Download Failed', error.response?.data?.message || 'Unable to download export file.');
+  } finally {
+    downloadingExportId.value = null;
   }
 };
 

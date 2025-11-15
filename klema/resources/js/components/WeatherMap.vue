@@ -6,8 +6,6 @@
 
 <script setup>
 import { ref, onMounted, nextTick } from 'vue';
-import L from 'leaflet';
-import 'leaflet/dist/leaflet.css';
 import { initLeafletIcons } from '../utils/leafletConfig';
 import { createMapLayers } from '../utils/mapLayers';
 import { applyMapStyles } from '../utils/mapStyles';
@@ -31,6 +29,28 @@ const activeBaseLayer = ref(null);
 const requestedBaseLayer = ref('street');
 
 const { formatTemperature, formatWindSpeed } = useDisplaySettings();
+
+let L = null;
+let leafletLoader = null;
+
+const ensureLeaflet = async () => {
+  if (L) {
+    return L;
+  }
+
+  if (!leafletLoader) {
+    leafletLoader = Promise.all([
+      import('leaflet'),
+      import('leaflet/dist/leaflet.css')
+    ]).then(([leafletModule]) => {
+      L = leafletModule.default ?? leafletModule;
+      initLeafletIcons(L);
+      return L;
+    });
+  }
+
+  return leafletLoader;
+};
 
 const baseLayerMap = {
   street: '🗺️ Street Map',
@@ -91,6 +111,7 @@ const setBaseLayer = (layerId) => {
 };
 
 const initMap = async () => {
+  await ensureLeaflet();
   await nextTick();
   
   if (!mapContainer.value) return;
@@ -112,7 +133,7 @@ const initMap = async () => {
     handleMapClick(e.latlng);
   });
   
-  const { baseLayers, overlayLayers } = createMapLayers();
+  const { baseLayers, overlayLayers } = createMapLayers(L);
   
   baseMapLayers.value = baseLayers;
   // Store overlay layers for programmatic control
@@ -453,7 +474,7 @@ const getFarmColor = (farmId) => {
 };
 
 onMounted(async () => {
-  initLeafletIcons();
+  await ensureLeaflet();
   await new Promise(resolve => setTimeout(resolve, 500));
   await initMap();
 });

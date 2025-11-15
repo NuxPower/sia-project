@@ -1,5 +1,3 @@
-import L from 'leaflet';
-
 const OPENWEATHER_API_KEY = import.meta.env.VITE_OPENWEATHER_API_KEY;
 
 if (!OPENWEATHER_API_KEY) {
@@ -12,7 +10,11 @@ const getNasaTrueColorDate = (daysAgo = 2) => {
   return date.toISOString().split('T')[0];
 };
 
-export function createMapLayers() {
+export function createMapLayers(L) {
+  if (!L) {
+    throw new Error('Leaflet instance is required before creating map layers.');
+  }
+
   const nasaTrueColorDate = getNasaTrueColorDate(2);
 
   const baseLayers = {

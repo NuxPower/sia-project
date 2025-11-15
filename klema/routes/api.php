@@ -65,6 +65,7 @@ Route::middleware(['auth:sanctum', 'verified'])
     Route::post('/exports/weather', [ExportApiController::class, 'exportWeatherData']);
     Route::post('/exports/farms', [ExportApiController::class, 'exportFarmData']);
     Route::post('/exports/activities', [ExportApiController::class, 'exportActivityData']);
+    Route::get('/exports/{export:export_id}/download', [ExportApiController::class, 'download'])->name('exports.download');
 
     // Admin endpoints (now accessible to all farmers)
     Route::prefix('admin')->group(function () {

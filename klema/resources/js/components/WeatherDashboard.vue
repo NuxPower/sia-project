@@ -159,22 +159,14 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onBeforeUnmount, watch, computed, nextTick } from 'vue';
+import { ref, onMounted, onBeforeUnmount, watch, computed, nextTick, defineAsyncComponent } from 'vue';
 import axios from 'axios';
 import SearchBar from './SearchBar.vue';
 import ClickInstruction from './ClickInstruction.vue';
 import WeatherLayerControls from './WeatherLayerControls.vue';
-import WeatherMap from './WeatherMap.vue';
 import LoadingIndicator from './LoadingIndicator.vue';
 import WeatherTimeline from './WeatherTimeline.vue';
 import TimelineLegend from './TimelineLegend.vue';
-import DashboardView from './Views/DashboardView.vue';
-import CalendarView from './Views/CalendarView.vue';
-import CalendarActivityCreateView from './Views/CalendarActivityCreateView.vue';
-import AlertsView from './Views/AlertsView.vue';
-import SettingsView from './Views/SettingsView.vue';
-import ExportView from './Views/ExportView.vue';
-import DayDetailView from './Views/DayDetailView.vue';
 import GlobalAlertNotification from './GlobalAlertNotification.vue';
 import AuthContainer from './Auth/AuthContainer.vue';
 import { useWeatherAPI } from '../composables/useWeatherAPI';
@@ -188,6 +180,15 @@ import {
   DEFAULT_NOTIFICATION_SETTINGS,
   SUPPORTED_NOTIFICATION_SETTING_KEYS
 } from '../composables/useNotificationSettings';
+
+const WeatherMap = defineAsyncComponent(() => import('./WeatherMap.vue'));
+const DashboardView = defineAsyncComponent(() => import('./Views/DashboardView.vue'));
+const CalendarView = defineAsyncComponent(() => import('./Views/CalendarView.vue'));
+const CalendarActivityCreateView = defineAsyncComponent(() => import('./Views/CalendarActivityCreateView.vue'));
+const AlertsView = defineAsyncComponent(() => import('./Views/AlertsView.vue'));
+const SettingsView = defineAsyncComponent(() => import('./Views/SettingsView.vue'));
+const ExportView = defineAsyncComponent(() => import('./Views/ExportView.vue'));
+const DayDetailView = defineAsyncComponent(() => import('./Views/DayDetailView.vue'));
 
 const MOBILE_BREAKPOINT = 900;
 const weatherMapRef = ref(null);
@@ -261,6 +262,7 @@ let suppressNextLocationUpdate = false;
 const latestHistoryData = ref([]);
 const latestForecastData = ref([]);
 const farmPrefillComplete = ref(false);
+let initialLocationInitPromise = null;
 const selectedDay = ref(null);
 const selectedDayDetail = ref(null);
 const selectedDayHourly = ref([]);
@@ -1130,17 +1132,26 @@ const handleMapClick = async ({ lat, lng }) => {
   }
 };
 
-const searchWeather = async () => {
-  // Ensure searchLocation is a string
-  const location = typeof searchLocation.value === 'string' 
-    ? searchLocation.value 
-    : String(searchLocation.value || DEFAULT_LOCATION_STRING);
-  
-  if (!location.trim()) return;
+const searchWeather = async (locationOverride = null) => {
+  const rawInput = locationOverride ?? searchLocation.value ?? DEFAULT_LOCATION_STRING;
+  const normalizedInput = typeof rawInput === 'string'
+    ? rawInput
+    : String(rawInput || DEFAULT_LOCATION_STRING);
+  const trimmed = normalizedInput.trim();
+
+  if (!trimmed) {
+    return false;
+  }
+
+  if (searchLocation.value !== trimmed) {
+    searchLocation.value = trimmed;
+  } else {
+    // Ensure we store the trimmed variant for future lookups
+    searchLocation.value = trimmed;
+  }
   
   isLoadingWeather.value = true;
   try {
-    const trimmed = location.trim();
     const farmMatch = farmCoordinateMap.value[trimmed.toLowerCase()];
 
     let current, history, forecastData;
@@ -1202,9 +1213,11 @@ const searchWeather = async () => {
       snapshotNotificationPreferences()
     );
     await fetchForecastWarnings({ forecast: forecastData });
+    return true;
   } catch (error) {
     console.error('Error searching weather:', error);
     alert('Failed to fetch weather data. Please try again.');
+    return false;
   } finally {
     isLoadingWeather.value = false;
   }
@@ -1243,114 +1256,97 @@ const loadAppSettings = () => {
 };
 
 const initializeDefaultLocation = async () => {
-  // Load saved settings
-  const appSettings = loadAppSettings();
-  
-  // Check if user has saved location preferences
-  if (appSettings) {
-    // If location type is 'farm' and a farm is selected
-    if (appSettings.locationType === 'farm' && appSettings.selectedFarmId && rawFarms.value?.length) {
-      const selectedFarm = rawFarms.value.find(f => f.farm_id === appSettings.selectedFarmId);
-      if (selectedFarm) {
-        const name = selectedFarm?.farm_name || DEFAULT_LOCATION_STRING;
-        searchLocation.value = name;
+  if (farmPrefillComplete.value) {
+    return true;
+  }
 
-        const lat = parseFloat(selectedFarm?.latitude);
-        const lon = parseFloat(selectedFarm?.longitude);
-        if (!Number.isNaN(lat) && !Number.isNaN(lon)) {
-          try {
-            await updateWeatherForLocation(lat, lon, name);
-            if (weatherMapRef.value) {
-              weatherMapRef.value.moveToLocation(lat, lon, 12);
+  if (initialLocationInitPromise) {
+    return initialLocationInitPromise;
+  }
+
+  initialLocationInitPromise = (async () => {
+    const appSettings = loadAppSettings();
+    
+    if (appSettings) {
+      if (appSettings.locationType === 'farm' && appSettings.selectedFarmId && rawFarms.value?.length) {
+        const selectedFarm = rawFarms.value.find(f => f.farm_id === appSettings.selectedFarmId);
+        if (selectedFarm) {
+          const name = selectedFarm?.farm_name || DEFAULT_LOCATION_STRING;
+          const lat = parseFloat(selectedFarm?.latitude);
+          const lon = parseFloat(selectedFarm?.longitude);
+          searchLocation.value = name;
+
+          if (!Number.isNaN(lat) && !Number.isNaN(lon)) {
+            const success = await updateWeatherForLocation(lat, lon, name);
+            if (success) {
+              weatherMapRef.value?.moveToLocation(lat, lon, 12);
+              farmPrefillComplete.value = true;
+              return true;
             }
-            farmPrefillComplete.value = true;
-            return true;
-          } catch (error) {
-            console.error('Failed to load weather for selected farm:', error);
+          }
+        }
+      }
+      
+      if (appSettings.locationType === 'custom' && appSettings.defaultLocation) {
+        const location = appSettings.defaultLocation.trim();
+        if (location) {
+          searchLocation.value = location;
+          const coordMatch = location.match(/^(-?\d+\.?\d*),\s*(-?\d+\.?\d*)$/);
+          if (coordMatch) {
+            const lat = parseFloat(coordMatch[1]);
+            const lon = parseFloat(coordMatch[2]);
+            if (!Number.isNaN(lat) && !Number.isNaN(lon)) {
+              const success = await updateWeatherForLocation(lat, lon);
+              if (success) {
+                weatherMapRef.value?.moveToLocation(lat, lon, 12);
+                farmPrefillComplete.value = true;
+                return true;
+              }
+            }
+          } else {
+            const success = await searchWeather(location);
+            if (success) {
+              farmPrefillComplete.value = true;
+              return true;
+            }
           }
         }
       }
     }
     
-    // If location type is 'custom' and defaultLocation is set
-    if (appSettings.locationType === 'custom' && appSettings.defaultLocation) {
-      const location = appSettings.defaultLocation.trim();
-      if (location) {
-        searchLocation.value = location;
-        // Check if it's coordinates (format: "lat, lng" or "lat,lng")
-        const coordMatch = location.match(/^(-?\d+\.?\d*),\s*(-?\d+\.?\d*)$/);
-        if (coordMatch) {
-          const lat = parseFloat(coordMatch[1]);
-          const lon = parseFloat(coordMatch[2]);
-          if (!Number.isNaN(lat) && !Number.isNaN(lon)) {
-            try {
-              await updateWeatherForLocation(lat, lon);
-              if (weatherMapRef.value) {
-                weatherMapRef.value.moveToLocation(lat, lon, 12);
-              }
-              farmPrefillComplete.value = true;
-              return true;
-            } catch (error) {
-              console.error('Failed to load weather for coordinates:', error);
-            }
-          }
-        } else {
-          // It's a location name, use searchWeather
-          return false; // Let searchWeather handle it
+    if (rawFarms.value?.length) {
+      const firstFarm = rawFarms.value[0];
+      const name = firstFarm?.farm_name || DEFAULT_LOCATION_STRING;
+      const lat = parseFloat(firstFarm?.latitude);
+      const lon = parseFloat(firstFarm?.longitude);
+      searchLocation.value = name;
+
+      if (!Number.isNaN(lat) && !Number.isNaN(lon)) {
+        const success = await updateWeatherForLocation(lat, lon, name);
+        if (success) {
+          weatherMapRef.value?.moveToLocation(lat, lon);
+          farmPrefillComplete.value = true;
+          return true;
         }
       }
     }
-  }
-  
-  // Fallback to first farm if available
-  if (rawFarms.value?.length) {
-    const firstFarm = rawFarms.value[0];
-    const name = firstFarm?.farm_name || DEFAULT_LOCATION_STRING;
-    searchLocation.value = name;
 
-    const lat = parseFloat(firstFarm?.latitude);
-    const lon = parseFloat(firstFarm?.longitude);
-    if (!Number.isNaN(lat) && !Number.isNaN(lon)) {
-      try {
-        const { current, history, forecastData } = await fetchWeatherByCoordinates(
-          lat,
-          lon,
-          { days: INITIAL_FORECAST_DAYS, historyDays: INITIAL_HISTORY_DAYS }
-        );
-        currentWeather.value = current;
-        refreshTimeline(history, forecastData, fullForecastTimeline.value);
-        const historySource = buildHistorySource({
-          lat,
-          lon,
-          location: name,
-          farmId: firstFarm?.farm_id,
-          initialHistoryLength: Array.isArray(history) ? history.length : 0
-        });
-        scheduleExtendedHistoryFetch(historySource);
-        const forecastSource = buildForecastSource({
-          lat,
-          lon,
-          location: name,
-          initialForecastLength: Array.isArray(forecastData) ? forecastData.length : 0
-        });
-        scheduleExtendedForecastFetch(forecastSource);
-        weatherMapRef.value?.moveToLocation(lat, lon);
-        weatherMapRef.value?.updateMarker(lat, lon, current);
-        checkWeatherConditions(
-          { current, history, forecast: forecastData },
-          snapshotNotificationPreferences()
-        );
-        await fetchForecastWarnings({ forecast: forecastData });
-        farmPrefillComplete.value = true;
-        return true;
-      } catch (error) {
-        console.warn('Failed to prefill weather for first farm coordinates:', error);
-      }
+    const fallbackLocation = DEFAULT_LOCATION_STRING;
+    searchLocation.value = fallbackLocation;
+    const fallbackSuccess = await searchWeather(fallbackLocation);
+    if (fallbackSuccess) {
+      farmPrefillComplete.value = true;
+      return true;
     }
-  }
 
-  searchLocation.value = DEFAULT_LOCATION_STRING;
-  return false;
+    return false;
+  })();
+
+  try {
+    return await initialLocationInitPromise;
+  } finally {
+    initialLocationInitPromise = null;
+  }
 };
 
 const registerGlobalHandlers = () => {
@@ -1573,7 +1569,7 @@ const focusMapOnFarm = (farm) => {
 
 const updateWeatherForLocation = async (lat, lng, name = null) => {
   if (!Number.isFinite(parseFloat(lat)) || !Number.isFinite(parseFloat(lng))) {
-    return;
+    return false;
   }
 
   isLoadingWeather.value = true;
@@ -1614,8 +1610,10 @@ const updateWeatherForLocation = async (lat, lng, name = null) => {
     if (selectedDay.value?.date) {
       hydrateSelectedDay(selectedDay.value.date);
     }
+    return true;
   } catch (error) {
     console.error('Error updating weather for farm location:', error);
+    return false;
   } finally {
     isLoadingWeather.value = false;
   }

@@ -48,6 +48,6 @@ class Export extends Model
 
     public function getDownloadUrlAttribute()
     {
-        return route('exports.download', $this->export_id);
+        return route('api.exports.download', $this->export_id);
     }
 }

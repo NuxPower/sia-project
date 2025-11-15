@@ -36,7 +36,7 @@ class ExportApiController extends Controller
                     'file_name' => $export->file_name,
                     'file_size' => $export->file_size,
                     'created_at' => $export->created_at->toISOString(),
-                    'download_url' => route('exports.download', $export->export_id),
+                    'download_url' => route('api.exports.download', $export->export_id),
                 ];
             });
 
@@ -53,8 +53,8 @@ class ExportApiController extends Controller
     {
         $validated = $request->validate([
             'farm_id' => 'nullable|exists:farms,farm_id',
-            'start_date' => 'required|date',
-            'end_date' => 'required|date|after_or_equal:start_date',
+            'start_date' => 'required|date|before_or_equal:today',
+            'end_date' => 'required|date|after_or_equal:start_date|before_or_equal:today',
             'format' => 'nullable|in:csv,pdf',
         ]);
 
@@ -142,7 +142,7 @@ class ExportApiController extends Controller
                 'file_name' => $export->file_name,
                 'file_size' => $export->file_size,
                 'created_at' => $export->created_at->toISOString(),
-                'download_url' => route('exports.download', $export->export_id),
+                'download_url' => route('api.exports.download', $export->export_id),
             ],
         ]);
     }
@@ -220,7 +220,7 @@ class ExportApiController extends Controller
                 'file_name' => $export->file_name,
                 'file_size' => $export->file_size,
                 'created_at' => $export->created_at->toISOString(),
-                'download_url' => route('exports.download', $export->export_id),
+                'download_url' => route('api.exports.download', $export->export_id),
             ],
         ]);
     }
@@ -297,7 +297,7 @@ class ExportApiController extends Controller
                 'file_name' => $export->file_name,
                 'file_size' => $export->file_size,
                 'created_at' => $export->created_at->toISOString(),
-                'download_url' => route('exports.download', $export->export_id),
+                'download_url' => route('api.exports.download', $export->export_id),
             ],
         ]);
     }
@@ -565,6 +565,25 @@ class ExportApiController extends Controller
 
         $pdf = Pdf::loadHTML($html);
         Storage::put($filePath, $pdf->output());
+    }
+
+    /**
+     * Download an export file via the API.
+     */
+    public function download(Export $export)
+    {
+        $this->authorize('view', $export);
+
+        $disk = $export->disk ?? 'local';
+
+        if (!Storage::disk($disk)->exists($export->file_path)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Export file is no longer available.',
+            ], 404);
+        }
+        
+        return Storage::disk($disk)->download($export->file_path, $export->file_name);
     }
 }
 
