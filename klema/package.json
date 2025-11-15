@@ -1,23 +1,53 @@
 {
     "$schema": "https://json.schemastore.org/package.json",
+    "name": "klema",
+    "version": "1.0.0",
+    "description": "KLEMA - Climate-Smart Agriculture Monitoring System",
+    "author": "KLEMA Team",
     "private": true,
     "type": "module",
+    "main": "electron/main.js",
     "scripts": {
-        "build": "vite build",
-        "dev": "vite"
+        "build": "npx vite build",
+        "dev": "npx vite",
+        "build:web": "npm run build",
+        "build:mobile": "npm run build && npm run copy:dist && npx @capacitor/cli sync",
+        "copy:dist": "mkdir -p dist && cp -r public/build/* dist/ && cp public/index.php dist/ 2>/dev/null || true",
+        "build:desktop": "npm run build && electron-builder",
+        "electron": "electron .",
+        "electron:dev": "NODE_ENV=development electron .",
+        "electron:build": "npm run build && electron-builder",
+        "electron:build:win": "npm run build && electron-builder --win",
+        "electron:build:mac": "npm run build && electron-builder --mac",
+        "electron:build:linux": "npm run build && electron-builder --linux",
+        "cap:sync": "npx @capacitor/cli sync",
+        "cap:open:android": "npx @capacitor/cli open android",
+        "cap:open:ios": "npx @capacitor/cli open ios",
+        "cap:init": "npx @capacitor/cli init",
+        "android:build": "cd android && ./gradlew assembleDebug",
+        "android:build:release": "cd android && ./gradlew assembleRelease",
+        "android:install": "adb install android/app/build/outputs/apk/debug/app-debug.apk",
+        "android:build:install": "npm run build && npm run cap:sync && npm run android:build && npm run android:install"
     },
     "devDependencies": {
         "@popperjs/core": "^2.11.6",
         "@tailwindcss/vite": "^4.0.0",
+        "@types/node": "^24.10.1",
         "axios": "^1.12.2",
         "bootstrap": "^5.2.3",
         "concurrently": "^9.0.1",
+        "electron": "^31.0.0",
+        "electron-builder": "^25.1.8",
         "laravel-vite-plugin": "^2.0.0",
         "sass": "^1.56.1",
         "tailwindcss": "^4.0.0",
         "vite": "^7.0.4"
     },
     "dependencies": {
+        "@capacitor/android": "^6.0.0",
+        "@capacitor/cli": "^6.0.0",
+        "@capacitor/core": "^6.0.0",
+        "@capacitor/ios": "^6.0.0",
         "@vitejs/plugin-vue": "^6.0.1",
         "cesium": "^1.135.0",
         "leaflet": "^1.9.4",
@@ -25,5 +55,44 @@
         "vanta": "^0.5.24",
         "vite-plugin-cesium": "^1.2.23",
         "vue": "^3.5.21"
+    },
+    "build": {
+        "appId": "com.klema.weather",
+        "productName": "Klema",
+        "directories": {
+            "output": "release"
+        },
+        "files": [
+            "dist/**/*",
+            "electron/**/*",
+            "public/build/**/*"
+        ],
+        "win": {
+            "target": [
+                "nsis",
+                "portable"
+            ],
+            "icon": "assets/icon.ico"
+        },
+        "mac": {
+            "target": [
+                "dmg",
+                "zip"
+            ],
+            "icon": "assets/icon.icns",
+            "category": "public.app-category.utilities"
+        },
+        "linux": {
+            "target": [
+                "AppImage",
+                "deb"
+            ],
+            "icon": "assets/icon.png",
+            "category": "Utility"
+        },
+        "nsis": {
+            "oneClick": false,
+            "allowToChangeInstallationDirectory": true
+        }
     }
 }

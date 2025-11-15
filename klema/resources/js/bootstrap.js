@@ -61,6 +61,13 @@ window.axios.interceptors.response.use(
 
         if (error?.response?.status === 401) {
             revokeApiToken();
+
+            const isOnAuthPage = ['/login', '/register'].includes(window.location.pathname);
+            if (!isOnAuthPage) {
+                window.location.href = '/login';
+            } else {
+                window.location.reload();
+            }
         }
 
         return Promise.reject(error);

@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Middleware\EnsureUserHasRole;
+use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
@@ -27,6 +28,12 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->alias([
             'role' => EnsureUserHasRole::class,
         ]);
+    })
+    ->withSchedule(function (Schedule $schedule): void {
+        $schedule->command('alerts:auto-generate')
+            ->hourly()
+            ->withoutOverlapping()
+            ->runInBackground();
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         //

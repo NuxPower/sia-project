@@ -70,7 +70,11 @@
       <section class="precip-section detail-panel">
         <h2>Rain Window</h2>
         <p class="panel-description">{{ precipitationExplanation }}</p>
-        <div v-if="hourlySeries.length" class="precip-chart">
+        <div
+          v-if="hourlySeries.length"
+          class="precip-chart"
+          :style="{ '--precip-columns': hourlySeries.length || 1 }"
+        >
           <div class="precip-hour" v-for="hour in hourlySeries" :key="hour.time">
             <div class="bar-wrapper">
               <div
@@ -757,10 +761,11 @@ const precipitationTooltip = (hour) => {
 }
 
 .summary-cards {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-  gap: 16px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: clamp(12px, 1.6vw, 18px);
   width: 100%;
+  align-items: stretch;
 }
 
 .summary-card {
@@ -771,7 +776,9 @@ const precipitationTooltip = (hour) => {
   display: flex;
   flex-direction: column;
   min-width: 0;
+  flex: 1 1 clamp(180px, 22vw, 240px);
   backdrop-filter: blur(6px);
+  box-sizing: border-box;
 }
 
 .summary-card .label {
@@ -871,12 +878,14 @@ const precipitationTooltip = (hour) => {
 
 .precip-chart {
   display: grid;
-  grid-template-columns: repeat(24, 1fr);
+  grid-template-columns: repeat(var(--precip-columns, 1), minmax(clamp(18px, calc(100% / var(--precip-columns, 1)), 60px), 1fr));
   align-items: end;
-  gap: 4px;
+  gap: clamp(4px, 0.8vw, 10px);
   padding: 12px 4px 0;
   min-height: 160px;
+  width: 100%;
   overflow-x: auto;
+  scroll-snap-type: x proximity;
 }
 
 .precip-hour {
@@ -885,6 +894,7 @@ const precipitationTooltip = (hour) => {
   align-items: center;
   gap: 6px;
   min-width: 0;
+  scroll-snap-align: start;
 }
 
 .bar-wrapper {
@@ -992,12 +1002,18 @@ const precipitationTooltip = (hour) => {
   }
 
   .summary-cards {
-    grid-template-columns: 1fr;
+    flex-wrap: nowrap;
+    overflow-x: auto;
     gap: 0.75rem;
+    padding-bottom: 0.5rem;
+    margin-bottom: -0.5rem;
+    scroll-snap-type: x proximity;
   }
 
   .summary-card {
     padding: 0.75rem;
+    flex: 0 0 220px;
+    scroll-snap-align: start;
   }
 
   .summary-value {
@@ -1028,7 +1044,10 @@ const precipitationTooltip = (hour) => {
   }
 
   .summary-cards {
-    grid-template-columns: repeat(2, 1fr);
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    gap: 0.85rem;
+    padding-bottom: 0.5rem;
   }
 
   .detail-content {
@@ -1039,6 +1058,7 @@ const precipitationTooltip = (hour) => {
 
   .summary-card {
     padding: 0.875rem;
+    flex: 0 0 230px;
   }
 
   .temperature-table .table-row {
@@ -1053,7 +1073,7 @@ const precipitationTooltip = (hour) => {
   }
 
   .summary-cards {
-    grid-template-columns: repeat(3, 1fr);
+    flex-wrap: wrap;
   }
 
   .detail-content {
@@ -1075,7 +1095,8 @@ const precipitationTooltip = (hour) => {
   }
 
   .summary-cards {
-    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    flex-wrap: wrap;
+    justify-content: flex-start;
   }
 
   .detail-content {
@@ -1103,7 +1124,7 @@ const precipitationTooltip = (hour) => {
   }
 
   .summary-cards {
-    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    flex-wrap: wrap;
   }
 
   .temperature-table .table-row {

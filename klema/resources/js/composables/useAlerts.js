@@ -765,7 +765,6 @@ export function useAlerts() {
     const getAlertTypeInfo = (alertType) => {
         const typeMap = {
             'weather': { icon: 'fas fa-cloud-rain', color: 'warning', label: 'Weather Alert' },
-            'pest': { icon: 'fas fa-bug', color: 'danger', label: 'Pest Alert' },
             'irrigation': { icon: 'fas fa-tint', color: 'info', label: 'Irrigation Alert' },
             'harvest': { icon: 'fas fa-cut', color: 'success', label: 'Harvest Alert' },
             'maintenance': { icon: 'fas fa-wrench', color: 'secondary', label: 'Maintenance Alert' }

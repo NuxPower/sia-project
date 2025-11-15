@@ -66,8 +66,8 @@ class TestDataSeeder extends Seeder
 
         Alert::create([
             'farm_id' => $farm1->farm_id,
-            'alert_type' => 'pest',
-            'message' => 'Aphid infestation detected in sector 3. Immediate treatment recommended.',
+            'alert_type' => 'maintenance',
+            'message' => 'High winds predicted tomorrow. Secure equipment and postpone servicing.',
             'issued_at' => now()->subDays(1),
             'resolved' => false,
         ]);

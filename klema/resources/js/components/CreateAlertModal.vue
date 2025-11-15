@@ -49,7 +49,6 @@
           >
             <option value="">Select alert type</option>
             <option value="weather">Weather Alert</option>
-            <option value="pest">Pest Alert</option>
             <option value="irrigation">Irrigation Alert</option>
             <option value="harvest">Harvest Alert</option>
             <option value="maintenance">Maintenance Alert</option>
@@ -181,25 +180,23 @@ const submitAlert = async () => {
 </script>
 
 <style scoped>
+::v-deep(#farm_id option),
 ::v-deep(#alert_type option) {
-  background-color: #1e293b;
-  color: white;
+  background-color: #f8fafc;
+  color: #0f172a;
 }
 
 ::v-deep(#alert_type option[value="weather"]) {
-  background-color: #1e3a8a;
-}
-::v-deep(#alert_type option[value="pest"]) {
-  background-color: #7f1d1d;
+  background-color: #dbeafe;
 }
 ::v-deep(#alert_type option[value="irrigation"]) {
-  background-color: #14532d;
+  background-color: #dcfce7;
 }
 ::v-deep(#alert_type option[value="harvest"]) {
-  background-color: #78350f;
+  background-color: #ffedd5;
 }
 ::v-deep(#alert_type option[value="maintenance"]) {
-  background-color: #4c1d95;
+  background-color: #ede9fe;
 }
 
 .modal-overlay {

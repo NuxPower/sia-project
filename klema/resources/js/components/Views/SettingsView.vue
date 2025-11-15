@@ -316,7 +316,8 @@ const logout = async () => {
     }
 
     revokeApiToken();
-    window.location.href = '/login';
+    // For mobile, reload the app which will show login if needed
+    window.location.reload();
   } catch (error) {
     console.error('Logout error:', error);
     showError('Logout Failed', 'Failed to logout. Please try again.');

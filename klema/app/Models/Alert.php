@@ -17,12 +17,15 @@ class Alert extends Model
         'alert_type',
         'message',
         'issued_at',
-        'resolved'
+        'resolved',
+        'is_system_generated',
+        'automation_key',
     ];
 
     protected $casts = [
         'issued_at' => 'datetime',
         'resolved' => 'boolean',
+        'is_system_generated' => 'boolean',
     ];
 
     public function farm()
@@ -34,7 +37,6 @@ class Alert extends Model
     {
         $colorMap = [
             'weather' => 'bg-yellow-500',
-            'pest' => 'bg-red-500',
             'irrigation' => 'bg-blue-500',
             'harvest' => 'bg-green-500',
             'maintenance' => 'bg-purple-500',
@@ -47,7 +49,6 @@ class Alert extends Model
     {
         $iconMap = [
             'weather' => 'fas fa-cloud-rain',
-            'pest' => 'fas fa-bug',
             'irrigation' => 'fas fa-tint',
             'harvest' => 'fas fa-cut',
             'maintenance' => 'fas fa-wrench',

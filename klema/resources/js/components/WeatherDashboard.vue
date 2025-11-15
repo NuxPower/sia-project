@@ -94,10 +94,11 @@
         <div class="overlay-panel">
           <div class="overlay-content">
             <Transition name="view-slide-fade" mode="out-in">
-              <component
+            <component
                 v-if="overlayViewConfig.component"
                 :is="overlayViewConfig.component"
                 v-bind="overlayViewConfig.props"
+                v-on="overlayViewConfig.listeners"
                 :key="overlayViewConfig.key"
               />
             </Transition>
@@ -116,6 +117,13 @@
       :location-label="currentLocationLabel"
       @close="closeDayDetail"
     />
+
+    <CalendarActivityCreateView
+      v-if="calendarDetail"
+      :detail="calendarDetail"
+      @close="closeCalendarDetail"
+      @saved="handleCalendarActivitySaved"
+    />
   </div>
 </template>
 
@@ -131,6 +139,7 @@ import WeatherTimeline from './WeatherTimeline.vue';
 import TimelineLegend from './TimelineLegend.vue';
 import DashboardView from './Views/DashboardView.vue';
 import CalendarView from './Views/CalendarView.vue';
+import CalendarActivityCreateView from './Views/CalendarActivityCreateView.vue';
 import AlertsView from './Views/AlertsView.vue';
 import SettingsView from './Views/SettingsView.vue';
 import ExportView from './Views/ExportView.vue';
@@ -184,6 +193,8 @@ const farmPrefillComplete = ref(false);
 const selectedDay = ref(null);
 const selectedDayDetail = ref(null);
 const selectedDayHourly = ref([]);
+const calendarDetail = ref(null);
+const calendarRefreshToken = ref(0);
 const isExtendingHistory = ref(false);
 const activeHistoryFetchKey = ref(null);
 const currentHistoryContext = ref(null);
@@ -286,6 +297,166 @@ const currentLocationLabel = computed(() => {
 
 const currentUser = ref(null);
 const systemStats = ref(null);
+const dashboardActivities = ref([]);
+const dashboardActivitiesLoading = ref(false);
+const dashboardActivitiesError = ref('');
+const activityActionBusy = ref({});
+const activityActionToast = ref(null);
+const lastActivityFetchTs = ref(0);
+const ACTIVITY_LOOKBACK_DAYS = 30;
+const ACTIVITY_LOOKAHEAD_DAYS = 60;
+let activityToastTimeoutId = null;
+
+const formatDateParam = (date) => {
+  if (!(date instanceof Date) || Number.isNaN(date.getTime())) {
+    return null;
+  }
+
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
+const buildActivityWindow = () => {
+  const today = new Date();
+  const from = new Date(today);
+  from.setDate(from.getDate() - ACTIVITY_LOOKBACK_DAYS);
+
+  const to = new Date(today);
+  to.setDate(to.getDate() + ACTIVITY_LOOKAHEAD_DAYS);
+
+  return {
+    from_date: formatDateParam(from),
+    to_date: formatDateParam(to)
+  };
+};
+
+const setActivityBusy = (activityId, action) => {
+  activityActionBusy.value = {
+    ...(activityActionBusy.value ?? {}),
+    [activityId]: action || true
+  };
+};
+
+const clearActivityBusy = (activityId) => {
+  const next = { ...(activityActionBusy.value ?? {}) };
+  delete next[activityId];
+  activityActionBusy.value = next;
+};
+
+const showActivityToast = (type, message) => {
+  if (activityToastTimeoutId) {
+    clearTimeout(activityToastTimeoutId);
+  }
+
+  const toast = {
+    id: Date.now(),
+    type,
+    message
+  };
+  activityActionToast.value = toast;
+
+  activityToastTimeoutId = setTimeout(() => {
+    if (activityActionToast.value?.id === toast.id) {
+      activityActionToast.value = null;
+    }
+  }, 5000);
+};
+
+const fetchDashboardActivities = async (force = false) => {
+  if (dashboardActivitiesLoading.value && !force) {
+    return;
+  }
+
+  dashboardActivitiesLoading.value = true;
+  dashboardActivitiesError.value = '';
+
+  try {
+    await ensureApiToken();
+    const params = {
+      limit: 100,
+      sort: 'asc',
+      ...buildActivityWindow()
+    };
+    const { data } = await axios.get('/api/activities', { params });
+    dashboardActivities.value = Array.isArray(data?.activities) ? data.activities : [];
+    lastActivityFetchTs.value = Date.now();
+  } catch (error) {
+    console.error('Failed to load dashboard activities', error);
+    dashboardActivitiesError.value =
+      error.response?.data?.message || 'Unable to load activities right now.';
+  } finally {
+    dashboardActivitiesLoading.value = false;
+  }
+};
+
+const ensureDashboardActivitiesLoaded = (force = false) => {
+  const now = Date.now();
+  const staleThreshold = 1000 * 60 * 5; // 5 minutes
+
+  if (
+    force ||
+    !dashboardActivities.value.length ||
+    now - lastActivityFetchTs.value > staleThreshold
+  ) {
+    fetchDashboardActivities(true);
+  }
+};
+
+const handleActivityStatusChange = async ({ activityId, status }) => {
+  if (!activityId || !status) {
+    return;
+  }
+
+  setActivityBusy(activityId, status);
+  try {
+    await ensureApiToken();
+    await axios.patch(`/api/activities/${activityId}`, { status });
+    showActivityToast('success', status === 'completed' ? 'Activity marked as finished.' : 'Activity updated.');
+    await fetchDashboardActivities(true);
+  } catch (error) {
+    console.error('Failed to update activity status', error);
+    showActivityToast(
+      'error',
+      error.response?.data?.message || 'Unable to update the activity status.'
+    );
+  } finally {
+    clearActivityBusy(activityId);
+  }
+};
+
+const handleActivityDelete = async (activityId) => {
+  if (!activityId) {
+    return;
+  }
+
+  setActivityBusy(activityId, 'delete');
+  try {
+    await ensureApiToken();
+    await axios.delete(`/api/activities/${activityId}`);
+    showActivityToast('success', 'Activity deleted.');
+    await fetchDashboardActivities(true);
+  } catch (error) {
+    console.error('Failed to delete activity', error);
+    showActivityToast(
+      'error',
+      error.response?.data?.message || 'Unable to delete the activity.'
+    );
+  } finally {
+    clearActivityBusy(activityId);
+  }
+};
+
+watch(
+  activeView,
+  (view) => {
+    if (view === 'dashboard') {
+      ensureDashboardActivitiesLoaded();
+    }
+  },
+  { immediate: true }
+);
 
 // Fetch user info and system stats
 const fetchUserInfo = async () => {
@@ -333,6 +504,38 @@ const locateFarm = (farmId) => {
   }
 };
 
+const handleCalendarDayOpen = (detail) => {
+  if (detail?.mode === 'view') {
+    if (detail?.forecast) {
+      selectedDay.value = {
+        date: detail.date,
+        label: getDayLabel({ date: detail.date }),
+      };
+      selectedDayDetail.value = detail.forecast;
+      selectedDayHourly.value = detail.forecast?.hourly ?? [];
+    }
+    return;
+  }
+
+  if (detail && detail.date) {
+    calendarDetail.value = detail;
+  } else {
+    const today = new Date();
+    const fallbackDate = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+    calendarDetail.value = { date: fallbackDate };
+  }
+};
+
+const closeCalendarDetail = () => {
+  calendarDetail.value = null;
+};
+
+const handleCalendarActivitySaved = () => {
+  calendarRefreshToken.value += 1;
+  ensureDashboardActivitiesLoaded(true);
+  closeCalendarDetail();
+};
+
 const overlayViewConfig = computed(() => {
   switch (activeView.value) {
     case 'dashboard':
@@ -350,6 +553,11 @@ const overlayViewConfig = computed(() => {
           isDrawing: !!boundarySession.value,
           isPlacingPoint: !!pointSession.value,
           systemStats: systemStats.value,
+          activities: dashboardActivities.value,
+          activitiesLoading: dashboardActivitiesLoading.value,
+          activitiesError: dashboardActivitiesError.value,
+          activityActionBusy: activityActionBusy.value,
+          activityActionToast: activityActionToast.value,
           onRefreshFarms: refreshFarmLayers,
           onCreateFarm: createFarm,
           onSaveFarm: updateFarmDetails,
@@ -359,16 +567,24 @@ const overlayViewConfig = computed(() => {
           onCancelBoundary: cancelBoundaryEditing,
           onStartPoint: startPointPlacement,
           onCancelPoint: cancelPointPlacement,
-          onLocateFarm: locateFarm
-        }
+          onLocateFarm: locateFarm,
+          onRefreshActivities: () => ensureDashboardActivitiesLoaded(true),
+          onChangeActivityStatus: handleActivityStatusChange,
+          onDeleteActivity: handleActivityDelete
+        },
+        listeners: {}
       };
     case 'calendar':
       return {
-        key: 'calendar',
+        key: `calendar-${calendarRefreshToken.value}`,
         component: CalendarView,
         props: {
           getWeatherIcon,
-          timeline: fullForecastTimeline.value
+          timeline: fullForecastTimeline.value,
+          refreshToken: calendarRefreshToken.value
+        },
+        listeners: {
+          'open-day': handleCalendarDayOpen
         }
       };
     case 'alerts':
@@ -396,7 +612,8 @@ const overlayViewConfig = computed(() => {
           createAlert: handleCreateAlert,
           farms: alertsFarms.value,
           locationLabel: currentLocationLabel.value
-        }
+        },
+        listeners: {}
       };
     case 'settings':
       return {
@@ -404,7 +621,8 @@ const overlayViewConfig = computed(() => {
         component: SettingsView,
         props: {
           farms: rawFarms.value
-        }
+        },
+        listeners: {}
       };
     case 'exports':
       return {
@@ -412,13 +630,15 @@ const overlayViewConfig = computed(() => {
         component: ExportView,
         props: {
           farms: rawFarms.value
-        }
+        },
+        listeners: {}
       };
     default:
       return {
         key: '',
         component: null,
-        props: {}
+        props: {},
+        listeners: {}
       };
   }
 });
@@ -708,6 +928,12 @@ watch(rawFarms, async (farms, previous) => {
     }
   }
 }, { immediate: true });
+
+watch(activeView, (view) => {
+  if (view !== 'calendar') {
+    calendarDetail.value = null;
+  }
+});
 
 const setActiveView = (view) => {
   activeView.value = view;
@@ -1041,6 +1267,19 @@ const initializeDefaultLocation = async () => {
   return false;
 };
 
+const registerGlobalHandlers = () => {
+  if (typeof window === 'undefined') {
+    return;
+  }
+
+  window.vueApp = window.vueApp || {};
+  window.vueApp.setActiveView = setActiveView;
+  window.vueApp.searchWeather = searchWeather;
+  window.vueApp.searchLocation = searchLocation;
+};
+
+registerGlobalHandlers();
+
 onMounted(async () => {
   await fetchUserInfo();
   await ensureApiToken(window.axios);
@@ -1054,11 +1293,7 @@ onMounted(async () => {
     await searchWeather();
   }
   
-  window.vueApp = {
-    setActiveView,
-    searchWeather,
-    searchLocation
-  };
+  registerGlobalHandlers();
   
   await initializeAlertsPanel();
 });

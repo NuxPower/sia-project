@@ -22,6 +22,8 @@ return [
         '127.0.0.1',
         '127.0.0.1:8000',
         '::1',
+        'capacitor://localhost',
+        'ionic://localhost',
         parse_url(config('app.url'), PHP_URL_HOST),
         Sanctum::currentApplicationUrlWithPort(),
         Sanctum::currentRequestHost(),

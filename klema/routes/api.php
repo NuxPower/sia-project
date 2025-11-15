@@ -29,7 +29,9 @@ Route::prefix('auth')->group(function () {
 // Allow session-authenticated dashboard users to mint SPA tokens
 Route::middleware(['web', 'auth'])->post('/auth/token', [AuthApiController::class, 'issueToken']);
 
-Route::middleware(['auth:sanctum', 'verified'])->group(function () {
+Route::middleware(['auth:sanctum', 'verified'])
+    ->name('api.')
+    ->group(function () {
     // Weather endpoints
     Route::prefix('weather')->group(function () {
         Route::get('/current', [WeatherApiController::class, 'getCurrentWeather']);
@@ -51,7 +53,9 @@ Route::middleware(['auth:sanctum', 'verified'])->group(function () {
     Route::apiResource('alerts', AlertApiController::class);
 
     // Activity endpoints
-    Route::apiResource('activities', ActivityApiController::class)->only(['index', 'store']);
+    Route::get('/activities/meta', [ActivityApiController::class, 'meta']);
+    Route::get('/activities/recommendation', [ActivityApiController::class, 'recommendation']);
+    Route::apiResource('activities', ActivityApiController::class)->only(['index', 'store', 'show', 'update', 'destroy']);
 
     // Export endpoints
     Route::get('/exports', [ExportApiController::class, 'index']);
