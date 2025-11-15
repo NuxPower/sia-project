@@ -288,7 +288,7 @@
 
 <script setup>
 import { ref, reactive, onMounted, computed } from 'vue';
-import { authorizedFetch } from '../../services/auth';
+import { authorizedFetch } from '../../services/http';
 import { useGlobalAlerts } from '../../composables/useGlobalAlerts';
 
 const { showSuccess, showError } = useGlobalAlerts();

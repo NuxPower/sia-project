@@ -30,7 +30,7 @@
       <!-- Custom Location Input -->
       <div class="setting-item" v-if="settings.locationType === 'custom'">
         <label>Default Location</label>
-        <input type="text" v-model="settings.defaultLocation" class="setting-input" placeholder="Enter location (e.g., Northern Mindanao)">
+        <input type="text" v-model="settings.defaultLocation" class="setting-input" placeholder="Enter location (e.g., Butuan, Caraga, PH)">
         <button class="action-button" @click="getCurrentLocation" style="margin-top: 10px;">
           <i class="fas fa-crosshairs"></i>
           Detect Location
@@ -181,7 +181,7 @@ const NOTIFICATION_SETTINGS_KEY = 'notificationSettings';
 
 const defaultSettings = Object.freeze({
   locationType: 'custom', // 'custom' or 'farm'
-  defaultLocation: 'Northern Mindanao',
+  defaultLocation: 'Butuan, Caraga, PH',
   selectedFarmId: '',
   temperatureUnit: 'celsius',
   windSpeedUnit: 'ms',

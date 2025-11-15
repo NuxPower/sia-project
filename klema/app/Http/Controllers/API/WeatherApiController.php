@@ -153,11 +153,11 @@ class WeatherApiController extends Controller
                 if (!isset($entry['name'])) {
                     if ($farm && $farm->farm_name) {
                         $entry['name'] = $farm->farm_name;
-                    } elseif ($location && $location !== 'Butuan, Caraga, PH' && $location !== 'Northern Mindanao') {
+                    } elseif ($location && strcasecmp($location, 'Butuan, Caraga, PH') !== 0) {
                         $entry['name'] = $location;
                     } elseif ($resolvedCoordinates && isset($resolvedCoordinates['name'])) {
                         $resolvedName = $resolvedCoordinates['name'];
-                        if (!in_array(strtolower($resolvedName), ['butuan', 'cagayan de oro', 'northern mindanao'])) {
+                        if (!in_array(strtolower($resolvedName), ['butuan', 'cagayan de oro', 'butuan, caraga, ph'])) {
                             $entry['name'] = $resolvedName;
                         }
                     }

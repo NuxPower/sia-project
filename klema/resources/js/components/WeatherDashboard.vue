@@ -189,6 +189,7 @@ const AlertsView = defineAsyncComponent(() => import('./Views/AlertsView.vue'));
 const SettingsView = defineAsyncComponent(() => import('./Views/SettingsView.vue'));
 const ExportView = defineAsyncComponent(() => import('./Views/ExportView.vue'));
 const DayDetailView = defineAsyncComponent(() => import('./Views/DayDetailView.vue'));
+const UsersView = defineAsyncComponent(() => import('./Views/UsersView.vue'));
 
 const MOBILE_BREAKPOINT = 900;
 const weatherMapRef = ref(null);
@@ -230,7 +231,8 @@ applyAuthBodyClass(isAuthenticated.value);
 watch(isAuthenticated, (next) => {
   applyAuthBodyClass(next);
 });
-const DEFAULT_LOCATION_STRING = 'Northern Mindanao'; // Default fallback string
+const APP_SETTINGS_STORAGE_KEY = 'appSettings';
+const DEFAULT_LOCATION_STRING = 'Butuan, Caraga, PH'; // Default fallback string
 const getDefaultLocation = () => {
   if (typeof window !== 'undefined' && 'geolocation' in navigator) {
     return new Promise((resolve) => {
@@ -704,6 +706,13 @@ const overlayViewConfig = computed(() => {
         },
         listeners: {}
       };
+    case 'users':
+      return {
+        key: 'users',
+        component: UsersView,
+        props: {},
+        listeners: {}
+      };
     case 'exports':
       return {
         key: 'exports',
@@ -1033,7 +1042,8 @@ const setActiveView = (view) => {
     'calendar': 2,
     'alerts': 3,
     'exports': 4,
-    'settings': 5
+    'settings': 5,
+    'users': 6
   };
   
   const sidebar = document.getElementById('sidebar');
@@ -1204,7 +1214,7 @@ const searchWeather = async (locationOverride = null) => {
       weatherMapRef.value?.updateMarker(current.coord.lat, current.coord.lon, current);
     }
  
-    if (!farmPrefillComplete.value && rawFarms.value?.length) {
+    if (!farmPrefillComplete.value) {
       farmPrefillComplete.value = true;
     }
     
@@ -1244,7 +1254,7 @@ const loadAppSettings = () => {
   }
   
   try {
-    const stored = window.localStorage?.getItem('appSettings');
+    const stored = window.localStorage?.getItem(APP_SETTINGS_STORAGE_KEY);
     if (stored) {
       return JSON.parse(stored);
     }
@@ -1255,53 +1265,70 @@ const loadAppSettings = () => {
   return null;
 };
 
-const initializeDefaultLocation = async () => {
-  if (farmPrefillComplete.value) {
+const initializeDefaultLocation = async ({ force = false, settingsOverride = null } = {}) => {
+  if (farmPrefillComplete.value && !force) {
     return true;
   }
 
-  if (initialLocationInitPromise) {
+  if (!force && initialLocationInitPromise) {
     return initialLocationInitPromise;
   }
 
-  initialLocationInitPromise = (async () => {
-    const appSettings = loadAppSettings();
-    
+  if (force) {
+    initialLocationInitPromise = null;
+  }
+
+  const runInitialization = async () => {
+    const appSettings = settingsOverride ?? loadAppSettings();
+
+    const tryCoordinates = async ({ lat, lon, name, zoom = 12 }) => {
+      const parsedLat = Number.parseFloat(lat);
+      const parsedLon = Number.parseFloat(lon);
+      if (!Number.isFinite(parsedLat) || !Number.isFinite(parsedLon)) {
+        return false;
+      }
+
+      const success = await updateWeatherForLocation(parsedLat, parsedLon, name);
+      if (success) {
+        weatherMapRef.value?.moveToLocation(parsedLat, parsedLon, zoom);
+        farmPrefillComplete.value = true;
+      }
+      return success;
+    };
+
     if (appSettings) {
       if (appSettings.locationType === 'farm' && appSettings.selectedFarmId && rawFarms.value?.length) {
-        const selectedFarm = rawFarms.value.find(f => f.farm_id === appSettings.selectedFarmId);
+        const selectedFarm = rawFarms.value.find(
+          (farm) => String(farm?.farm_id) === String(appSettings.selectedFarmId)
+        );
         if (selectedFarm) {
           const name = selectedFarm?.farm_name || DEFAULT_LOCATION_STRING;
-          const lat = parseFloat(selectedFarm?.latitude);
-          const lon = parseFloat(selectedFarm?.longitude);
           searchLocation.value = name;
 
-          if (!Number.isNaN(lat) && !Number.isNaN(lon)) {
-            const success = await updateWeatherForLocation(lat, lon, name);
-            if (success) {
-              weatherMapRef.value?.moveToLocation(lat, lon, 12);
-              farmPrefillComplete.value = true;
-              return true;
-            }
+          const coordsLoaded = await tryCoordinates({
+            lat: selectedFarm?.latitude,
+            lon: selectedFarm?.longitude,
+            name
+          });
+          if (coordsLoaded) {
+            return true;
           }
         }
       }
-      
+
       if (appSettings.locationType === 'custom' && appSettings.defaultLocation) {
         const location = appSettings.defaultLocation.trim();
         if (location) {
           searchLocation.value = location;
           const coordMatch = location.match(/^(-?\d+\.?\d*),\s*(-?\d+\.?\d*)$/);
           if (coordMatch) {
-            const lat = parseFloat(coordMatch[1]);
-            const lon = parseFloat(coordMatch[2]);
-            if (!Number.isNaN(lat) && !Number.isNaN(lon)) {
-              const success = await updateWeatherForLocation(lat, lon);
-              if (success) {
-                weatherMapRef.value?.moveToLocation(lat, lon, 12);
-                farmPrefillComplete.value = true;
-                return true;
-              }
+            const coordsLoaded = await tryCoordinates({
+              lat: coordMatch[1],
+              lon: coordMatch[2],
+              name: location
+            });
+            if (coordsLoaded) {
+              return true;
             }
           } else {
             const success = await searchWeather(location);
@@ -1313,39 +1340,57 @@ const initializeDefaultLocation = async () => {
         }
       }
     }
-    
+
     if (rawFarms.value?.length) {
       const firstFarm = rawFarms.value[0];
       const name = firstFarm?.farm_name || DEFAULT_LOCATION_STRING;
-      const lat = parseFloat(firstFarm?.latitude);
-      const lon = parseFloat(firstFarm?.longitude);
       searchLocation.value = name;
 
-      if (!Number.isNaN(lat) && !Number.isNaN(lon)) {
-        const success = await updateWeatherForLocation(lat, lon, name);
-        if (success) {
-          weatherMapRef.value?.moveToLocation(lat, lon);
-          farmPrefillComplete.value = true;
-          return true;
-        }
+      const coordsLoaded = await tryCoordinates({
+        lat: firstFarm?.latitude,
+        lon: firstFarm?.longitude,
+        name,
+        zoom: 10
+      });
+      if (coordsLoaded) {
+        return true;
       }
     }
 
-    const fallbackLocation = DEFAULT_LOCATION_STRING;
-    searchLocation.value = fallbackLocation;
-    const fallbackSuccess = await searchWeather(fallbackLocation);
+    searchLocation.value = DEFAULT_LOCATION_STRING;
+    const fallbackSuccess = await searchWeather(DEFAULT_LOCATION_STRING);
     if (fallbackSuccess) {
       farmPrefillComplete.value = true;
       return true;
     }
 
     return false;
-  })();
+  };
+
+  initialLocationInitPromise = runInitialization();
 
   try {
     return await initialLocationInitPromise;
   } finally {
     initialLocationInitPromise = null;
+  }
+};
+
+const handleSettingsRefresh = (settingsPayload = null) => {
+  if (!isAuthenticated.value) {
+    return;
+  }
+  farmPrefillComplete.value = false;
+  initializeDefaultLocation({ force: true, settingsOverride: settingsPayload ?? null });
+};
+
+const handleAppSettingsUpdated = (event) => {
+  handleSettingsRefresh(event?.detail ?? null);
+};
+
+const handleStorageSettingsChange = (event) => {
+  if (event.key === APP_SETTINGS_STORAGE_KEY) {
+    handleSettingsRefresh();
   }
 };
 
@@ -1398,12 +1443,16 @@ const handleAuthRequiredEvent = () => {
 
 if (typeof window !== 'undefined') {
   window.addEventListener('auth:required', handleAuthRequiredEvent);
+  window.addEventListener('appSettingsUpdated', handleAppSettingsUpdated);
+  window.addEventListener('storage', handleStorageSettingsChange);
 }
 
 onBeforeUnmount(() => {
   if (typeof window !== 'undefined') {
     window.removeEventListener('auth:required', handleAuthRequiredEvent);
     window.removeEventListener('resize', updateViewportMode);
+    window.removeEventListener('appSettingsUpdated', handleAppSettingsUpdated);
+    window.removeEventListener('storage', handleStorageSettingsChange);
   }
   applyAuthBodyClass(true);
   toggleDrawingModeClass(false);
@@ -1421,6 +1470,8 @@ const getMobilePanelTitle = () => {
       return 'Exports';
     case 'settings':
       return 'Settings';
+    case 'users':
+      return 'Users';
     default:
       return 'Details';
   }

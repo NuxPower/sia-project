@@ -407,6 +407,10 @@
 
 <script setup>
 import { computed, ref, onMounted, onBeforeUnmount, watch, nextTick } from 'vue';
+import * as THREE from 'three';
+import CLOUDS from 'vanta/dist/vanta.clouds.min.js';
+import FOG from 'vanta/dist/vanta.fog.min.js';
+import WAVES from 'vanta/dist/vanta.waves.min.js';
 import FarmManagementPanel from '../FarmManagementPanel.vue';
 import { useDisplaySettings } from '../../composables/useDisplaySettings';
 
@@ -466,87 +470,6 @@ const props = defineProps({
 });
 
 const { formatTemperature, formatWindSpeed } = useDisplaySettings();
-
-const THREE_SCRIPT_SRC = '/vendor/three.module.min.js';
-const THREE_READY_EVENT = 'three:ready';
-let threeLoaderPromise = null;
-let THREERef = null;
-let vantaEffects = null;
-let vantaAssetsPromise = null;
-
-const ensureThreeGlobal = () => {
-  if (typeof window === 'undefined') {
-    return Promise.resolve(null);
-  }
-
-  if (window.THREE) {
-    return Promise.resolve(window.THREE);
-  }
-
-  if (threeLoaderPromise) {
-    return threeLoaderPromise;
-  }
-
-  threeLoaderPromise = new Promise((resolve, reject) => {
-    const handleReady = () => {
-      window.removeEventListener(THREE_READY_EVENT, handleReady);
-      resolve(window.THREE);
-    };
-
-    window.addEventListener(THREE_READY_EVENT, handleReady, { once: true });
-
-    const existingScript = document.querySelector('script[data-three-loader]');
-    if (existingScript) {
-      return;
-    }
-
-    const script = document.createElement('script');
-    script.type = 'module';
-    script.dataset.threeLoader = 'true';
-    script.textContent = `
-      import * as THREE from '${THREE_SCRIPT_SRC}';
-      window.THREE = THREE;
-      window.dispatchEvent(new Event('${THREE_READY_EVENT}'));
-    `;
-    script.onerror = (error) => {
-      window.removeEventListener(THREE_READY_EVENT, handleReady);
-      threeLoaderPromise = null;
-      reject(error);
-    };
-
-    document.head.appendChild(script);
-  });
-
-  return threeLoaderPromise;
-};
-
-const ensureVantaAssets = async () => {
-  if (THREERef && vantaEffects) {
-    return { THREE: THREERef, effects: vantaEffects };
-  }
-
-  if (!vantaAssetsPromise) {
-    vantaAssetsPromise = Promise.all([
-      ensureThreeGlobal(),
-      import('vanta/dist/vanta.clouds.min.js'),
-      import('vanta/dist/vanta.fog.min.js'),
-      import('vanta/dist/vanta.waves.min.js')
-    ]).then(([threeModule, cloudsModule, fogModule, wavesModule]) => {
-      THREERef = threeModule ?? window.THREE;
-      vantaEffects = {
-        CLOUDS: cloudsModule.default ?? cloudsModule,
-        FOG: fogModule.default ?? fogModule,
-        WAVES: wavesModule.default ?? wavesModule
-      };
-      return { THREE: THREERef, effects: vantaEffects };
-    }).catch((error) => {
-      vantaAssetsPromise = null;
-      throw error;
-    });
-  }
-
-  return vantaAssetsPromise;
-};
 
 const emit = defineEmits([
   'refresh-farms',
@@ -790,12 +713,7 @@ const destroyVanta = () => {
 };
 
 const selectVantaEffect = (condition = '') => {
-  if (!vantaEffects) {
-    return null;
-  }
-
   const normalized = condition.toLowerCase();
-  const { CLOUDS, FOG, WAVES } = vantaEffects;
 
   if (normalized.includes('rain') || normalized.includes('thunder')) {
     return FOG;
@@ -812,21 +730,15 @@ const selectVantaEffect = (condition = '') => {
   return CLOUDS;
 };
 
-const initVanta = async () => {
+const initVanta = () => {
   if (typeof window === 'undefined' || !weatherCard.value) {
-    return;
-  }
-
-  await ensureVantaAssets();
-
-  if (!THREERef || !vantaEffects) {
     return;
   }
 
   destroyVanta();
 
   const condition = props.currentWeather?.weather?.[0]?.main ?? '';
-  const effectType = selectVantaEffect(condition) ?? vantaEffects.CLOUDS;
+  const effectType = selectVantaEffect(condition);
 
   if (!effectType) {
     return;
@@ -852,7 +764,7 @@ const initVanta = async () => {
     const { minHeight, scale, scaleMobile } = getVantaViewportConfig();
     vantaEffect = effectType({
       el: weatherCard.value,
-      THREE: THREERef,
+      THREE,
       mouseControls: false,
       touchControls: false,
       gyroControls: false,
