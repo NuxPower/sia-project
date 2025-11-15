@@ -28,13 +28,15 @@ COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 
 WORKDIR /var/www/html
 
-COPY klema/composer.json klema/composer.lock ./ 
-RUN composer install --no-dev --optimize-autoloader --prefer-dist --no-interaction
+COPY klema/composer.json klema/composer.lock ./
+RUN composer install --no-dev --optimize-autoloader --prefer-dist --no-interaction --no-scripts
 
-COPY klema/package.json klema/package-lock.json ./ 
+COPY klema/package.json klema/package-lock.json ./
 RUN npm ci --omit=dev=false --legacy-peer-deps=false
 
 COPY klema/ .
+
+RUN php artisan package:discover --ansi
 
 RUN mkdir -p storage bootstrap/cache \
     && chown -R www-data:www-data storage bootstrap/cache \
