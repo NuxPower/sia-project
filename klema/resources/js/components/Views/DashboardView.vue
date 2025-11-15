@@ -239,35 +239,41 @@
                   <i class="fas fa-eye"></i>
                   <span>View</span>
                 </button>
-                <button
-                  v-if="canFinishActivity(activity)"
-                  type="button"
-                  class="table-button success"
-                  @click="changeActivityStatus(activity, 'completed')"
-                  :disabled="isActivityBusy(activity)"
-                >
-                  <i :class="isActivityBusy(activity) ? 'fas fa-spinner fa-spin' : 'fas fa-check'"></i>
-                  <span>Finish</span>
-                </button>
-                <button
-                  v-if="canCancelActivity(activity)"
-                  type="button"
-                  class="table-button warning"
-                  @click="changeActivityStatus(activity, 'cancelled')"
-                  :disabled="isActivityBusy(activity)"
-                >
-                  <i :class="isActivityBusy(activity) ? 'fas fa-spinner fa-spin' : 'fas fa-ban'"></i>
-                  <span>Cancel</span>
-                </button>
-                <button
-                  type="button"
-                  class="table-button danger"
-                  @click="deleteActivity(activity)"
-                  :disabled="isActivityBusy(activity)"
-                >
-                  <i :class="isActivityBusy(activity, 'delete') ? 'fas fa-spinner fa-spin' : 'fas fa-trash'"></i>
-                  <span>Delete</span>
-                </button>
+                <template v-if="isActivityActive(activity)">
+                  <button
+                    v-if="canFinishActivity(activity)"
+                    type="button"
+                    class="table-button success"
+                    @click="changeActivityStatus(activity, 'completed')"
+                    :disabled="isActivityBusy(activity)"
+                  >
+                    <i :class="isActivityBusy(activity) ? 'fas fa-spinner fa-spin' : 'fas fa-check'"></i>
+                    <span>Finish</span>
+                  </button>
+                  <button
+                    v-if="canCancelActivity(activity)"
+                    type="button"
+                    class="table-button warning"
+                    @click="changeActivityStatus(activity, 'cancelled')"
+                    :disabled="isActivityBusy(activity)"
+                  >
+                    <i :class="isActivityBusy(activity) ? 'fas fa-spinner fa-spin' : 'fas fa-ban'"></i>
+                    <span>Cancel</span>
+                  </button>
+                  <button
+                    type="button"
+                    class="table-button danger"
+                    @click="deleteActivity(activity)"
+                    :disabled="isActivityBusy(activity)"
+                  >
+                    <i :class="isActivityBusy(activity, 'delete') ? 'fas fa-spinner fa-spin' : 'fas fa-trash'"></i>
+                    <span>Delete</span>
+                  </button>
+                </template>
+                <span v-else class="table-button disabled">
+                  <i class="fas fa-ban"></i>
+                  <span>No actions</span>
+                </span>
               </td>
             </tr>
           </tbody>
@@ -643,6 +649,11 @@ const deleteActivity = (activity) => {
   }
 
   emit('delete-activity', id);
+};
+
+const isActivityActive = (activity) => {
+  const status = (activity?.status ?? '').toLowerCase();
+  return status !== 'completed' && status !== 'cancelled';
 };
 
 const openActivityDetail = (activity) => {
@@ -1462,6 +1473,14 @@ const weatherEffectClass = computed(() => {
 .table-button:disabled {
   opacity: 0.6;
   cursor: not-allowed;
+}
+
+.table-button.disabled {
+  background: rgba(148, 163, 184, 0.15);
+  border-color: rgba(148, 163, 184, 0.35);
+  color: #94a3b8;
+  cursor: default;
+  pointer-events: none;
 }
 
 .activity-detail-modal {

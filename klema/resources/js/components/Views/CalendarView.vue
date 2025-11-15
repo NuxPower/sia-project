@@ -216,7 +216,11 @@ function applySelectedActivityLabel() {
   form.value.activity_type = match?.label ?? '';
 }
 
-const form = ref(defaultFormState());
+const todayDateKey = formatDateKey(new Date());
+const form = ref({
+  ...defaultFormState(),
+  start_date: todayDateKey
+});
 applySelectedActivityLabel();
 
 const recommendationStatusMap = {
@@ -568,34 +572,43 @@ const submitActivity = async () => {
   }
 };
 
-const emitSelectedDay = (dateKey, dayMeta = null) => {
+const emitSelectedDay = (dateKey, dayMeta = null, mode = 'create') => {
   if (!dateKey) {
     return;
   }
-
-  const selectedDate = toDateOnly(dateKey);
-  const today = toDateOnly(new Date());
-  const isPast =
-    selectedDate && today
-      ? selectedDate.getTime() < today.getTime()
-      : false;
 
   const payload = {
     date: dateKey,
     forecast: forecastByDate.value[dateKey] ?? null,
     activities: activitiesByDate.value[dateKey] ?? [],
     dayMeta,
-    mode: isPast ? 'view' : 'create'
+    mode
   };
   emit('open-day', payload);
 };
 
-const openCreateViewForDate = (dateKey = formatDateKey(currentDate.value)) => {
-  emitSelectedDay(dateKey);
+const openCreateViewForDate = (dateKey = formatDateKey(new Date())) => {
+  const selectedDate = toDateOnly(dateKey);
+  const today = toDateOnly(new Date());
+  const safeDate =
+    selectedDate && today && selectedDate.getTime() < today.getTime()
+      ? formatDateKey(today)
+      : dateKey;
+
+  emitSelectedDay(safeDate, null, 'create');
 };
 
 const handleDayClick = (day) => {
-  emitSelectedDay(day?.fullDate, day);
+  if (!day?.fullDate) {
+    return;
+  }
+
+  const dayDate = toDateOnly(day.fullDate);
+  const today = toDateOnly(new Date());
+  const isPast =
+    dayDate && today ? dayDate.getTime() < today.getTime() : false;
+
+  emitSelectedDay(day.fullDate, day, isPast ? 'view' : 'create');
 };
 
 onMounted(() => {
