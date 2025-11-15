@@ -85,9 +85,15 @@ class ActivityApiController extends Controller
             'end_date' => 'nullable|date|after_or_equal:start_date',
             'status' => 'nullable|in:pending,in_progress,completed,cancelled',
             'notes' => 'nullable|string',
+            'weather_warning' => 'nullable|string|max:255',
         ]);
 
+        if (array_key_exists('weather_warning', $validated)) {
+            $validated['weather_warning'] = trim((string) $validated['weather_warning']) ?: null;
+        }
+
         $weatherCheck = $this->checkWeatherSuitability($validated['start_date']);
+        $weatherWarning = $validated['weather_warning'] ?? $weatherCheck['warning'];
 
         $activity = Activity::create([
             'user_id' => auth()->id(),
@@ -97,7 +103,7 @@ class ActivityApiController extends Controller
             'end_date' => $validated['end_date'] ?? null,
             'status' => $validated['status'] ?? 'pending',
             'notes' => $validated['notes'] ?? null,
-            'weather_warning' => $weatherCheck['warning'],
+            'weather_warning' => $weatherWarning,
         ]);
 
         return response()->json([
@@ -137,12 +143,17 @@ class ActivityApiController extends Controller
             'end_date' => 'nullable|date|after_or_equal:start_date',
             'status' => 'sometimes|required|in:pending,in_progress,completed,cancelled',
             'notes' => 'nullable|string',
+            'weather_warning' => 'nullable|string|max:255',
         ]);
+
+        if (array_key_exists('weather_warning', $validated)) {
+            $validated['weather_warning'] = trim((string) $validated['weather_warning']) ?: null;
+        }
 
         $weatherCheck = null;
         if (array_key_exists('start_date', $validated)) {
             $weatherCheck = $this->checkWeatherSuitability($validated['start_date']);
-            $validated['weather_warning'] = $weatherCheck['warning'];
+            $validated['weather_warning'] = $validated['weather_warning'] ?? $weatherCheck['warning'];
         }
 
         $activity->fill($validated);

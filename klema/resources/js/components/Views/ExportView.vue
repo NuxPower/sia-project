@@ -468,7 +468,7 @@ const formatDate = (dateString) => {
 /* Extra Small Devices (phones, up to 480px) */
 @media (max-width: 480px) {
   .exports-view {
-    padding: 1rem;
+    padding: 0.75rem;
   }
 
   .export-header h2 {
@@ -532,7 +532,7 @@ const formatDate = (dateString) => {
 /* Small Devices (landscape phones, 481px to 640px) */
 @media (min-width: 481px) and (max-width: 640px) {
   .exports-view {
-    padding: 1.25rem;
+    padding: 0.95rem;
   }
 
   .form-row {
@@ -547,7 +547,7 @@ const formatDate = (dateString) => {
 /* Medium Devices (tablets, 641px to 768px) */
 @media (min-width: 641px) and (max-width: 768px) {
   .exports-view {
-    padding: 1.5rem;
+    padding: 1.1rem;
   }
 
   .form-row {
@@ -562,7 +562,7 @@ const formatDate = (dateString) => {
 /* Standard Mobile (up to 768px) */
 @media (max-width: 768px) {
   .exports-view {
-    padding: 1.25rem;
+    padding: 0.95rem;
   }
   
   .form-row {

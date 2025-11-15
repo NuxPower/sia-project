@@ -27,49 +27,51 @@
     </div>
 
     <div class="calendar-grid">
-      <div class="calendar-weekdays">
-        <div v-for="day in weekdays" :key="day" class="weekday">{{ day }}</div>
-      </div>
-      
-      <div class="calendar-days">
-        <div
-          v-for="(day, index) in calendarDays"
-          :key="index"
-          class="calendar-day"
-          :class="{
-            'other-month': !day.currentMonth,
-            'today': day.isToday,
-            'has-weather': day.hasWeather,
-            'no-data': day.weather?.noData,
-            'has-activities': day.activities?.length
-          }"
-          @click="handleDayClick(day)"
-        >
-          <div class="day-number">{{ day.date }}</div>
-          <div v-if="day.hasWeather" class="day-weather">
-            <i :class="getWeatherIcon({ condition: day.weather.condition, icon: day.weather.icon })"></i>
-            <span class="day-temp">{{ day.weather.temp !== null && day.weather.temp !== undefined ? formatTemperature(day.weather.temp, { decimals: 0 }).replace('°C', '°').replace('°F', '°') : '—' }}</span>
-          </div>
-          <div v-else-if="day.weather?.noData" class="day-no-data">
-            <span>No data available</span>
-          </div>
-          <div v-if="day.activities?.length" class="day-activities">
-            <div
-              v-for="(activity, activityIndex) in day.activities.slice(0, 3)"
-              :key="activity.id ?? `${activity.start_date}-${activityIndex}`"
-              class="activity-chip"
-              :class="activity.status || 'pending'"
-            >
-              <span class="chip-title">{{ activity.activity_type }}</span>
-              <span class="chip-field">{{ activity.field }}</span>
-              <i
-                v-if="activity.weather_warning"
-                class="fas fa-exclamation-circle warning-icon"
-                :title="activity.weather_warning"
-              ></i>
+      <div class="calendar-scroll">
+        <div class="calendar-weekdays">
+          <div v-for="day in weekdays" :key="day" class="weekday">{{ day }}</div>
+        </div>
+        
+        <div class="calendar-days">
+          <div
+            v-for="(day, index) in calendarDays"
+            :key="index"
+            class="calendar-day"
+            :class="{
+              'other-month': !day.currentMonth,
+              'today': day.isToday,
+              'has-weather': day.hasWeather,
+              'no-data': day.weather?.noData,
+              'has-activities': day.activities?.length
+            }"
+            @click="handleDayClick(day)"
+          >
+            <div class="day-number">{{ day.date }}</div>
+            <div v-if="day.hasWeather" class="day-weather">
+              <i :class="getWeatherIcon({ condition: day.weather.condition, icon: day.weather.icon })"></i>
+              <span class="day-temp">{{ day.weather.temp !== null && day.weather.temp !== undefined ? formatTemperature(day.weather.temp, { decimals: 0 }).replace('°C', '°').replace('°F', '°') : '—' }}</span>
             </div>
-            <div v-if="day.activities.length > 3" class="activity-more">
-              +{{ day.activities.length - 3 }} more
+            <div v-else-if="day.weather?.noData" class="day-no-data">
+              <span>No data available</span>
+            </div>
+            <div v-if="day.activities?.length" class="day-activities">
+              <div
+                v-for="(activity, activityIndex) in day.activities.slice(0, 3)"
+                :key="activity.id ?? `${activity.start_date}-${activityIndex}`"
+                class="activity-chip"
+                :class="activity.status || 'pending'"
+              >
+                <span class="chip-title">{{ activity.activity_type }}</span>
+                <span class="chip-field">{{ activity.field }}</span>
+                <i
+                  v-if="activity.weather_warning"
+                  class="fas fa-exclamation-circle warning-icon"
+                  :title="activity.weather_warning"
+                ></i>
+              </div>
+              <div v-if="day.activities.length > 3" class="activity-more">
+                +{{ day.activities.length - 3 }} more
+              </div>
             </div>
           </div>
         </div>
@@ -791,11 +793,31 @@ watch(
   margin-bottom: 20px;
 }
 
+.calendar-scroll {
+  width: 100%;
+  overflow: auto;
+  padding-bottom: 6px;
+  border-radius: 12px;
+  scroll-behavior: smooth;
+  scroll-snap-type: both proximity;
+  touch-action: pan-x pan-y;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+
+.calendar-scroll::-webkit-scrollbar {
+  display: none;
+}
+
 .calendar-weekdays {
   display: grid;
-  grid-template-columns: repeat(7, 1fr);
+  grid-template-columns: repeat(7, minmax(80px, 1fr));
   gap: 10px;
   margin-bottom: 15px;
+  width: max(640px, 100%);
+  min-width: max(640px, 100%);
+  margin-left: auto;
+  margin-right: auto;
 }
 
 .weekday {
@@ -808,9 +830,11 @@ watch(
 
 .calendar-days {
   display: grid;
-  grid-template-columns: repeat(7, minmax(0, 1fr));
+  grid-template-columns: repeat(7, minmax(80px, 1fr));
   gap: 10px;
-  width: 100%;
+  width: max(640px, 100%);
+  min-width: max(640px, 100%);
+  margin: 0 auto;
 }
 
 .calendar-day {
@@ -826,6 +850,7 @@ watch(
   cursor: pointer;
   min-width: 0;
   overflow: hidden;
+  scroll-snap-align: center;
 }
 
 .calendar-day:hover {
@@ -1088,6 +1113,22 @@ watch(
   display: flex;
   flex-direction: column;
   gap: 6px;
+  flex: 1 1 auto;
+  overflow-y: auto;
+  padding-right: 2px;
+}
+
+.day-activities::-webkit-scrollbar {
+  width: 3px;
+}
+
+.day-activities::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.6);
+  border-radius: 999px;
+}
+
+.day-activities::-webkit-scrollbar-track {
+  background: transparent;
 }
 
 .day-no-data {
@@ -1352,7 +1393,7 @@ watch(
 /* Extra Small Devices (phones, up to 480px) */
 @media (max-width: 480px) {
   .calendar-view {
-    padding: 0.9375rem 0.5rem;
+    padding: 0.7rem 0.4rem;
     width: 100%;
     max-width: 100%;
     min-width: 100%;
@@ -1399,13 +1440,21 @@ watch(
     padding: 0.375rem 0.125rem;
   }
   
+  .calendar-scroll {
+    max-height: 70vh;
+  }
+
+  .calendar-weekdays,
+  .calendar-weekdays,
   .calendar-days {
-    gap: 0.25rem;
+    gap: 0.35rem;
+    width: max(520px, 100%);
+    min-width: max(520px, 100%);
   }
   
   .calendar-day {
-    padding: 0.25rem;
-    border-radius: 0.5rem;
+    padding: 0.45rem;
+    border-radius: 0.65rem;
   }
   
   .day-number {
@@ -1467,7 +1516,7 @@ watch(
 /* Small Devices (landscape phones, 481px to 640px) */
 @media (min-width: 481px) and (max-width: 640px) {
   .calendar-view {
-    padding: 1.25rem 0.75rem;
+    padding: 0.9rem 0.5rem;
     width: 100%;
     max-width: 100%;
     min-width: 100%;
@@ -1498,12 +1547,15 @@ watch(
     padding: 0.5rem 0.25rem;
   }
 
+  .calendar-weekdays,
   .calendar-days {
-    gap: 0.375rem;
+    gap: 0.4rem;
+    width: max(560px, 100%);
+    min-width: max(560px, 100%);
   }
-
+  
   .calendar-day {
-    padding: 0.5rem;
+    padding: 0.5rem 0.6rem;
   }
 
   .day-number {
@@ -1514,7 +1566,7 @@ watch(
 /* Medium Devices (tablets, 641px to 768px) */
 @media (min-width: 641px) and (max-width: 768px) {
   .calendar-view {
-    padding: 1.5rem 1rem;
+    padding: 1rem 0.6rem;
     width: 100%;
     max-width: 100%;
     min-width: 100%;
@@ -1540,7 +1592,7 @@ watch(
 /* Standard Mobile (up to 768px) */
 @media (max-width: 768px) {
   .calendar-view {
-    padding: 1.25rem 0.625rem;
+    padding: 0.9rem 0.5rem;
     width: 100%;
     max-width: 100%;
     min-width: 100%;
@@ -1583,13 +1635,16 @@ watch(
     padding: 0.5rem 0.25rem;
   }
   
+  .calendar-weekdays,
   .calendar-days {
-    gap: 0.375rem;
+    gap: 0.35rem;
+    width: max(600px, 100%);
+    min-width: max(600px, 100%);
   }
   
   .calendar-day {
-    padding: 0.375rem;
-    border-radius: 0.5rem;
+    padding: 0.5rem;
+    border-radius: 0.55rem;
   }
   
   .day-number {

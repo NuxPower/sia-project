@@ -109,10 +109,10 @@ If you want to develop and see changes live on your phone:
    hostname -I
    ```
 
-3. **Update `capacitor.config.ts`:**
+3. **Update `capacitor.config.ts` (point to `/app` so the SPA dashboard loads instead of the Blade login):**
    ```typescript
    server: {
-     url: 'http://YOUR_IP_ADDRESS:8000',  // Replace with your IP
+     url: 'http://YOUR_IP_ADDRESS:8000/app',  // Replace with your IP
      cleartext: true
    }
    ```
@@ -244,6 +244,7 @@ adb logcat
 # Uninstall app
 adb uninstall com.klema.weather
 ```
+
 
 
 

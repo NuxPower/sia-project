@@ -9,9 +9,11 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Password as PasswordBroker;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rules\Password;
 use Illuminate\Validation\ValidationException;
+use Illuminate\Auth\Events\PasswordReset;
 
 class AuthApiController extends Controller
 {
@@ -174,6 +176,101 @@ class AuthApiController extends Controller
         return response()->json([
             'success' => true,
             'message' => 'Verification link sent successfully.',
+        ]);
+    }
+
+    public function resendVerificationForEmail(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'email' => ['required', 'email'],
+        ]);
+
+        $user = User::where('email', $validated['email'])->first();
+
+        if (! $user) {
+            return response()->json([
+                'success' => true,
+                'message' => 'If the account exists, we have sent another verification email.',
+            ]);
+        }
+
+        if ($user->hasVerifiedEmail()) {
+            return response()->json([
+                'success' => true,
+                'message' => 'Your email is already verified.',
+            ]);
+        }
+
+        $user->sendEmailVerificationNotification();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Verification email sent successfully.',
+        ]);
+    }
+
+    public function sendPasswordResetLink(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'email' => ['required', 'email'],
+        ]);
+
+        $status = PasswordBroker::broker()->sendResetLink([
+            'email' => $validated['email'],
+        ]);
+
+        if ($status !== PasswordBroker::RESET_LINK_SENT) {
+            throw ValidationException::withMessages([
+                'email' => [__($status)],
+            ]);
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Password reset instructions sent if the account exists.',
+        ]);
+    }
+
+    public function resetPassword(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'token' => ['required', 'string'],
+            'email' => ['required', 'email'],
+            'password' => [
+                'required',
+                'string',
+                'confirmed',
+                Password::min(12)
+                    ->letters()
+                    ->mixedCase()
+                    ->numbers()
+                    ->symbols()
+                    ->uncompromised(),
+            ],
+        ]);
+
+        $status = PasswordBroker::broker()->reset(
+            $validated,
+            function ($user) use ($validated) {
+                $user->forceFill([
+                    'password' => Hash::make($validated['password']),
+                ])->setRememberToken(Str::random(60));
+
+                $user->save();
+
+                event(new PasswordReset($user));
+            }
+        );
+
+        if ($status !== PasswordBroker::PASSWORD_RESET) {
+            throw ValidationException::withMessages([
+                'email' => [__($status)],
+            ]);
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Password reset successfully. You can now sign in.',
         ]);
     }
 }

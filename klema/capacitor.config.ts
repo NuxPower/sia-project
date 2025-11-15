@@ -1,7 +1,8 @@
 import { CapacitorConfig } from '@capacitor/cli';
 
 const env = (globalThis as unknown as { process?: { env?: Record<string, string | undefined> } }).process?.env ?? {};
-const serverUrl = env.CAPACITOR_SERVER_URL || 'http://192.168.1.18:8000';
+const defaultServerUrl = 'http://192.168.1.18:8000/app';
+const serverUrl = env.CAPACITOR_SERVER_URL || defaultServerUrl;
 const isHttps = serverUrl.startsWith('https://');
 
 const config: CapacitorConfig = {
@@ -11,7 +12,7 @@ const config: CapacitorConfig = {
   server: {
     // For local development, use your computer's IP address:
     // Find it with: hostname -I or ip addr show
-    // Example: url: 'http://192.168.1.100:8000',
+    // Example: url: 'http://192.168.1.100:8000/app',
     url: serverUrl,
     cleartext: !isHttps  // Required for HTTP (not HTTPS)
     

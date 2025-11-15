@@ -35,7 +35,9 @@ const localValue = computed({
   position: fixed;
   top: 20px;
   right: 20px;
+  left: auto;
   z-index: 1000;
+  max-width: 420px;
 }
 
 .search-container {
@@ -46,6 +48,7 @@ const localValue = computed({
   padding: 12px 16px;
   color: white;
   min-width: 300px;
+  width: 100%;
 }
 
 .search-icon {
@@ -69,5 +72,19 @@ const localValue = computed({
 .search-input:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+}
+
+@media (max-width: 640px) {
+  .search-bar {
+    top: 16px;
+    left: 16px;
+    right: 16px;
+    max-width: none;
+  }
+
+  .search-container {
+    padding: 12px 14px;
+    min-width: 0;
+  }
 }
 </style>

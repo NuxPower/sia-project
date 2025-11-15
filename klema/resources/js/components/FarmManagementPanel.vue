@@ -613,10 +613,12 @@ watch(() => [editForm.latitude, editForm.longitude], ([lat, lng]) => {
   display: flex;
   gap: 8px;
   margin-top: 8px;
+  align-items: stretch;
 }
 
 .farm-panel__actions--wrap {
   flex-wrap: wrap;
+  width: 100%;
 }
 
 .farm-panel__button {
@@ -631,6 +633,8 @@ watch(() => [editForm.latitude, editForm.longitude], ([lat, lng]) => {
   font-size: 13px;
   cursor: pointer;
   transition: background 0.2s ease, border-color 0.2s ease;
+  justify-content: center;
+  text-align: center;
 }
 
 .farm-panel__button:hover {
@@ -670,6 +674,17 @@ watch(() => [editForm.latitude, editForm.longitude], ([lat, lng]) => {
   background: rgba(59, 130, 246, 0.4);
   border-color: rgba(59, 130, 246, 0.5);
   color: #dbeafe;
+}
+
+.farm-panel__actions--wrap .farm-panel__button {
+  flex: 1 1 calc(50% - 8px);
+  min-width: 150px;
+}
+
+@media (max-width: 640px) {
+  .farm-panel__actions--wrap .farm-panel__button {
+    flex: 1 1 100%;
+  }
 }
 
 .farm-panel__hint {

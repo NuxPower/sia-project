@@ -267,7 +267,7 @@ class ExportApiController extends Controller
                 'start_date' => $activity->start_date->format('Y-m-d'),
                 'end_date' => $activity->end_date ? $activity->end_date->format('Y-m-d') : 'N/A',
                 'status' => $activity->status ?? 'scheduled',
-                'weather_warning' => $activity->weather_warning ?? 'N/A',
+                'weather_warning' => $activity->weather_warning ?? 'No weather warning logged',
                 'notes' => $activity->notes ?? 'N/A',
             ];
         }

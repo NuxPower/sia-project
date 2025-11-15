@@ -210,31 +210,31 @@
               v-for="activity in filteredActivities"
               :key="resolveActivityId(activity) ?? activity.start_date"
             >
-              <td>
+              <td data-label="Activity">
                 <div class="activity-name">
                   <strong>{{ activity.activity_type }}</strong>
                   <small v-if="activity.notes">{{ activity.notes }}</small>
                 </div>
               </td>
-              <td>
+              <td data-label="Field">
                 <div class="activity-field">
                   {{ activity.field || '—' }}
                 </div>
               </td>
-              <td>{{ formatActivityDate(activity.start_date) }}</td>
-              <td>
+              <td data-label="Start Date" class="start-date">{{ formatActivityDate(activity.start_date) }}</td>
+              <td data-label="Status">
                 <span :class="statusChipClass(activity.status)">
                   {{ (activity.status || 'pending').replace('_', ' ') }}
                 </span>
               </td>
-              <td>
+              <td data-label="Weather">
                 <div v-if="activity.weather_warning" class="weather-warning-chip">
                   <i class="fas fa-exclamation-triangle"></i>
                   <span>{{ activity.weather_warning }}</span>
                 </div>
                 <span v-else class="no-warning">Clear</span>
               </td>
-              <td class="activity-actions">
+              <td class="activity-actions" data-label="Actions">
                 <button type="button" class="table-button" @click="openActivityDetail(activity)">
                   <i class="fas fa-eye"></i>
                   <span>View</span>
@@ -740,17 +740,34 @@ const initVanta = () => {
   const condition = props.currentWeather?.weather?.[0]?.main ?? '';
   const effectType = selectVantaEffect(condition);
 
+  const getVantaViewportConfig = () => {
+    if (typeof window === 'undefined') {
+      return { minHeight: 200, scale: 1, scaleMobile: 1 };
+    }
+
+    if (window.innerWidth <= 480) {
+      return { minHeight: 130, scale: 1, scaleMobile: 1 };
+    }
+
+    if (window.innerWidth <= 768) {
+      return { minHeight: 160, scale: 1, scaleMobile: 1 };
+    }
+
+    return { minHeight: 200, scale: 1, scaleMobile: 1 };
+  };
+
   try {
+    const { minHeight, scale, scaleMobile } = getVantaViewportConfig();
     vantaEffect = effectType({
       el: weatherCard.value,
       THREE,
       mouseControls: false,
       touchControls: false,
       gyroControls: false,
-      minHeight: 200.0,
+      minHeight,
       minWidth: 200.0,
-      scale: 1.0,
-      scaleMobile: 1.0,
+      scale,
+      scaleMobile,
       color: 0x0077ff,
       backgroundAlpha: 0.0
     });
@@ -842,8 +859,8 @@ const weatherEffectClass = computed(() => {
 .weather-summary-card {
   background: rgba(0, 0, 0, 0.6);
   border-radius: 20px;
-  padding: 30px;
-  margin-bottom: 30px;
+  padding: 28px;
+  margin-bottom: 22px;
   border: 1px solid rgba(255, 255, 255, 0.1);
   backdrop-filter: blur(10px);
   position: relative;
@@ -954,14 +971,17 @@ const weatherEffectClass = computed(() => {
 }
 
 .current-weather {
-  display: flex;
-  justify-content: space-between;
+  display: grid;
+  grid-template-columns: minmax(220px, 1fr) 1fr;
   align-items: center;
-  gap: 40px;
+  gap: 24px;
 }
 
 .temperature-display {
-  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  justify-content: center;
 }
 
 .temp-value {
@@ -992,42 +1012,41 @@ const weatherEffectClass = computed(() => {
 
 .weather-details {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 20px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
 }
 
 .detail-item {
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-template-columns: auto 1fr;
+  grid-template-rows: auto auto;
   align-items: center;
-  padding: 15px;
+  column-gap: 12px;
+  row-gap: 4px;
+  padding: 14px 16px;
   background: rgba(255, 255, 255, 0.05);
-  border-radius: 12px;
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
 }
 
 .detail-item i {
-  font-size: 24px;
-  color: #3b82f6;
-  margin-bottom: 8px;
-  -webkit-text-stroke: 0.5px rgba(15, 23, 42, 0.6);
-  text-shadow:
-    0 0 6px rgba(15, 23, 42, 0.45),
-    0 0 12px rgba(15, 23, 42, 0.35);
+  font-size: 20px;
+  color: #60a5fa;
+  grid-row: span 2;
 }
 
 .detail-item span {
-  font-size: 20px;
-  font-weight: bold;
-  color: #1f2937;
-  margin-bottom: 4px;
+  font-size: 18px;
+  font-weight: 700;
+  color: #f3f4f6;
+  line-height: 1.2;
 }
 
 .detail-item small {
-  font-size: 12px;
-  color: #374151;
+  font-size: 11px;
   letter-spacing: 0.4px;
   text-transform: uppercase;
+  color: #cbd5f5;
 }
 
 .forecast-grid {
@@ -1044,6 +1063,10 @@ const weatherEffectClass = computed(() => {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
   gap: 15px;
+  position: relative;
+  padding-top: 6px;
+  margin-top: -6px;
+  overflow: visible;
 }
 
 .forecast-card {
@@ -1191,7 +1214,6 @@ const weatherEffectClass = computed(() => {
   font-weight: bold;
   margin-bottom: 4px;
 }
-
 .stat-label {
   color: #9ca3af;
   font-size: 12px;
@@ -1239,6 +1261,7 @@ const weatherEffectClass = computed(() => {
 .activities-header h3 {
   margin: 0;
   font-size: 20px;
+  color: white;
 }
 
 .activities-header p {
@@ -1357,12 +1380,20 @@ const weatherEffectClass = computed(() => {
   width: 100%;
   border-collapse: collapse;
 }
-
+.activity-field {
+  color: white;
+}
 .activity-table th,
 .activity-table td {
   padding: 14px 12px;
   text-align: left;
   border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.activity-table td.start-date {
+  color: #fed7aa;
+  font-weight: 600;
+  letter-spacing: 0.02em;
 }
 
 .activity-table th {
@@ -1435,37 +1466,53 @@ const weatherEffectClass = computed(() => {
 
 .activity-actions {
   display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
+  flex-direction: column;
+  gap: 6px;
 }
 
 .table-button {
-  display: inline-flex;
+  width: 100%;
+  display: flex;
   align-items: center;
-  gap: 6px;
-  background: rgba(59, 130, 246, 0.1);
-  border: 1px solid rgba(59, 130, 246, 0.3);
-  color: #bfdbfe;
-  padding: 6px 10px;
-  border-radius: 10px;
+  justify-content: flex-start;
+  gap: 10px;
+  padding: 10px 14px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.05);
   font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
   cursor: pointer;
+  background: rgba(15, 23, 42, 0.65);
+  color: #e2e8f0;
+  transition: background 0.15s ease, border-color 0.15s ease, transform 0.15s ease;
+}
+
+.table-button i {
+  font-size: 14px;
+  opacity: 0.8;
+}
+
+.table-button:hover:not(:disabled) {
+  background: rgba(59, 130, 246, 0.12);
+  border-color: rgba(59, 130, 246, 0.3);
+  transform: translateX(2px);
 }
 
 .table-button.success {
-  background: rgba(16, 185, 129, 0.12);
+  background: rgba(16, 185, 129, 0.14);
   border-color: rgba(16, 185, 129, 0.4);
   color: #6ee7b7;
 }
 
 .table-button.warning {
-  background: rgba(250, 204, 21, 0.12);
+  background: rgba(250, 204, 21, 0.14);
   border-color: rgba(250, 204, 21, 0.4);
   color: #fde68a;
 }
 
 .table-button.danger {
-  background: rgba(239, 68, 68, 0.12);
+  background: rgba(239, 68, 68, 0.14);
   border-color: rgba(239, 68, 68, 0.4);
   color: #fecaca;
 }
@@ -1661,10 +1708,143 @@ const weatherEffectClass = computed(() => {
 
 /* Responsive Design - Mobile First Approach */
 
+@media (max-width: 640px) {
+  .dashboard-view {
+    padding: 0.75rem 0.5rem;
+  }
+
+  .weather-summary-card {
+    padding: 0.55rem 0.7rem;
+    border-radius: 0.85rem;
+    margin-bottom: 0.75rem;
+  }
+
+  .weather-summary-card::before {
+    inset: -20%;
+  }
+
+  .weather-summary-card.has-vanta .vanta-canvas {
+    opacity: 0.8;
+  }
+
+  .current-weather {
+    grid-template-columns: 1fr;
+    gap: 0.75rem;
+  }
+
+  .temp-value {
+    font-size: 2.2rem;
+    text-align: left;
+  }
+
+  .weather-details {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.5rem;
+  }
+
+  .detail-item {
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.65rem 0.75rem;
+  }
+
+  .detail-item span {
+    font-size: 0.95rem;
+  }
+
+  .activities-header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .activities-header .secondary-button {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .activity-controls {
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .control-field {
+    min-width: unset;
+    width: 100%;
+  }
+
+  .forecast-cards {
+    display: flex;
+    overflow-x: auto;
+    gap: 0.85rem;
+    padding-bottom: 0.5rem;
+    scroll-snap-type: x mandatory;
+  }
+
+  .forecast-card {
+    flex: 0 0 160px;
+    scroll-snap-align: start;
+  }
+
+  .activity-table,
+  .activity-table tbody,
+  .activity-table tr,
+  .activity-table td {
+    display: block;
+    width: 100%;
+  }
+
+  .activity-table thead {
+    display: none;
+  }
+
+  .activity-table tr {
+    background: rgba(15, 23, 42, 0.75);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 18px;
+    padding: 14px 16px;
+    margin-bottom: 16px;
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.35);
+  }
+
+  .activity-table td {
+    border: none;
+    padding: 8px 0;
+  }
+
+  .activity-table td::before {
+    content: attr(data-label);
+    display: block;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: #94a3b8;
+    margin-bottom: 2px;
+  }
+
+  .activity-actions {
+    flex-direction: column;
+    gap: 10px;
+    margin-top: 8px;
+  }
+
+  .activity-actions .table-button,
+  .activity-actions .table-button.success,
+  .activity-actions .table-button.warning,
+  .activity-actions .table-button.danger {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .activity-actions .table-button.disabled {
+    width: 100%;
+  }
+}
+
 /* Extra Small Devices (phones, up to 480px) */
 @media (max-width: 480px) {
   .dashboard-view {
-    padding: 1rem;
+    padding: 0.75rem 0.5rem;
   }
 
   .weather-summary-card {
@@ -1699,7 +1879,7 @@ const weatherEffectClass = computed(() => {
   }
 
   .weather-details {
-    grid-template-columns: 1fr;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 0.75rem;
   }
 
@@ -1721,12 +1901,12 @@ const weatherEffectClass = computed(() => {
   }
 
   .forecast-cards {
-    grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
     gap: 0.75rem;
   }
 
   .forecast-card {
     padding: 1rem;
+    flex: 0 0 140px;
   }
 
   .forecast-icon {
@@ -1784,7 +1964,7 @@ const weatherEffectClass = computed(() => {
   }
 
   .forecast-cards {
-    grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+    gap: 1rem;
   }
 
   .stats-grid {
@@ -1818,7 +1998,7 @@ const weatherEffectClass = computed(() => {
 /* Standard Mobile (up to 768px) */
 @media (max-width: 768px) {
   .dashboard-view {
-    padding: 1.25rem;
+    padding: 0.9rem 0.6rem;
   }
   
   .current-weather {
@@ -1827,7 +2007,7 @@ const weatherEffectClass = computed(() => {
   }
   
   .weather-details {
-    grid-template-columns: 1fr;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 1rem;
   }
   

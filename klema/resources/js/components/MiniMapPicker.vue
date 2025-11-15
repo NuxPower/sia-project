@@ -9,6 +9,7 @@
       />
       <button class="mini-map-picker__button" @click="performSearch" :disabled="isSearching">
         <i class="fas fa-search"></i>
+        <span>Search</span>
       </button>
     </div>
     <div ref="mapContainer" class="mini-map-picker__map" :style="{ height }"></div>
@@ -136,9 +137,25 @@ onMounted(() => {
 })
 
 onBeforeUnmount(() => {
-  if (map.value) {
-    map.value.remove()
+  if (!map.value) {
+    return
   }
+
+  // Stop any running animations (like wheel zoom inertia) before tearing down
+  map.value.stop?.()
+
+  // Clean up listeners to avoid callbacks firing after unmount
+  map.value.off()
+  marker.value?.off?.()
+
+  // Remove marker explicitly to detach from the map before it disappears
+  if (marker.value) {
+    marker.value.remove()
+    marker.value = null
+  }
+
+  map.value.remove()
+  map.value = null
 })
 </script>
 
@@ -151,29 +168,34 @@ onBeforeUnmount(() => {
 
 .mini-map-picker__controls {
   display: flex;
+  flex-wrap: wrap;
   gap: 8px;
 }
 
 .mini-map-picker__input {
-  flex: 1;
+  flex: 1 1 220px;
   padding: 8px 10px;
   border-radius: 8px;
   border: 1px solid rgba(59, 130, 246, 0.45);
   background: rgba(15, 23, 42, 0.7);
   color: #e2e8f0;
+  min-width: 0;
 }
 
 .mini-map-picker__button {
-  width: 40px;
-  height: 40px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  gap: 6px;
+  padding: 8px 14px;
   border-radius: 8px;
-  border: 1px solid rgba(59, 130, 246, 0.7);
-  background: rgba(59, 130, 246, 0.25);
-  color: #bfdbfe;
+  border: 1px solid rgba(59, 130, 246, 0.5);
+  background: linear-gradient(135deg, rgba(37, 99, 235, 0.65), rgba(59, 130, 246, 0.55));
+  color: #e0edff;
+  font-weight: 600;
+  letter-spacing: 0.01em;
   cursor: pointer;
+  flex: 0 0 auto;
 }
 
 .mini-map-picker__button:disabled {
@@ -186,6 +208,13 @@ onBeforeUnmount(() => {
   border-radius: 12px;
   overflow: hidden;
   border: 1px solid rgba(59, 130, 246, 0.35);
+}
+
+@media (max-width: 640px) {
+  .mini-map-picker__button {
+    flex: 1 1 140px;
+    justify-content: center;
+  }
 }
 </style>
 

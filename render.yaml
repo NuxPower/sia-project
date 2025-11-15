@@ -1,0 +1,87 @@
+databases:
+  - name: klema-db
+    databaseName: klema
+    plan: free
+    user: klema_app
+
+services:
+  - type: web
+    name: klema-web
+    env: docker
+    plan: starter
+    region: oregon
+    autoDeploy: true
+    envVars:
+      - key: APP_NAME
+        value: KLEMA
+      - key: APP_ENV
+        value: production
+      - key: APP_DEBUG
+        value: "false"
+      - key: APP_URL
+        value: https://klema.onrender.com
+      - key: APP_KEY
+        generateValue: true
+      - key: LOG_CHANNEL
+        value: stderr
+      - key: LOG_LEVEL
+        value: info
+      - key: DB_CONNECTION
+        value: pgsql
+      - key: DB_HOST
+        fromDatabase:
+          name: klema-db
+          property: host
+      - key: DB_PORT
+        fromDatabase:
+          name: klema-db
+          property: port
+      - key: DB_DATABASE
+        fromDatabase:
+          name: klema-db
+          property: database
+      - key: DB_USERNAME
+        fromDatabase:
+          name: klema-db
+          property: user
+      - key: DB_PASSWORD
+        fromDatabase:
+          name: klema-db
+          property: password
+      - key: RUN_MIGRATIONS
+        value: "1"
+      - key: SKIP_VITE_BUILD
+        value: "0"
+      - key: VITE_APP_ENV
+        value: production
+      - key: VITE_OPENWEATHER_API_KEY
+        sync: false
+      - key: OPENWEATHER_API_KEY
+        sync: false
+      - key: SESSION_DRIVER
+        value: database
+      - key: QUEUE_CONNECTION
+        value: database
+      - key: CACHE_DRIVER
+        value: file
+      - key: BROADCAST_DRIVER
+        value: log
+      - key: MAIL_MAILER
+        value: smtp
+      - key: MAIL_HOST
+        value: smtp.gmail.com
+      - key: MAIL_PORT
+        value: "587"
+      - key: MAIL_ENCRYPTION
+        value: tls
+      - key: MAIL_FROM_ADDRESS
+        value: no-reply@klema.local
+      - key: MAIL_FROM_NAME
+        value: KLEMA
+      - key: SANCTUM_STATEFUL_DOMAINS
+        value: klema.onrender.com
+      - key: SESSION_DOMAIN
+        value: klema.onrender.com
+      - key: FORCE_VITE_BUILD
+        value: "0"
+

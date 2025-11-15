@@ -58,11 +58,15 @@ If you must use web routes, you need to:
    php artisan config:clear
    ```
 
-2. **Make sure your frontend uses `/api/auth/login` for mobile**
+2. **Point the Capacitor WebView at `/app` instead of `/`**
+   - Set `CAPACITOR_SERVER_URL` (or edit `capacitor.config.ts`) to `http://YOUR_IP:8000/app`
+   - The new `/app` route always serves the Vue dashboard so the WebView never hits the Blade `/login`
 
-3. **Store the Bearer token and use it for all API requests**
+3. **Make sure your frontend uses `/api/auth/login` for mobile**
 
-4. **Rebuild and reinstall the app:**
+4. **Store the Bearer token and use it for all API requests**
+
+5. **Rebuild and reinstall the app:**
    ```bash
    npm run build:mobile
    cd android
@@ -77,6 +81,7 @@ Make sure your login component uses:
 - `/login` (web route) - for web browser only
 
 The API route returns a Bearer token that should be stored and used for all subsequent API requests.
+
 
 
 

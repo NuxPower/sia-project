@@ -8,6 +8,20 @@ import 'bootstrap';
 
 import axios from 'axios';
 import { getApiToken, revokeApiToken } from './services/auth';
+
+const isMobileContainer = () => {
+    if (typeof window === 'undefined') {
+        return false;
+    }
+    return window.location?.protocol === 'capacitor:' || window.location?.protocol === 'ionic:';
+};
+
+const hasSpaRoot = () => {
+    if (typeof document === 'undefined') {
+        return false;
+    }
+    return Boolean(document.getElementById('app'));
+};
 window.axios = axios;
 
 window.axios.defaults.headers.common['X-Requested-With'] = 'XMLHttpRequest';
@@ -62,11 +76,14 @@ window.axios.interceptors.response.use(
         if (error?.response?.status === 401) {
             revokeApiToken();
 
-            const isOnAuthPage = ['/login', '/register'].includes(window.location.pathname);
-            if (!isOnAuthPage) {
-                window.location.href = '/login';
+            if (isMobileContainer() || hasSpaRoot()) {
+                window.dispatchEvent(new CustomEvent('auth:required', {
+                    detail: {
+                        reason: 'unauthorized'
+                    }
+                }));
             } else {
-                window.location.reload();
+                window.location.href = '/app';
             }
         }
 

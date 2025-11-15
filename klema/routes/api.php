@@ -12,6 +12,9 @@ use App\Http\Controllers\API\ExportApiController;
 Route::prefix('auth')->group(function () {
     Route::middleware('throttle:login')->post('/login', [AuthApiController::class, 'login']);
     Route::middleware('throttle:register')->post('/register', [AuthApiController::class, 'register']);
+    Route::post('/password/forgot', [AuthApiController::class, 'sendPasswordResetLink'])->middleware('throttle:6,1');
+    Route::post('/password/reset', [AuthApiController::class, 'resetPassword'])->middleware('throttle:6,1');
+    Route::post('/email/resend', [AuthApiController::class, 'resendVerificationForEmail'])->middleware('throttle:6,1');
 
     Route::middleware(['auth:sanctum'])->group(function () {
         Route::post('/logout', [AuthApiController::class, 'logout']);
@@ -49,8 +52,8 @@ Route::middleware(['auth:sanctum', 'verified'])
     // Alert endpoints
     Route::get('/alerts/active', [AlertApiController::class, 'active']);
     Route::get('/alerts/forecast-warnings', [AlertApiController::class, 'forecastWarnings']);
-    Route::patch('/alerts/{alert}/resolve', [AlertApiController::class, 'resolve']);
-    Route::apiResource('alerts', AlertApiController::class);
+    Route::patch('/alerts/{alert}/resolve', [AlertApiController::class, 'resolve'])->whereNumber('alert');
+    Route::apiResource('alerts', AlertApiController::class)->whereNumber('alert');
 
     // Activity endpoints
     Route::get('/activities/meta', [ActivityApiController::class, 'meta']);

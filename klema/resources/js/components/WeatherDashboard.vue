@@ -1,5 +1,5 @@
 <template>
-  <div class="weather-dashboard">
+  <div v-if="isAuthenticated" class="weather-dashboard">
     <SearchBar 
       v-if="activeView === 'map' && !selectedDayDetail && !isDrawingBoundary"
       v-model="searchLocation"
@@ -89,12 +89,15 @@
     
     <TimelineLegend v-if="activeView === 'map' && !selectedDayDetail && !isDrawingBoundary" />
 
-    <transition name="overlay-fade">
-      <div v-if="activeView !== 'map' && !selectedDayDetail" class="overlay-wrapper">
+    <transition name="overlay-fade" v-if="!isMobileLayout">
+      <div
+        v-if="activeView !== 'map' && !selectedDayDetail && !isDrawingBoundary"
+        class="overlay-wrapper"
+      >
         <div class="overlay-panel">
           <div class="overlay-content">
             <Transition name="view-slide-fade" mode="out-in">
-            <component
+              <component
                 v-if="overlayViewConfig.component"
                 :is="overlayViewConfig.component"
                 v-bind="overlayViewConfig.props"
@@ -106,6 +109,30 @@
         </div>
       </div>
     </transition>
+
+    <div
+      v-else-if="activeView !== 'map' && !selectedDayDetail && !isDrawingBoundary"
+      class="mobile-panel"
+    >
+      <div class="mobile-panel__header">
+        <button class="mobile-panel__back" @click="setActiveView('map')">
+          <i class="fas fa-arrow-left"></i>
+          <span>Back to Map</span>
+        </button>
+        <h2 class="mobile-panel__title">{{ getMobilePanelTitle() }}</h2>
+      </div>
+      <div class="mobile-panel__content">
+        <Transition name="view-slide-fade" mode="out-in">
+          <component
+            v-if="overlayViewConfig.component"
+            :is="overlayViewConfig.component"
+            v-bind="overlayViewConfig.props"
+            v-on="overlayViewConfig.listeners"
+            :key="overlayViewConfig.key"
+          />
+        </Transition>
+      </div>
+    </div>
 
     <GlobalAlertNotification />
 
@@ -125,10 +152,14 @@
       @saved="handleCalendarActivitySaved"
     />
   </div>
+
+  <div v-else class="auth-screen">
+    <AuthContainer @login-success="handleLoginSuccess" />
+  </div>
 </template>
 
 <script setup>
-import { ref, onMounted, watch, computed, nextTick } from 'vue';
+import { ref, onMounted, onBeforeUnmount, watch, computed, nextTick } from 'vue';
 import axios from 'axios';
 import SearchBar from './SearchBar.vue';
 import ClickInstruction from './ClickInstruction.vue';
@@ -145,11 +176,12 @@ import SettingsView from './Views/SettingsView.vue';
 import ExportView from './Views/ExportView.vue';
 import DayDetailView from './Views/DayDetailView.vue';
 import GlobalAlertNotification from './GlobalAlertNotification.vue';
+import AuthContainer from './Auth/AuthContainer.vue';
 import { useWeatherAPI } from '../composables/useWeatherAPI';
 import { useWeatherUtils } from '../composables/useWeatherUtils';
 import { useGlobalAlerts } from '../composables/useGlobalAlerts';
 import { useFarmMap } from '../composables/useFarmMap';
-import { ensureApiToken } from '../services/auth';
+import { ensureApiToken, getApiToken, revokeApiToken } from '../services/auth';
 import { useAlerts } from '../composables/useAlerts';
 import { 
   useNotificationSettings,
@@ -157,7 +189,46 @@ import {
   SUPPORTED_NOTIFICATION_SETTING_KEYS
 } from '../composables/useNotificationSettings';
 
+const MOBILE_BREAKPOINT = 900;
 const weatherMapRef = ref(null);
+const hasStoredToken = () => {
+  try {
+    return !!getApiToken();
+  } catch (error) {
+    return false;
+  }
+};
+const isAuthenticated = ref(hasStoredToken());
+const isMobileLayout = ref(false);
+const updateViewportMode = () => {
+  if (typeof window === 'undefined') {
+    isMobileLayout.value = false;
+    return;
+  }
+  isMobileLayout.value = window.innerWidth <= MOBILE_BREAKPOINT;
+};
+updateViewportMode();
+const toggleDrawingModeClass = (isActive) => {
+  if (typeof document === 'undefined') {
+    return;
+  }
+  document.body.classList.toggle('drawing-boundary-mode', !!isActive);
+};
+
+const applyAuthBodyClass = (authState) => {
+  if (typeof document === 'undefined') {
+    return;
+  }
+  if (authState) {
+    document.body.classList.remove('auth-mode');
+  } else {
+    document.body.classList.add('auth-mode');
+  }
+};
+applyAuthBodyClass(isAuthenticated.value);
+watch(isAuthenticated, (next) => {
+  applyAuthBodyClass(next);
+});
 const DEFAULT_LOCATION_STRING = 'Northern Mindanao'; // Default fallback string
 const getDefaultLocation = () => {
   if (typeof window !== 'undefined' && 'geolocation' in navigator) {
@@ -479,6 +550,13 @@ const fetchUserInfo = async () => {
   } catch (error) {
     console.warn('Could not fetch user info:', error);
   }
+};
+
+const handleLoginSuccess = async (user) => {
+  currentUser.value = user;
+  isAuthenticated.value = true;
+  applyAuthBodyClass(true);
+  await bootstrapApp();
 };
 
 const locateFarm = (farmId) => {
@@ -929,6 +1007,14 @@ watch(rawFarms, async (farms, previous) => {
   }
 }, { immediate: true });
 
+watch(
+  isDrawingBoundary,
+  (next) => {
+    toggleDrawingModeClass(next);
+  },
+  { immediate: true }
+);
+
 watch(activeView, (view) => {
   if (view !== 'calendar') {
     calendarDetail.value = null;
@@ -1280,22 +1366,81 @@ const registerGlobalHandlers = () => {
 
 registerGlobalHandlers();
 
-onMounted(async () => {
-  await fetchUserInfo();
-  await ensureApiToken(window.axios);
-  
-  // Load farms first so we can use saved farm selection
-  await refreshFarmLayers({ reloadData: true });
-  
-  // Now initialize default location (which can use saved settings)
-  const prefilled = await initializeDefaultLocation();
-  if (!prefilled) {
-    await searchWeather();
+const bootstrapInProgress = ref(false);
+const bootstrapApp = async () => {
+  if (bootstrapInProgress.value) {
+    return;
   }
-  
-  registerGlobalHandlers();
-  
-  await initializeAlertsPanel();
+  bootstrapInProgress.value = true;
+  try {
+    await ensureApiToken(window.axios);
+    await fetchUserInfo();
+
+    // Load farms first so we can use saved farm selection
+    await refreshFarmLayers({ reloadData: true });
+
+    // Now initialize default location (which can use saved settings)
+    const prefilled = await initializeDefaultLocation();
+    if (!prefilled) {
+      await searchWeather();
+    }
+
+    registerGlobalHandlers();
+
+    await initializeAlertsPanel();
+  } finally {
+    bootstrapInProgress.value = false;
+  }
+};
+
+const handleAuthRequiredEvent = () => {
+  revokeApiToken();
+  currentUser.value = null;
+  isAuthenticated.value = false;
+  applyAuthBodyClass(false);
+};
+
+if (typeof window !== 'undefined') {
+  window.addEventListener('auth:required', handleAuthRequiredEvent);
+}
+
+onBeforeUnmount(() => {
+  if (typeof window !== 'undefined') {
+    window.removeEventListener('auth:required', handleAuthRequiredEvent);
+    window.removeEventListener('resize', updateViewportMode);
+  }
+  applyAuthBodyClass(true);
+  toggleDrawingModeClass(false);
+});
+
+const getMobilePanelTitle = () => {
+  switch (activeView.value) {
+    case 'dashboard':
+      return 'Dashboard';
+    case 'calendar':
+      return 'Calendar';
+    case 'alerts':
+      return 'Alerts';
+    case 'exports':
+      return 'Exports';
+    case 'settings':
+      return 'Settings';
+    default:
+      return 'Details';
+  }
+};
+
+onMounted(async () => {
+  if (typeof window !== 'undefined') {
+    window.addEventListener('resize', updateViewportMode);
+    updateViewportMode();
+  }
+
+  if (!isAuthenticated.value) {
+    return;
+  }
+
+  await bootstrapApp();
 });
 
 watch([farmFeatures, pointFeatures], () => {
@@ -1736,7 +1881,6 @@ const getLoadingSubtitle = () => {
   background: linear-gradient(135deg, #0f172a, #1e293b);
   overflow: hidden;
 }
-
 /* Drawing Controls */
 .drawing-controls {
   position: fixed;
@@ -1882,6 +2026,60 @@ const getLoadingSubtitle = () => {
 
 .drawing-controls__button i {
   font-size: 14px;
+}
+
+.auth-screen {
+  min-height: 100vh;
+  background: #0f172a;
+}
+
+.mobile-panel {
+  position: fixed;
+  inset: 0;
+  background: linear-gradient(135deg, #0f172a, #1e293b);
+  z-index: 4000;
+  display: flex;
+  flex-direction: column;
+}
+
+.mobile-panel__header {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 18px 20px;
+  background: rgba(15, 23, 42, 0.95);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
+}
+
+.mobile-panel__back {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border: none;
+  background: rgba(59, 130, 246, 0.15);
+  color: #93c5fd;
+  padding: 10px 14px;
+  border-radius: 999px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.mobile-panel__back i {
+  font-size: 14px;
+}
+
+.mobile-panel__title {
+  margin: 0;
+  color: #e2e8f0;
+  font-size: 16px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.mobile-panel__content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 20px;
 }
 
 /* Responsive Design - Mobile First Approach */

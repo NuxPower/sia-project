@@ -25,8 +25,25 @@
         body {
             margin: 0;
             padding: 0;
-            overflow: hidden;
             background: linear-gradient(135deg, #0f172a, #1e293b);
+            transition: background 0.3s ease;
+        }
+
+        body:not(.auth-mode) {
+            overflow: hidden;
+        }
+
+        body.auth-mode {
+            min-height: 100vh;
+            overflow-x: hidden;
+            overflow-y: auto;
+            background: radial-gradient(circle at 15% 20%, rgba(59, 130, 246, 0.45), transparent 55%),
+                        radial-gradient(circle at 85% 30%, rgba(14, 165, 233, 0.40), transparent 50%),
+                        linear-gradient(135deg, #0f172a 0%, #1e293b 45%, #111827 100%);
+        }
+
+        body.auth-mode .navbar {
+            display: none;
         }
 
         /* Sidebar Container */
@@ -373,6 +390,13 @@
 
         .custom-scrollbar::-webkit-scrollbar-thumb:hover {
             background: rgba(59, 130, 246, 0.6);
+        }
+
+        body.drawing-boundary-mode .navbar {
+            opacity: 0;
+            pointer-events: none;
+            transform: translateX(-24px);
+            transition: opacity 0.2s ease, transform 0.2s ease;
         }
 
         /* Smooth scrolling */

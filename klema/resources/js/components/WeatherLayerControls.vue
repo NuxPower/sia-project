@@ -1,17 +1,44 @@
 <template>
-  <div class="weather-layer-controls">
-    <div class="controls-header" @click="isExpanded = !isExpanded">
-      <span class="controls-title">🌤️ Weather Layers</span>
-      <button 
-        class="toggle-button"
-        :class="{ 'expanded': isExpanded }"
-      >
-        <i :class="isExpanded ? 'fas fa-chevron-up' : 'fas fa-chevron-down'"></i>
-      </button>
-    </div>
-    
-    <transition name="slide">
-      <div v-if="isExpanded" class="controls-body">
+  <div
+    class="weather-layer-controls"
+    :class="{ 'is-mobile': isMobileLayout, 'is-open': isMobileLayout && isExpanded }"
+  >
+    <button
+      v-if="isMobileLayout && !isExpanded"
+      class="mobile-layer-button"
+      type="button"
+      @click="openMobilePanel"
+    >
+      <i class="fas fa-layer-group"></i>
+    </button>
+
+    <div
+      v-else
+      class="layer-panel"
+      :class="{ 'mobile-panel': isMobileLayout }"
+    >
+      <div class="controls-header" @click="!isMobileLayout && toggleExpanded()">
+        <span class="controls-title">🌤️ Weather Layers</span>
+        <button 
+          v-if="!isMobileLayout"
+          class="toggle-button"
+          :class="{ 'expanded': isExpanded }"
+          type="button"
+        >
+          <i :class="isExpanded ? 'fas fa-chevron-up' : 'fas fa-chevron-down'"></i>
+        </button>
+        <button
+          v-else
+          class="toggle-button mobile-close"
+          type="button"
+          @click="closeMobilePanel"
+        >
+          <i class="fas fa-times"></i>
+        </button>
+      </div>
+      
+      <transition name="slide">
+        <div v-if="isExpanded" class="controls-body">
         <div class="layer-section">
           <div class="section-title">Base Maps</div>
           <div 
@@ -54,17 +81,19 @@
             </label>
           </div>
         </div>
-      </div>
-    </transition>
+        </div>
+      </transition>
+    </div>
   </div>
 </template>
 
 <script setup>
-import { ref } from 'vue';
+import { ref, onMounted, onBeforeUnmount, watch } from 'vue';
 
 const emit = defineEmits(['toggle-layer', 'change-base-layer']);
 
 const isExpanded = ref(true);
+const isMobileLayout = ref(false);
 
 const baseLayers = ref([
   { id: 'street', name: 'Street Map', icon: '🗺️', description: 'OpenStreetMap Standard' },
@@ -94,6 +123,47 @@ const toggleLayer = (layerId) => {
     emit('toggle-layer', { layerId, active: layer.active });
   }
 };
+
+const updateLayout = () => {
+  if (typeof window === 'undefined') {
+    isMobileLayout.value = false;
+    return;
+  }
+  isMobileLayout.value = window.innerWidth <= 640;
+};
+
+const toggleExpanded = () => {
+  isExpanded.value = !isExpanded.value;
+};
+
+const openMobilePanel = () => {
+  isExpanded.value = true;
+};
+
+const closeMobilePanel = () => {
+  isExpanded.value = false;
+};
+
+onMounted(() => {
+  updateLayout();
+  if (typeof window !== 'undefined') {
+    window.addEventListener('resize', updateLayout);
+  }
+});
+
+onBeforeUnmount(() => {
+  if (typeof window !== 'undefined') {
+    window.removeEventListener('resize', updateLayout);
+  }
+});
+
+watch(
+  isMobileLayout,
+  (next) => {
+    isExpanded.value = !next;
+  },
+  { immediate: true }
+);
 </script>
 
 <style scoped>
@@ -101,11 +171,14 @@ const toggleLayer = (layerId) => {
   position: fixed;
   top: 150px;
   right: 20px;
+  z-index: 1000;
+}
+
+.layer-panel {
   background: rgba(0, 0, 0, 0.85);
   border-radius: 12px;
   border: 1px solid rgba(59, 130, 246, 0.3);
   backdrop-filter: blur(15px);
-  z-index: 1000;
   min-width: 220px;
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
 }
@@ -277,6 +350,49 @@ const toggleLayer = (layerId) => {
 
 .base-option.active .base-indicator::after {
   opacity: 1;
+}
+
+.weather-layer-controls.is-mobile {
+  top: auto;
+  bottom: 170px;
+  right: 16px;
+}
+
+.layer-panel.mobile-panel {
+  width: min(320px, 90vw);
+  border-radius: 16px;
+  box-shadow: 0 20px 45px rgba(2, 6, 23, 0.6);
+}
+
+.weather-layer-controls.is-mobile .controls-header {
+  padding: 16px;
+}
+
+.weather-layer-controls.is-mobile .controls-body {
+  max-height: 65vh;
+}
+
+.mobile-layer-button {
+  width: 56px;
+  height: 56px;
+  border-radius: 18px;
+  border: 1px solid rgba(59, 130, 246, 0.5);
+  background: rgba(15, 23, 42, 0.9);
+  color: #bfdbfe;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+  box-shadow: 0 12px 24px rgba(2, 6, 23, 0.45);
+  cursor: pointer;
+}
+
+.mobile-layer-button:active {
+  transform: translateY(1px);
+}
+
+.mobile-close {
+  color: #e2e8f0;
 }
 
 .switch {

@@ -36,6 +36,14 @@
       </div>
     </section>
 
+    <div v-if="suggestedWeatherWarning" class="weather-warning-banner">
+      <i class="fas fa-exclamation-triangle"></i>
+      <div>
+        <strong>Weather warning detected</strong>
+        <p>{{ suggestedWeatherWarning }}</p>
+      </div>
+    </div>
+
     <section v-if="existingActivities.length" class="existing-activities">
       <h3>Planned activities on this day</h3>
       <ul>
@@ -134,6 +142,19 @@
       </label>
 
       <label class="form-field">
+        <span>End Date (optional)</span>
+        <input
+          v-model="form.end_date"
+          type="date"
+          :min="form.start_date"
+          :class="{ invalid: formErrors.end_date }"
+        />
+        <small v-if="formErrors.end_date" class="field-error">
+          {{ formErrors.end_date[0] }}
+        </small>
+      </label>
+
+      <label class="form-field">
         <span>Notes (optional)</span>
         <textarea
           v-model="form.notes"
@@ -141,6 +162,35 @@
         ></textarea>
         <small v-if="formErrors.notes" class="field-error">
           {{ formErrors.notes[0] }}
+        </small>
+      </label>
+
+      <label class="form-field">
+        <span>Weather warning (auto-filled)</span>
+        <input
+          v-model="form.weather_warning"
+          type="text"
+          placeholder="E.g., Heavy rainfall expected"
+          @input="handleWeatherWarningInput"
+        />
+        <small class="field-hint">
+          <template v-if="suggestedWeatherWarning">
+            Suggested: <strong>{{ suggestedWeatherWarning }}</strong>
+            <button
+              v-if="weatherWarningTouched"
+              type="button"
+              class="link-button"
+              @click="applySuggestedWarning"
+            >
+              Use suggestion
+            </button>
+          </template>
+          <template v-else>
+            No risky weather detected for this date.
+          </template>
+        </small>
+        <small v-if="formErrors.weather_warning" class="field-error">
+          {{ formErrors.weather_warning[0] }}
         </small>
       </label>
 
@@ -314,9 +364,12 @@ const form = ref({
   activity_type: fallbackActivityOptions[0]?.label ?? '',
   field: '',
   start_date: props.detail?.date ?? todayDateKey,
+  end_date: null,
   notes: '',
-  status: 'pending'
+  status: 'pending',
+  weather_warning: ''
 });
+const weatherWarningTouched = ref(false);
 
 const selectedActivityOption = computed(() =>
   activityTypeOptions.value.find((option) => option.key === selectedActivityTypeKey.value)
@@ -324,6 +377,56 @@ const selectedActivityOption = computed(() =>
 
 const dayWeather = computed(() => props.detail?.forecast ?? null);
 const existingActivities = computed(() => props.detail?.activities ?? []);
+
+const computeWeatherWarning = (weather) => {
+  if (!weather) {
+    return null;
+  }
+
+  const condition = (weather.description || weather.condition || weather.weather?.[0]?.main || '').toLowerCase();
+  const precip = Number(
+    weather.precipitation_sum ??
+    weather.precip_mm ??
+    weather.rain ??
+    weather.daily_precipitation ??
+    0
+  );
+  const wind = Number(weather.wind_max_kmh ?? weather.wind_speed ?? weather.wind ?? 0);
+  const tempMax = Number(weather.temp_max ?? weather.main?.temp_max ?? null);
+  const tempMin = Number(weather.temp_min ?? weather.main?.temp_min ?? null);
+
+  if (condition.includes('storm') || condition.includes('thunder')) {
+    return 'Severe storm conditions likely';
+  }
+
+  if (precip >= 25) {
+    return 'Heavy rainfall expected';
+  }
+
+  if (precip >= 5) {
+    return 'Rain likely throughout the day';
+  }
+
+  if (wind >= 50) {
+    return 'Damaging wind gusts possible';
+  }
+
+  if (wind >= 30) {
+    return 'Strong winds could impact field work';
+  }
+
+  if (Number.isFinite(tempMax) && tempMax >= 35) {
+    return 'Extreme heat risk';
+  }
+
+  if (Number.isFinite(tempMin) && tempMin <= 5) {
+    return 'Low temperature / frost risk';
+  }
+
+  return null;
+};
+
+const suggestedWeatherWarning = computed(() => computeWeatherWarning(dayWeather.value));
 
 const formattedDate = computed(() => {
   const date = toDateOnly(form.value.start_date);
@@ -431,12 +534,42 @@ const resetForm = (dateKey) => {
     activity_type: (form.value.activity_type || fallbackActivityOptions[0]?.label) ?? '',
     field: '',
     start_date: clampToToday(dateKey || todayDateKey),
+    end_date: null,
     notes: '',
-    status: 'pending'
+    status: 'pending',
+    weather_warning: computeWeatherWarning(props.detail?.forecast ?? null) ?? ''
   };
   formErrors.value = {};
   formSubmitError.value = '';
+  weatherWarningTouched.value = false;
   applySelectedActivityLabel();
+};
+
+const enforceValidEndDate = () => {
+  if (!form.value.end_date) {
+    return;
+  }
+
+  const start = toDateOnly(form.value.start_date);
+  const end = toDateOnly(form.value.end_date);
+
+  if (!start || !end) {
+    form.value.end_date = null;
+    return;
+  }
+
+  if (end.getTime() < start.getTime()) {
+    form.value.end_date = formatDateKey(start);
+  }
+};
+
+const handleWeatherWarningInput = () => {
+  weatherWarningTouched.value = true;
+};
+
+const applySuggestedWarning = () => {
+  weatherWarningTouched.value = false;
+  form.value.weather_warning = suggestedWeatherWarning.value ?? '';
 };
 
 const fetchActivityTypes = async () => {
@@ -516,6 +649,21 @@ const fetchActivityRecommendation = async () => {
   }
 };
 
+watch(suggestedWeatherWarning, (warning) => {
+  if (!weatherWarningTouched.value) {
+    form.value.weather_warning = warning ?? '';
+  }
+});
+
+watch(() => form.value.start_date, () => {
+  enforceValidEndDate();
+  weatherWarningTouched.value = false;
+});
+
+watch(() => form.value.end_date, () => {
+  enforceValidEndDate();
+});
+
 const submitActivity = async () => {
   if (isSubmittingActivity.value) {
     return;
@@ -534,8 +682,10 @@ const submitActivity = async () => {
       activity_type: form.value.activity_type.trim(),
       field: form.value.field.trim(),
       start_date: form.value.start_date,
+      end_date: form.value.end_date || null,
       notes: form.value.notes?.trim() || null,
-      status: form.value.status || 'pending'
+      status: form.value.status || 'pending',
+      weather_warning: form.value.weather_warning?.trim() || null
     };
 
     const axiosInstance = window.axios || axios;
@@ -730,6 +880,28 @@ onMounted(() => {
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
 }
 
+.weather-warning-banner {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  background: rgba(251, 191, 36, 0.15);
+  border: 1px solid rgba(251, 191, 36, 0.4);
+  border-radius: 16px;
+  padding: 14px 20px;
+  margin: 0 32px 20px;
+  color: #fde68a;
+}
+
+.weather-warning-banner i {
+  font-size: 20px;
+}
+
+.weather-warning-banner p {
+  margin: 4px 0 0;
+  color: #fef3c7;
+  font-size: 14px;
+}
+
 .weather-icon {
   display: flex;
   align-items: center;
@@ -902,6 +1074,28 @@ onMounted(() => {
 .form-field textarea {
   min-height: 100px;
   resize: vertical;
+}
+
+.field-hint {
+  display: block;
+  margin-top: 4px;
+  font-size: 12px;
+  color: #94a3b8;
+}
+
+.link-button {
+  background: none;
+  border: none;
+  color: #60a5fa;
+  cursor: pointer;
+  padding: 0;
+  margin-left: 8px;
+  font-size: 12px;
+  text-decoration: underline;
+}
+
+.link-button:hover {
+  color: #93c5fd;
 }
 
 .form-field input.invalid,
@@ -1320,9 +1514,10 @@ onMounted(() => {
   }
 
   .weather-context,
+  .weather-warning-banner,
   .existing-activities,
   .create-form {
-    margin: 0 16px 16px;
+    margin: 0 12px 14px;
   }
 
   .weather-context {
@@ -1358,7 +1553,7 @@ onMounted(() => {
   }
 
   .create-form {
-    padding: 20px;
+    padding: 16px;
   }
 
   .advisor-metrics {

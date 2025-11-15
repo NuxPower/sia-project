@@ -834,7 +834,7 @@ input:checked + .slider:before {
 /* Extra Small Devices (phones, up to 480px) */
 @media (max-width: 480px) {
   .alerts-view {
-    padding: 1rem;
+    padding: 0.75rem;
   }
   
   .alerts-header {
@@ -904,20 +904,21 @@ input:checked + .slider:before {
 
   .setting-item {
     padding: 0.75rem;
-    flex-direction: column;
-    align-items: flex-start;
+    flex-direction: row;
+    align-items: center;
     gap: 0.75rem;
   }
 
   .setting-info {
-    width: 100%;
+    width: auto;
+    flex: 1;
   }
 }
 
 /* Small Devices (landscape phones, 481px to 640px) */
 @media (min-width: 481px) and (max-width: 640px) {
   .alerts-view {
-    padding: 1.25rem;
+    padding: 0.9rem;
   }
 
   .warnings-grid {
@@ -932,7 +933,7 @@ input:checked + .slider:before {
 /* Medium Devices (tablets, 641px to 768px) */
 @media (min-width: 641px) and (max-width: 768px) {
   .alerts-view {
-    padding: 1.5rem;
+    padding: 1rem;
   }
 
   .warnings-grid {
@@ -943,7 +944,7 @@ input:checked + .slider:before {
 /* Standard Mobile (up to 768px) */
 @media (max-width: 768px) {
   .alerts-view {
-    padding: 1.25rem;
+    padding: 0.9rem;
   }
   
   .alerts-header {
@@ -954,6 +955,15 @@ input:checked + .slider:before {
   
   .warnings-grid {
     grid-template-columns: 1fr;
+  }
+  
+  .setting-item {
+    flex-direction: row;
+    align-items: center;
+  }
+  
+  .setting-info {
+    flex: 1;
   }
 }
 
