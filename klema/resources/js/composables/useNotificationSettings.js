@@ -3,17 +3,22 @@ import axios from 'axios'
 
 const API_BASE_URL = '/api'
 
+export const DEFAULT_NOTIFICATION_SETTINGS = Object.freeze({
+    heavyRainAlerts: true,
+    strongWindWarnings: true,
+    temperatureExtremes: false,
+    stormAlerts: true,
+    irrigationAlerts: false,
+    harvestAlerts: true,
+    maintenanceAlerts: false
+})
+
+export const SUPPORTED_NOTIFICATION_SETTING_KEYS = Object.freeze(
+    Object.keys(DEFAULT_NOTIFICATION_SETTINGS)
+)
+
 export function useNotificationSettings() {
-    const settings = reactive({
-        heavyRainAlerts: true,
-        strongWindWarnings: true,
-        temperatureExtremes: false,
-        stormAlerts: true,
-        pestAlerts: true,
-        irrigationAlerts: false,
-        harvestAlerts: true,
-        maintenanceAlerts: false
-    })
+    const settings = reactive({ ...DEFAULT_NOTIFICATION_SETTINGS })
     
     const loading = ref(false)
     const error = ref(null)
@@ -28,7 +33,14 @@ export function useNotificationSettings() {
             const savedSettings = localStorage.getItem('notificationSettings')
             if (savedSettings) {
                 const parsedSettings = JSON.parse(savedSettings)
-                Object.assign(settings, parsedSettings)
+
+                SUPPORTED_NOTIFICATION_SETTING_KEYS.forEach((key) => {
+                    if (Object.prototype.hasOwnProperty.call(parsedSettings, key)) {
+                        settings[key] = !!parsedSettings[key]
+                    } else {
+                        settings[key] = DEFAULT_NOTIFICATION_SETTINGS[key]
+                    }
+                })
             }
             
             // In the future, this would be an API call:
@@ -49,7 +61,12 @@ export function useNotificationSettings() {
         
         try {
             // Save to localStorage for now
-            localStorage.setItem('notificationSettings', JSON.stringify(settings))
+            const payload = SUPPORTED_NOTIFICATION_SETTING_KEYS.reduce((acc, key) => {
+                acc[key] = !!settings[key]
+                return acc
+            }, {})
+
+            localStorage.setItem('notificationSettings', JSON.stringify(payload))
             
             // In the future, this would be an API call:
             // await axios.put(`${API_BASE_URL}/notification-settings`, { settings })
@@ -66,7 +83,11 @@ export function useNotificationSettings() {
 
     // Update a specific setting
     const updateSetting = async (settingName, value) => {
-        settings[settingName] = value
+        if (!SUPPORTED_NOTIFICATION_SETTING_KEYS.includes(settingName)) {
+            return
+        }
+
+        settings[settingName] = !!value
         await saveSettings()
     }
 
@@ -93,25 +114,20 @@ export function useNotificationSettings() {
                 label: 'Storm Alerts',
                 description: 'Notifications for storms and severe weather'
             },
-            pestAlerts: {
-                icon: 'fas fa-bug',
-                label: 'Pest Alerts',
-                description: 'Warnings about pest infestations'
-            },
             irrigationAlerts: {
                 icon: 'fas fa-tint',
                 label: 'Irrigation Alerts',
-                description: 'Reminders for irrigation scheduling'
+                description: 'Get nudged when prolonged dry spells call for irrigation'
             },
             harvestAlerts: {
                 icon: 'fas fa-cut',
                 label: 'Harvest Alerts',
-                description: 'Optimal harvest time notifications'
+                description: 'Spot favorable harvest windows based on weather outlook'
             },
             maintenanceAlerts: {
                 icon: 'fas fa-wrench',
                 label: 'Maintenance Alerts',
-                description: 'Equipment and infrastructure maintenance reminders'
+                description: 'Prepare equipment ahead of severe weather events'
             }
         }
 

@@ -3,10 +3,13 @@
 namespace App\Services;
 
 use App\Models\WeatherData;
+use App\Models\Farm;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Log;
 use Carbon\Carbon;
 use Illuminate\Support\Str;
+use Illuminate\Support\Collection;
 
 class WeatherService
 {
@@ -17,9 +20,8 @@ class WeatherService
     {
         $this->apiKey = config('services.openweather.api_key');
         
-        // If no API key is configured, we'll use mock data
         if (empty($this->apiKey) || $this->apiKey === 'your-openweather-api-key-here') {
-            $this->apiKey = null;
+            throw new \RuntimeException('OpenWeather API key is not configured. Set services.openweather.api_key.');
         }
     }
 
@@ -28,28 +30,17 @@ class WeatherService
         $cacheKey = "weather_current_{$location}";
         
         return Cache::remember($cacheKey, 600, function () use ($location) {
-            // If no API key, return mock data immediately
-            if (!$this->apiKey) {
-                return $this->getMockCurrentWeather($location);
+            $response = Http::weather()->get("{$this->baseUrl}/weather", [
+                'q' => $location,
+                'appid' => $this->apiKey,
+                'units' => 'metric'
+            ]);
+
+            if (!$response->successful()) {
+                throw new \RuntimeException('Failed to fetch current weather: '.$response->status());
             }
 
-            try {
-                // Use custom HTTP macro for weather API calls
-                $response = Http::weather()->get("{$this->baseUrl}/weather", [
-                    'q' => $location,
-                    'appid' => $this->apiKey,
-                    'units' => 'metric'
-                ]);
-
-                if ($response->successful()) {
-                    return $response->json();
-                }
-            } catch (\Exception $e) {
-                \Log::warning('Weather API request failed: ' . $e->getMessage());
-            }
-
-            // Return mock data if API fails
-            return $this->getMockCurrentWeather($location);
+            return $response->json();
         });
     }
 
@@ -58,29 +49,18 @@ class WeatherService
         $cacheKey = "weather_current_coords_{$lat}_{$lon}";
         
         return Cache::remember($cacheKey, 600, function () use ($lat, $lon) {
-            // If no API key, return mock data with coordinates
-            if (!$this->apiKey) {
-                return $this->getMockCurrentWeatherByCoords($lat, $lon);
+            $response = Http::weather()->get("{$this->baseUrl}/weather", [
+                'lat' => $lat,
+                'lon' => $lon,
+                'appid' => $this->apiKey,
+                'units' => 'metric'
+            ]);
+
+            if (!$response->successful()) {
+                throw new \RuntimeException('Failed to fetch current weather by coordinates: '.$response->status());
             }
 
-            try {
-                // Use coordinates for OpenWeatherMap API
-                $response = Http::weather()->get("{$this->baseUrl}/weather", [
-                    'lat' => $lat,
-                    'lon' => $lon,
-                    'appid' => $this->apiKey,
-                    'units' => 'metric'
-                ]);
-
-                if ($response->successful()) {
-                    return $response->json();
-                }
-            } catch (\Exception $e) {
-                \Log::warning('Weather API request by coordinates failed: ' . $e->getMessage());
-            }
-
-            // Return mock data if API fails
-            return $this->getMockCurrentWeatherByCoords($lat, $lon);
+            return $response->json();
         });
     }
 
@@ -89,30 +69,19 @@ class WeatherService
         $cacheKey = "weather_forecast_{$location}_{$days}";
         
         return Cache::remember($cacheKey, 3600, function () use ($location, $days) {
-            // If no API key, return mock data immediately
-            if (!$this->apiKey) {
-                return $this->getMockForecast($location);
+            $response = Http::weather()->get("{$this->baseUrl}/forecast", [
+                'q' => $location,
+                'appid' => $this->apiKey,
+                'units' => 'metric',
+                'cnt' => $days * 8 // 8 forecasts per day (3-hour intervals)
+            ]);
+
+            if (!$response->successful()) {
+                throw new \RuntimeException('Failed to fetch forecast: '.$response->status());
             }
 
-            try {
-                // Use custom HTTP macro for weather API calls
-                $response = Http::weather()->get("{$this->baseUrl}/forecast", [
-                    'q' => $location,
-                    'appid' => $this->apiKey,
-                    'units' => 'metric',
-                    'cnt' => $days * 8 // 8 forecasts per day (3-hour intervals)
-                ]);
-
-                if ($response->successful()) {
-                    $data = $response->json();
-                    return $this->processForecastData($data);
-                }
-            } catch (\Exception $e) {
-                \Log::warning('Weather Forecast API request failed: ' . $e->getMessage());
-            }
-
-            // Return mock data if API fails
-            return $this->getMockForecast($location);
+            $data = $response->json();
+            return $this->processForecastData($data, $days);
         });
     }
 
@@ -121,45 +90,329 @@ class WeatherService
         $cacheKey = "weather_forecast_coords_{$lat}_{$lon}_{$days}";
         
         return Cache::remember($cacheKey, 3600, function () use ($lat, $lon, $days) {
-            // If no API key, return mock data with coordinates
-            if (!$this->apiKey) {
-                return $this->getMockForecastByCoords($lat, $lon);
+            $response = Http::weather()->get("{$this->baseUrl}/forecast", [
+                'lat' => $lat,
+                'lon' => $lon,
+                'appid' => $this->apiKey,
+                'units' => 'metric',
+                'cnt' => $days * 8 // 8 forecasts per day (3-hour intervals)
+            ]);
+
+            if (!$response->successful()) {
+                throw new \RuntimeException('Failed to fetch forecast by coordinates: '.$response->status());
             }
 
-            try {
-                // Use coordinates for OpenWeatherMap API
-                $response = Http::weather()->get("{$this->baseUrl}/forecast", [
-                    'lat' => $lat,
-                    'lon' => $lon,
-                    'appid' => $this->apiKey,
-                    'units' => 'metric',
-                    'cnt' => $days * 8 // 8 forecasts per day (3-hour intervals)
-                ]);
-
-                if ($response->successful()) {
-                    $data = $response->json();
-                    return $this->processForecastData($data);
-                }
-            } catch (\Exception $e) {
-                \Log::warning('Weather Forecast API request by coordinates failed: ' . $e->getMessage());
-            }
-
-            // Return mock data if API fails
-            return $this->getMockForecastByCoords($lat, $lon);
+            $data = $response->json();
+            return $this->processForecastData($data, $days);
         });
     }
 
-    public function getHistoricalWeather($location, $date)
+    public function getHistoricalWeather($location, $days)
     {
-        // OpenWeatherMap historical data requires paid plan
-        // Return mock historical data for demonstration
-        return $this->getMockHistoricalWeather($date);
+        $days = max(1, min((int) $days, 7));
+
+        $locationName = Str::of($location ?? '')->trim()->lower();
+        if ($locationName->isEmpty()) {
+            return [];
+        }
+
+        // Get records from the past up to today (exclude future dates)
+        // Allow today's data to be included in historical queries
+        $todayUtc = Carbon::today('UTC')->startOfDay();
+        $tomorrowUtc = $todayUtc->copy()->addDay();
+
+        $records = WeatherData::query()
+            ->whereNotNull('location_name')
+            ->where('location_name', $locationName)
+            ->where('recorded_at', '>=', $todayUtc->copy()->subDays($days))
+            ->where('recorded_at', '<', $tomorrowUtc) // Include today, exclude future dates
+            ->orderByDesc('recorded_at')
+            ->limit($days)
+            ->get();
+
+        if ($records->isEmpty()) {
+            return [];
+        }
+
+        return $this->formatHistoricalCollection($records);
     }
 
-    public function getHistoricalWeatherByCoordinates($lat, $lon, $date)
+    public function getHistoricalWeatherByCoordinates($lat, $lon, $days)
     {
-        // Coordinate-based historical data also falls back to mock responses for now
-        return $this->getMockHistoricalWeather($date);
+        $days = max(1, min((int) $days, 7));
+
+        if ($lat === null || $lon === null) {
+            return [];
+        }
+
+        $lat = round((float) $lat, 3);
+        $lon = round((float) $lon, 3);
+
+        // Get records from the past up to today (exclude future dates)
+        // Allow today's data to be included in historical queries
+        $todayUtc = Carbon::today('UTC')->startOfDay();
+        $tomorrowUtc = $todayUtc->copy()->addDay();
+
+        // Use stricter tolerance (0.01 degrees ≈ 1km) to avoid matching nearby locations
+        $tolerance = 0.01;
+        $records = WeatherData::query()
+            ->whereNotNull('latitude')
+            ->whereNotNull('longitude')
+            ->whereBetween('latitude', [$lat - $tolerance, $lat + $tolerance])
+            ->whereBetween('longitude', [$lon - $tolerance, $lon + $tolerance])
+            ->where('recorded_at', '>=', $todayUtc->copy()->subDays($days))
+            ->where('recorded_at', '<', $tomorrowUtc) // Include today, exclude future dates
+            ->orderByDesc('recorded_at')
+            ->limit($days)
+            ->get();
+
+        if ($records->isEmpty()) {
+            return [];
+        }
+
+        return $this->formatHistoricalCollection($records);
+    }
+
+    public function findStoredHistoricalByCoordinates(float $lat, float $lon, Carbon $date): ?array
+    {
+        $lat = round($lat, 3);
+        $lon = round($lon, 3);
+
+        // Ensure date is in UTC and at start of day for consistent comparison
+        $dateUtc = $date->copy()->setTimezone('UTC')->startOfDay();
+        $dateEndUtc = $dateUtc->copy()->endOfDay();
+
+        // Use stricter tolerance (0.01 degrees ≈ 1km) to avoid matching nearby locations
+        $tolerance = 0.01;
+        $record = WeatherData::query()
+            ->whereNotNull('latitude')
+            ->whereNotNull('longitude')
+            ->whereBetween('latitude', [$lat - $tolerance, $lat + $tolerance])
+            ->whereBetween('longitude', [$lon - $tolerance, $lon + $tolerance])
+            ->whereBetween('recorded_at', [$dateUtc, $dateEndUtc])
+            ->orderByDesc('recorded_at')
+            ->first();
+
+        return $record ? $this->createSnapshotFromRecord($record) : null;
+    }
+
+    public function findStoredHistoricalByLocation(string $location, Carbon $date): ?array
+    {
+        $locationName = Str::of($location ?? '')->trim()->lower();
+        if ($locationName->isEmpty()) {
+            return null;
+        }
+
+        // Ensure date is in UTC and at start of day for consistent comparison
+        $dateUtc = $date->copy()->setTimezone('UTC')->startOfDay();
+        $dateEndUtc = $dateUtc->copy()->endOfDay();
+
+        $record = WeatherData::query()
+            ->whereNotNull('location_name')
+            ->where('location_name', $locationName)
+            ->whereBetween('recorded_at', [$dateUtc, $dateEndUtc])
+            ->orderByDesc('recorded_at')
+            ->first();
+
+        return $record ? $this->createSnapshotFromRecord($record) : null;
+    }
+
+    public function fetchHistoricalSnapshotByCoordinates(float $lat, float $lon, Carbon $date): ?array
+    {
+        $series = $this->fetchHistoricalSeriesByCoordinates($lat, $lon, $date->copy(), $date->copy());
+
+        return $series[$date->format('Y-m-d')] ?? null;
+    }
+
+    public function fetchHistoricalSeriesByCoordinates(float $lat, float $lon, Carbon $startDate, Carbon $endDate): array
+    {
+        $start = $startDate->copy()->format('Y-m-d');
+        $end = $endDate->copy()->format('Y-m-d');
+
+        // Cache historical data for 24 hours (historical data doesn't change)
+        // Use coordinates rounded to 3 decimals for cache key (about 100m precision)
+        $latKey = round($lat, 3);
+        $lonKey = round($lon, 3);
+        $cacheKey = "historical_weather_{$latKey}_{$lonKey}_{$start}_{$end}";
+
+        return Cache::remember($cacheKey, 86400, function () use ($lat, $lon, $start, $end) {
+            try {
+                $response = Http::withOptions([
+                    'timeout' => 10,
+                ])->get('https://archive-api.open-meteo.com/v1/archive', [
+                'latitude' => $lat,
+                'longitude' => $lon,
+                'start_date' => $start,
+                'end_date' => $end,
+                'daily' => implode(',', [
+                    'temperature_2m_max',
+                    'temperature_2m_min',
+                    'weathercode',
+                    'windspeed_10m_max',
+                    'precipitation_sum',
+                    'sunrise',
+                    'sunset',
+                    'precipitation_probability_mean',
+                ]),
+                'hourly' => implode(',', [
+                    'temperature_2m',
+                    'apparent_temperature',
+                    'relativehumidity_2m',
+                    'precipitation',
+                    'rain',
+                    'showers',
+                    'snowfall',
+                    'cloudcover',
+                    'wind_speed_10m',
+                    'wind_direction_10m',
+                    'wind_gusts_10m',
+                    'precipitation_probability',
+                ]),
+                'timezone' => 'auto',
+            ]);
+
+            if (!$response->successful()) {
+                Log::warning('Historical weather range fetch failed', [
+                    'lat' => $lat,
+                    'lon' => $lon,
+                    'start' => $start,
+                    'end' => $end,
+                    'status' => $response->status(),
+                    'body' => $response->body(),
+                ]);
+                return [];
+            }
+
+                $payload = $response->json();
+                return $this->transformHistoricalSeriesPayload($payload, $lat, $lon);
+            } catch (\Throwable $e) {
+                Log::error('Historical weather range fetch exception', [
+                    'message' => $e->getMessage(),
+                    'lat' => $lat,
+                    'lon' => $lon,
+                    'start' => $start,
+                    'end' => $end,
+                ]);
+
+                return [];
+            }
+        });
+    }
+
+    public function geocodeLocation(string $location): ?array
+    {
+        $normalized = Str::of($location ?? '')->trim();
+        if ($normalized->isEmpty()) {
+            return null;
+        }
+
+        $cacheKey = 'geocode_' . Str::lower($normalized);
+
+        return Cache::remember($cacheKey, 86400, function () use ($normalized) {
+            $response = Http::weather()->get('https://api.openweathermap.org/geo/1.0/direct', [
+                'q' => $normalized,
+                'limit' => 1,
+                'appid' => $this->apiKey,
+            ]);
+
+            if (!$response->successful()) {
+                Log::warning('Geocoding request failed', [
+                    'location' => $normalized,
+                    'status' => $response->status(),
+                    'body' => $response->body(),
+                ]);
+                return null;
+            }
+
+            $results = $response->json();
+            $first = $results[0] ?? null;
+
+            if (!$first || !isset($first['lat'], $first['lon'])) {
+                return null;
+            }
+
+            return [
+                'lat' => (float) $first['lat'],
+                'lon' => (float) $first['lon'],
+                'name' => $first['name'] ?? (string) $normalized,
+                'country' => $first['country'] ?? null,
+            ];
+        });
+    }
+
+    /**
+     * Reverse geocode coordinates to get location name.
+     */
+    public function reverseGeocodeCoordinates(float $lat, float $lon): ?array
+    {
+        $lat = round($lat, 3);
+        $lon = round($lon, 3);
+        $cacheKey = "reverse_geocode_{$lat}_{$lon}";
+
+        return Cache::remember($cacheKey, 86400, function () use ($lat, $lon) {
+            $response = Http::weather()->get('https://api.openweathermap.org/geo/1.0/reverse', [
+                'lat' => $lat,
+                'lon' => $lon,
+                'limit' => 1,
+                'appid' => $this->apiKey,
+            ]);
+
+            if (!$response->successful()) {
+                Log::warning('Reverse geocoding request failed', [
+                    'lat' => $lat,
+                    'lon' => $lon,
+                    'status' => $response->status(),
+                    'body' => $response->body(),
+                ]);
+                return null;
+            }
+
+            $results = $response->json();
+            $first = $results[0] ?? null;
+
+            if (!$first) {
+                return null;
+            }
+
+            // Build location name from available fields
+            $name = $first['name'] ?? '';
+            $state = $first['state'] ?? null;
+            $country = $first['country'] ?? null;
+
+            $locationName = $name;
+            if ($state && $state !== $name) {
+                $locationName .= ', ' . $state;
+            }
+            if ($country) {
+                $locationName .= ', ' . $country;
+            }
+
+            return [
+                'lat' => (float) $first['lat'],
+                'lon' => (float) $first['lon'],
+                'name' => $locationName ?: $name,
+                'country' => $country,
+            ];
+        });
+    }
+
+    /**
+     * Find a farm by coordinates (within 0.005 degree tolerance, ~500m).
+     * Only matches farms that are very close to the weather data coordinates.
+     */
+    private function findFarmByCoordinates(float $lat, float $lon): ?Farm
+    {
+        // Don't round coordinates here - use them as-is for precise matching
+        // Use a small tolerance (0.005 degrees ≈ 500m) to match nearby farms
+        // This is stricter than weather data matching to avoid false matches
+        $tolerance = 0.005;
+        
+        return Farm::query()
+            ->whereNotNull('latitude')
+            ->whereNotNull('longitude')
+            ->whereBetween('latitude', [$lat - $tolerance, $lat + $tolerance])
+            ->whereBetween('longitude', [$lon - $tolerance, $lon + $tolerance])
+            ->first();
     }
 
     public function storeWeatherSnapshot(array $weather, array $context = []): ?WeatherData
@@ -171,14 +424,53 @@ class WeatherService
         $recordedAt = $this->resolveRecordedAt($weather, $context['recorded_at'] ?? null);
         $farmId = $context['farm_id'] ?? null;
 
-        $location = $context['location'] ?? $context['location_name'] ?? ($weather['name'] ?? null);
-        $locationName = $location ? Str::lower(trim($location)) : null;
-        if ($locationName === '') {
-            $locationName = null;
+        // If farm_id is explicitly provided, fetch the farm to get its name and coordinates
+        $farm = null;
+        if ($farmId !== null) {
+            $farm = Farm::find($farmId);
+            if ($farm) {
+                // Always use farm's name when farm_id is provided
+                $locationName = Str::lower(trim($farm->farm_name));
+                // Use farm's coordinates if not provided in context
+                $lat = $context['lat'] ?? ($farm->latitude !== null ? (float) $farm->latitude : null);
+                $lon = $context['lon'] ?? ($farm->longitude !== null ? (float) $farm->longitude : null);
+            } else {
+                // Farm not found, reset farm_id
+                $farmId = null;
+            }
         }
 
-        $lat = $context['lat'] ?? data_get($weather, 'coord.lat');
-        $lon = $context['lon'] ?? data_get($weather, 'coord.lon');
+        // If no farm_id, get location from context
+        if (!$farm) {
+            $location = $context['location'] ?? $context['location_name'] ?? ($weather['name'] ?? null);
+            $locationName = $location ? Str::lower(trim($location)) : null;
+            if ($locationName === '') {
+                $locationName = null;
+            }
+
+            $lat = $context['lat'] ?? data_get($weather, 'coord.lat');
+            $lon = $context['lon'] ?? data_get($weather, 'coord.lon');
+
+            // If no farm_id provided but we have coordinates, try to match to existing farms
+            if (!$farmId && $lat !== null && $lon !== null) {
+                $farm = $this->findFarmByCoordinates($lat, $lon);
+                if ($farm) {
+                    $farmId = $farm->farm_id;
+                    // Always use farm name as location name when farm is matched
+                    // This ensures data is categorized by the actual farm, not geocoded location
+                    $locationName = Str::lower(trim($farm->farm_name));
+                }
+            }
+        }
+
+        // If still no location name but we have coordinates, try to reverse geocode
+        // Only do this if we don't have a farm (to avoid overwriting farm names)
+        if (!$locationName && !$farmId && $lat !== null && $lon !== null) {
+            $geocoded = $this->reverseGeocodeCoordinates($lat, $lon);
+            if ($geocoded) {
+                $locationName = Str::lower(trim($geocoded['name']));
+            }
+        }
 
         if (!$farmId && $locationName === null && ($lat === null || $lon === null)) {
             // Without a farm or identifiable location, skip persistence
@@ -188,24 +480,32 @@ class WeatherService
         $lat = $lat !== null ? round((float) $lat, 6) : null;
         $lon = $lon !== null ? round((float) $lon, 6) : null;
 
-        $query = WeatherData::query()->where('recorded_at', $recordedAt);
+        // Use start and end of day range for querying to handle any time on that day
+        $startOfDay = $recordedAt->copy()->startOfDay();
+        $endOfDay = $recordedAt->copy()->endOfDay();
+        $query = WeatherData::query()->whereBetween('recorded_at', [$startOfDay, $endOfDay]);
 
+        // Priority: farm_id > coordinates > location_name
+        // Use coordinates for matching as they're more reliable and allow updating NULL location_name
         if ($farmId) {
             $query->where('farm_id', $farmId);
+        } elseif ($lat !== null && $lon !== null) {
+            // Match by coordinates first (most reliable)
+            // Use small tolerance (0.001 degrees ≈ 100m) to handle slight rounding differences
+            // This allows updating records that previously had NULL location_name
+            $tolerance = 0.001;
+            $query->whereNull('farm_id')
+                  ->whereNotNull('latitude')
+                  ->whereNotNull('longitude')
+                  ->whereBetween('latitude', [$lat - $tolerance, $lat + $tolerance])
+                  ->whereBetween('longitude', [$lon - $tolerance, $lon + $tolerance]);
+        } elseif ($locationName !== null) {
+            // Fall back to location_name matching if no coordinates
+            $query->whereNull('farm_id')
+                  ->where('location_name', $locationName);
         } else {
-            $query->whereNull('farm_id');
-
-            if ($locationName !== null) {
-                $query->where('location_name', $locationName);
-            } else {
-                $query->whereNull('location_name');
-            }
-
-            if ($lat !== null && $lon !== null) {
-                $query->where('latitude', $lat)->where('longitude', $lon);
-            } else {
-                $query->whereNull('latitude')->whereNull('longitude');
-            }
+            // No reliable identifier
+            return null;
         }
 
         $payload = [
@@ -230,18 +530,204 @@ class WeatherService
         return WeatherData::create($payload);
     }
 
-    private function processForecastData($data)
+    private function transformHistoricalSeriesPayload(array $payload, float $lat, float $lon): array
+    {
+        $timezoneName = data_get($payload, 'timezone', 'UTC');
+        $utcOffsetSeconds = (int) data_get($payload, 'utc_offset_seconds', 0);
+
+        $hourlyBuckets = $this->bucketHourlyEntries($payload, $timezoneName, $utcOffsetSeconds);
+
+        $dates = data_get($payload, 'daily.time', []);
+        $series = [];
+
+        // Filter out today and future dates from historical data
+        // Historical data should only include dates in the past
+        $todayUtc = Carbon::today('UTC')->startOfDay();
+
+        foreach ($dates as $index => $dateString) {
+            // Parse date string and check if it's in the past
+            $dateObj = Carbon::parse($dateString, 'UTC')->startOfDay();
+            
+            // Skip today and future dates - these should not be in historical data
+            if ($dateObj->gte($todayUtc)) {
+                continue;
+            }
+
+            $entry = $this->buildHistoricalEntryFromPayload(
+                $payload,
+                $index,
+                $dateString,
+                $lat,
+                $lon,
+                $timezoneName,
+                $utcOffsetSeconds,
+                $hourlyBuckets[$dateString] ?? []
+            );
+
+            if ($entry !== null) {
+                $series[$dateString] = $entry;
+            }
+        }
+
+        return $series;
+    }
+
+    private function bucketHourlyEntries(array $payload, string $timezoneName, int $utcOffsetSeconds): array
+    {
+        $times = data_get($payload, 'hourly.time', []);
+        $buckets = [];
+
+        foreach ($times as $index => $timeString) {
+            $dateKey = substr((string) $timeString, 0, 10);
+            if (!isset($buckets[$dateKey])) {
+                $buckets[$dateKey] = [];
+            }
+
+            $hourTimestamp = Carbon::parse($timeString, $timezoneName)->setTimezone('UTC')->timestamp;
+            $temperature = data_get($payload, "hourly.temperature_2m.{$index}");
+            $apparentTemperature = data_get($payload, "hourly.apparent_temperature.{$index}");
+            $humidity = data_get($payload, "hourly.relativehumidity_2m.{$index}");
+            $cloudCover = data_get($payload, "hourly.cloudcover.{$index}");
+            $windSpeedKmh = data_get($payload, "hourly.wind_speed_10m.{$index}");
+            $windGustKmh = data_get($payload, "hourly.wind_gusts_10m.{$index}");
+            $windDirection = data_get($payload, "hourly.wind_direction_10m.{$index}");
+            $precipitation = data_get($payload, "hourly.precipitation.{$index}");
+            $precipProbabilityHourly = data_get($payload, "hourly.precipitation_probability.{$index}");
+
+            $windSpeedMs = $windSpeedKmh !== null ? ((float) $windSpeedKmh) / 3.6 : null;
+            $windGustMs = $windGustKmh !== null ? ((float) $windGustKmh) / 3.6 : null;
+
+            $buckets[$dateKey][] = [
+                'dt' => $hourTimestamp,
+                'timestamp' => $hourTimestamp,
+                'time' => $hourTimestamp,
+                'temp' => $temperature,
+                'temperature' => $temperature,
+                'feels_like' => $apparentTemperature,
+                'humidity' => $humidity,
+                'clouds' => $cloudCover,
+                'cloud_cover' => $cloudCover,
+                'wind_speed' => $windSpeedMs,
+                'wind_gust' => $windGustMs,
+                'wind_deg' => $windDirection,
+                'precipitation' => $precipitation,
+                'precipitationProbability' => $precipProbabilityHourly,
+                'precip_probability' => $precipProbabilityHourly,
+                'rain' => [
+                    'value' => $precipitation,
+                ],
+                'timezone_offset' => $utcOffsetSeconds,
+            ];
+        }
+
+        return $buckets;
+    }
+
+    private function buildHistoricalEntryFromPayload(
+        array $payload,
+        int $index,
+        string $dateString,
+        float $lat,
+        float $lon,
+        string $timezoneName,
+        int $utcOffsetSeconds,
+        array $hourlyData
+    ): ?array {
+        $tempMax = data_get($payload, "daily.temperature_2m_max.{$index}");
+        $tempMin = data_get($payload, "daily.temperature_2m_min.{$index}");
+
+        if ($tempMax === null && $tempMin === null) {
+            return null;
+        }
+
+        $weatherCode = (int) data_get($payload, "daily.weathercode.{$index}", -1);
+        $windSpeed = data_get($payload, "daily.windspeed_10m_max.{$index}");
+        $precipitationSum = data_get($payload, "daily.precipitation_sum.{$index}");
+        $precipProbability = data_get($payload, "daily.precipitation_probability_mean.{$index}");
+
+        $averageTemp = null;
+        if ($tempMax !== null && $tempMin !== null) {
+            $averageTemp = ($tempMax + $tempMin) / 2;
+        } elseif ($tempMax !== null) {
+            $averageTemp = $tempMax;
+        } elseif ($tempMin !== null) {
+            $averageTemp = $tempMin;
+        }
+
+        $condition = $this->mapWeatherCodeToCondition($weatherCode);
+        $timestamp = Carbon::parse($dateString, 'UTC')->setTime(12, 0)->timestamp;
+
+        $sunriseIso = data_get($payload, "daily.sunrise.{$index}");
+        $sunsetIso = data_get($payload, "daily.sunset.{$index}");
+        $sunriseTimestamp = $sunriseIso
+            ? Carbon::parse($sunriseIso, $timezoneName)->setTimezone('UTC')->timestamp
+            : null;
+        $sunsetTimestamp = $sunsetIso
+            ? Carbon::parse($sunsetIso, $timezoneName)->setTimezone('UTC')->timestamp
+            : null;
+
+        // Calculate average humidity from hourly data if available
+        $humidityValues = [];
+        if (!empty($hourlyData)) {
+            foreach ($hourlyData as $hour) {
+                if (isset($hour['humidity']) && $hour['humidity'] !== null) {
+                    $humidityValues[] = (float) $hour['humidity'];
+                }
+            }
+        }
+        $averageHumidity = !empty($humidityValues) ? round(array_sum($humidityValues) / count($humidityValues), 2) : null;
+
+        return [
+            'date' => $dateString,
+            'dt' => $timestamp,
+            'timestamp' => $timestamp,
+            'coord' => [
+                'lat' => $lat,
+                'lon' => $lon,
+            ],
+            'main' => [
+                'temp' => $averageTemp,
+                'temp_min' => $tempMin,
+                'temp_max' => $tempMax,
+                'humidity' => $averageHumidity,
+                'pressure' => null,
+            ],
+            'weather' => [[
+                'main' => $condition['main'],
+                'description' => $condition['description'],
+                'icon' => $condition['icon'],
+            ]],
+            'wind' => [
+                'speed' => $windSpeed,
+            ],
+            'sunrise' => $sunriseTimestamp,
+            'sunset' => $sunsetTimestamp,
+            'timezone_offset' => $utcOffsetSeconds,
+            'precipitation_sum' => $precipitationSum,
+            'precip_probability' => $precipProbability,
+            'hourly' => $hourlyData,
+        ];
+    }
+
+    private function processForecastData($data, int $days = 7)
     {
         $dailyForecasts = [];
         $currentDate = null;
         $dayData = [];
+        $lat = data_get($data, 'city.coord.lat');
+        $lon = data_get($data, 'city.coord.lon');
+        $timezoneOffset = data_get($data, 'city.timezone', 0);
+        $limit = max(1, min($days, 16));
 
         foreach ($data['list'] as $forecast) {
-            $date = Carbon::parse($forecast['dt_txt'])->format('Y-m-d');
+            $timestamp = data_get($forecast, 'dt');
+            $date = Carbon::createFromTimestamp($timestamp, 'UTC')
+                ->addSeconds($timezoneOffset)
+                ->format('Y-m-d');
             
             if ($currentDate !== $date) {
                 if (!empty($dayData)) {
-                    $dailyForecasts[] = $this->aggregateDayData($dayData, $currentDate);
+                    $dailyForecasts[] = $this->aggregateDayData($dayData, $currentDate, $lat, $lon, (int) $timezoneOffset);
                 }
                 $currentDate = $date;
                 $dayData = [];
@@ -250,257 +736,277 @@ class WeatherService
             $dayData[] = $forecast;
         }
 
-        // Add the last day
         if (!empty($dayData)) {
-            $dailyForecasts[] = $this->aggregateDayData($dayData, $currentDate);
+            $dailyForecasts[] = $this->aggregateDayData($dayData, $currentDate, $lat, $lon, (int) $timezoneOffset);
         }
 
-        return array_slice($dailyForecasts, 0, 7);
+        return array_slice($dailyForecasts, 0, $limit);
     }
 
-    private function aggregateDayData($dayData, $date)
+    private function aggregateDayData(array $dayData, ?string $date, ?float $lat = null, ?float $lon = null, int $timezoneOffset = 0): array
     {
-        $temps = array_column(array_column($dayData, 'main'), 'temp');
+        if (!$date) {
+            $date = Carbon::today('UTC')->format('Y-m-d');
+        }
+
+        $temps = array_filter(array_map(function ($entry) {
+            $value = data_get($entry, 'main.temp');
+            return $value !== null ? (float) $value : null;
+        }, $dayData), fn ($value) => $value !== null);
+        $tempMax = !empty($temps) ? round(max($temps), 1) : null;
+        $tempMin = !empty($temps) ? round(min($temps), 1) : null;
+
         $conditions = array_column(array_column($dayData, 'weather'), 0);
-        
+        $conditionEntry = $this->resolveDominantCondition($conditions);
+
+        $popValues = array_filter(array_map(fn ($entry) => data_get($entry, 'pop'), $dayData), fn ($value) => $value !== null);
+        $averagePop = !empty($popValues) ? array_sum($popValues) / count($popValues) : null;
+
+        $sunrise = $this->computeSolarEvent($date, $lat, $lon, $timezoneOffset, true);
+        $sunset = $this->computeSolarEvent($date, $lat, $lon, $timezoneOffset, false);
+
+        $hourly = array_map(function ($entry) use ($timezoneOffset) {
+            $entry['timezone_offset'] = $timezoneOffset;
+            return $entry;
+        }, array_values($dayData));
+
         return [
             'date' => $date,
             'day' => Carbon::parse($date)->format('l'),
-            'temp_max' => round(max($temps)),
-            'temp_min' => round(min($temps)),
-            'condition' => $conditions[0]['main'] ?? 'Clear',
-            'icon' => $conditions[0]['icon'] ?? '01d',
-            'description' => $conditions[0]['description'] ?? 'Clear sky'
+            'temp_max' => $tempMax,
+            'temp_min' => $tempMin,
+            'condition' => $conditionEntry['main'] ?? null,
+            'icon' => $conditionEntry['icon'] ?? null,
+            'description' => $conditionEntry['description'] ?? null,
+            'precip_probability' => $averagePop,
+            'sunrise' => $sunrise,
+            'sunset' => $sunset,
+            'hourly' => $hourly,
+            'timezone_offset' => $timezoneOffset,
         ];
     }
 
-    private function getMockCurrentWeather($location = null)
+    private function resolveDominantCondition(array $conditions): array
     {
-        // Generate different mock data based on location or use default
-        $locationName = $this->extractLocationName($location) ?: 'Maramag';
-        
-        return [
-            'weather' => [
-                ['main' => 'Rain', 'description' => 'Heavy Rain', 'icon' => '10d']
-            ],
-            'main' => [
-                'temp' => 28,
-                'feels_like' => 31,
-                'humidity' => 85,
-                'temp_min' => 24,
-                'temp_max' => 28,
-                'pressure' => 1012
-            ],
-            'wind' => [
-                'speed' => 7.9
-            ],
-            'visibility' => 5000,
-            'dt' => time(),
-            'sys' => [
-                'sunrise' => strtotime('4:50 AM'),
-                'sunset' => strtotime('6:45 PM'),
-                'country' => 'PH'
-            ],
-            'coord' => [
-                'lat' => 7.7708,
-                'lon' => 125.0061
-            ],
-            'name' => $locationName
-        ];
-    }
-
-    private function getMockCurrentWeatherByCoords($lat, $lon)
-    {
-        // Generate location-specific mock data based on coordinates
-        $mockLocation = $this->getMockLocationFromCoords($lat, $lon);
-        
-        return [
-            'weather' => [
-                ['main' => $mockLocation['condition'], 'description' => $mockLocation['description'], 'icon' => $mockLocation['icon']]
-            ],
-            'main' => [
-                'temp' => $mockLocation['temp'],
-                'feels_like' => $mockLocation['temp'] + 3,
-                'humidity' => $mockLocation['humidity'],
-                'temp_min' => $mockLocation['temp'] - 4,
-                'temp_max' => $mockLocation['temp'] + 2,
-                'pressure' => $mockLocation['pressure']
-            ],
-            'wind' => [
-                'speed' => $mockLocation['wind_speed']
-            ],
-            'visibility' => 10000,
-            'dt' => time(),
-            'sys' => [
-                'sunrise' => strtotime('5:00 AM'),
-                'sunset' => strtotime('6:30 PM'),
-                'country' => $mockLocation['country']
-            ],
-            'coord' => [
-                'lat' => (float) $lat,
-                'lon' => (float) $lon
-            ],
-            'name' => $mockLocation['name']
-        ];
-    }
-
-    private function getMockForecast($location = null)
-    {
-        $locationName = $this->extractLocationName($location) ?: 'Maramag';
-        return $this->generateMockForecast($locationName);
-    }
-
-    private function getMockForecastByCoords($lat, $lon)
-    {
-        $mockLocation = $this->getMockLocationFromCoords($lat, $lon);
-        return $this->generateMockForecast($mockLocation['name']);
-    }
-
-    private function generateMockForecast($locationName)
-    {
-        $days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
-        $conditions = [
-            ['condition' => 'Rain', 'icon' => '10d'],
-            ['condition' => 'Rain', 'icon' => '10d'],
-            ['condition' => 'Rain', 'icon' => '10d'],
-            ['condition' => 'Clouds', 'icon' => '04d'],
-            ['condition' => 'Clear', 'icon' => '01d'],
-            ['condition' => 'Clear', 'icon' => '01d'],
-            ['condition' => 'Clear', 'icon' => '01d']
-        ];
-
-        $forecast = [];
-        for ($i = 0; $i < 7; $i++) {
-            $forecast[] = [
-                'date' => Carbon::now()->addDays($i)->format('Y-m-d'),
-                'day' => $days[$i],
-                'temp_max' => rand(32, 35),
-                'temp_min' => rand(26, 28),
-                'condition' => $conditions[$i]['condition'],
-                'icon' => $conditions[$i]['icon']
-            ];
+        if (empty($conditions)) {
+            return ['main' => null, 'description' => null, 'icon' => null];
         }
 
-        return $forecast;
+        $priority = ['Thunderstorm', 'Rain', 'Drizzle', 'Snow', 'Clear', 'Clouds', 'Mist', 'Fog', 'Haze'];
+
+        usort($conditions, function ($a, $b) use ($priority) {
+            $indexA = array_search($a['main'] ?? '', $priority);
+            $indexB = array_search($b['main'] ?? '', $priority);
+
+            $indexA = $indexA === false ? PHP_INT_MAX : $indexA;
+            $indexB = $indexB === false ? PHP_INT_MAX : $indexB;
+
+            return $indexA <=> $indexB;
+        });
+
+        return $conditions[0] ?? ['main' => null, 'description' => null, 'icon' => null];
     }
-
-    private function getMockLocationFromCoords($lat, $lon)
+ 
+    private function resolveRecordedAt(array $weather, $provided = null): Carbon
     {
-        // Generate different mock data based on coordinates
-        // This simulates different locations
-        
-        $lat = (float) $lat;
-        $lon = (float) $lon;
-        
-        // Manila area
-        if ($lat >= 14.0 && $lat <= 15.0 && $lon >= 120.0 && $lon <= 121.5) {
-            return [
-                'name' => 'Manila',
-                'country' => 'PH',
-                'temp' => 32,
-                'humidity' => 75,
-                'pressure' => 1010,
-                'wind_speed' => 5.2,
-                'condition' => 'Clouds',
-                'description' => 'Partly cloudy',
-                'icon' => '03d'
-            ];
-        }
-        
-        // Cebu area
-        if ($lat >= 10.0 && $lat <= 11.0 && $lon >= 123.0 && $lon <= 124.5) {
-            return [
-                'name' => 'Cebu City',
-                'country' => 'PH',
-                'temp' => 30,
-                'humidity' => 80,
-                'pressure' => 1011,
-                'wind_speed' => 4.8,
-                'condition' => 'Clear',
-                'description' => 'Clear sky',
-                'icon' => '01d'
-            ];
-        }
-        
-        // Davao area
-        if ($lat >= 6.5 && $lat <= 7.5 && $lon >= 125.0 && $lon <= 126.0) {
-            return [
-                'name' => 'Davao City',
-                'country' => 'PH',
-                'temp' => 29,
-                'humidity' => 85,
-                'pressure' => 1013,
-                'wind_speed' => 3.5,
-                'condition' => 'Rain',
-                'description' => 'Light rain',
-                'icon' => '10d'
-            ];
-        }
-        
-        // Default for other coordinates
-        return [
-            'name' => 'Unknown Location',
-            'country' => 'PH',
-            'temp' => 28,
-            'humidity' => 82,
-            'pressure' => 1012,
-            'wind_speed' => 4.0,
-            'condition' => 'Clouds',
-            'description' => 'Scattered clouds',
-            'icon' => '03d'
-        ];
-    }
-
-    private function extractLocationName($location)
-    {
-        if (!$location) return null;
-        
-        // Extract just the city name from location strings like "Manila, PH" or "Cebu City, Cebu, PH"
-        $parts = explode(',', $location);
-        return trim($parts[0]);
-    }
-
-    private function getMockHistoricalWeather($date)
-    {
-        return [
-            'weather' => [
-                ['main' => 'Rain', 'description' => 'Heavy Rain']
-            ],
-            'main' => [
-                'temp' => 26,
-                'humidity' => 90
-            ],
-            'wind' => [
-                'speed' => 8.5
-            ],
-            'rain' => [
-                '1h' => 12.5
-            ]
-        ];
-    }
-
-    private function resolveRecordedAt(array $weather, $override = null): Carbon
-    {
-        if ($override instanceof Carbon) {
-            return $override->copy()->startOfHour();
-        }
-
-        if (is_numeric($override)) {
-            return Carbon::createFromTimestamp($override)->startOfHour();
-        }
-
-        if (is_string($override)) {
-            try {
-                return Carbon::parse($override)->startOfHour();
-            } catch (\Throwable $e) {
-                // fall through
+        if ($provided) {
+            $parsed = Carbon::parse($provided);
+            // Ensure we're in UTC timezone and extract the date part
+            $parsed->setTimezone('UTC');
+            $recordedDate = $parsed->copy()->startOfDay();
+            
+            // Never save records with future dates
+            // If provided date is in the future, clamp it to today
+            $todayUtc = Carbon::today('UTC');
+            if ($recordedDate->gt($todayUtc)) {
+                return $todayUtc;
             }
+            
+            return $recordedDate;
         }
 
         if (isset($weather['dt']) && is_numeric($weather['dt'])) {
-            return Carbon::createFromTimestamp($weather['dt'])->startOfHour();
+            // API timestamp is in UTC (Unix timestamp)
+            // Create from UTC timestamp, extract the date, and set to start of that day
+            $dateTime = Carbon::createFromTimestampUTC((int) $weather['dt']);
+            $recordedDate = $dateTime->copy()->startOfDay();
+            
+            // Never save records with future dates
+            // If API timestamp is in the future, clamp it to today
+            $todayUtc = Carbon::today('UTC');
+            if ($recordedDate->gt($todayUtc)) {
+                return $todayUtc;
+            }
+            
+            return $recordedDate;
         }
 
-        return Carbon::now()->startOfHour();
+        if (isset($weather['timestamp']) && is_numeric($weather['timestamp'])) {
+            // Timestamp is in UTC (Unix timestamp)
+            // Create from UTC timestamp, extract the date, and set to start of that day
+            $dateTime = Carbon::createFromTimestampUTC((int) $weather['timestamp']);
+            $recordedDate = $dateTime->copy()->startOfDay();
+            
+            // Never save records with future dates
+            // If timestamp is in the future, clamp it to today
+            $todayUtc = Carbon::today('UTC');
+            if ($recordedDate->gt($todayUtc)) {
+                return $todayUtc;
+            }
+            
+            return $recordedDate;
+        }
+
+        // Default to today at start of day in UTC (for current weather)
+        return Carbon::today('UTC');
+    }
+
+    private function computeSolarEvent(string $date, ?float $lat, ?float $lon, int $timezoneOffset, bool $sunrise): ?int
+    {
+        if ($lat === null || $lon === null) {
+            return null;
+        }
+
+        $zenith = 90 + (50 / 60);
+        $offsetHours = $timezoneOffset / 3600;
+        $timestamp = strtotime($date . ' 12:00:00 UTC');
+
+        if ($timestamp === false) {
+            return null;
+        }
+
+        $result = $sunrise
+            ? date_sunrise($timestamp, SUNFUNCS_RET_TIMESTAMP, $lat, $lon, $zenith, $offsetHours)
+            : date_sunset($timestamp, SUNFUNCS_RET_TIMESTAMP, $lat, $lon, $zenith, $offsetHours);
+
+        if ($result === false) {
+            return null;
+        }
+
+        return $result;
+    }
+
+    private function formatHistoricalCollection(Collection $records): array
+    {
+        return $records
+            ->sortBy('recorded_at')
+            ->values()
+            ->map(function (WeatherData $record) {
+                // Parse recorded_at as UTC and extract date
+                $recordedAt = Carbon::parse($record->recorded_at)->setTimezone('UTC');
+                $dateString = $recordedAt->toDateString();
+                $timestamp = $recordedAt->timestamp;
+
+                return [
+                    'date' => $dateString,
+                    'dt' => $timestamp,
+                    'main' => [
+                        'temp' => $record->temperature,
+                        'temp_min' => $record->temperature,
+                        'temp_max' => $record->temperature,
+                        'humidity' => $record->humidity,
+                        'pressure' => $record->pressure,
+                    ],
+                    'weather' => [[
+                        'main' => $record->condition,
+                        'description' => $record->condition,
+                        'icon' => $record->condition_icon,
+                    ]],
+                    'wind' => [
+                        'speed' => $record->wind_speed,
+                    ],
+                    'rain' => [
+                        '1h' => $record->rainfall,
+                    ],
+                ];
+            })
+            ->all();
+    }
+
+    private function createSnapshotFromRecord(WeatherData $record): array
+    {
+        // Parse recorded_at as UTC and extract date
+        $recordedAt = Carbon::parse($record->recorded_at)->setTimezone('UTC');
+        $dateString = $recordedAt->toDateString();
+        $timestamp = $recordedAt->timestamp;
+
+        return [
+            'date' => $dateString,
+            'dt' => $timestamp,
+            'timestamp' => $timestamp,
+            'coord' => [
+                'lat' => $record->latitude,
+                'lon' => $record->longitude,
+            ],
+            'main' => [
+                'temp' => $record->temperature,
+                'temp_min' => $record->temperature,
+                'temp_max' => $record->temperature,
+                'humidity' => $record->humidity,
+                'pressure' => $record->pressure,
+            ],
+            'weather' => [[
+                'main' => $record->condition,
+                'description' => $record->condition,
+                'icon' => $record->condition_icon,
+            ]],
+            'wind' => [
+                'speed' => $record->wind_speed,
+            ],
+            'rain' => [
+                '1h' => $record->rainfall,
+            ],
+            'name' => $record->location_name ? Str::title($record->location_name) : null,
+        ];
+    }
+
+    private function mapWeatherCodeToCondition(int $code): array
+    {
+        $mapping = [
+            0 => ['Clear', 'Clear sky', '01d'],
+            1 => ['Clouds', 'Mainly clear', '02d'],
+            2 => ['Clouds', 'Partly cloudy', '03d'],
+            3 => ['Clouds', 'Overcast', '04d'],
+            45 => ['Mist', 'Fog', '50d'],
+            48 => ['Mist', 'Depositing rime fog', '50d'],
+            51 => ['Drizzle', 'Light drizzle', '09d'],
+            53 => ['Drizzle', 'Moderate drizzle', '09d'],
+            55 => ['Drizzle', 'Dense drizzle', '09d'],
+            56 => ['Rain', 'Light freezing drizzle', '13d'],
+            57 => ['Rain', 'Dense freezing drizzle', '13d'],
+            61 => ['Rain', 'Slight rain', '10d'],
+            63 => ['Rain', 'Moderate rain', '10d'],
+            65 => ['Rain', 'Heavy rain', '10d'],
+            66 => ['Rain', 'Light freezing rain', '13d'],
+            67 => ['Rain', 'Heavy freezing rain', '13d'],
+            71 => ['Snow', 'Slight snow fall', '13d'],
+            73 => ['Snow', 'Moderate snow fall', '13d'],
+            75 => ['Snow', 'Heavy snow fall', '13d'],
+            77 => ['Snow', 'Snow grains', '13d'],
+            80 => ['Rain', 'Slight rain showers', '09d'],
+            81 => ['Rain', 'Moderate rain showers', '09d'],
+            82 => ['Rain', 'Violent rain showers', '09d'],
+            85 => ['Snow', 'Slight snow showers', '13d'],
+            86 => ['Snow', 'Heavy snow showers', '13d'],
+            95 => ['Thunderstorm', 'Thunderstorm', '11d'],
+            96 => ['Thunderstorm', 'Thunderstorm with slight hail', '11d'],
+            99 => ['Thunderstorm', 'Thunderstorm with heavy hail', '11d'],
+        ];
+
+        $entry = $mapping[$code] ?? null;
+
+        if ($entry === null) {
+            return [
+                'main' => 'Unknown',
+                'description' => 'Unknown',
+                'icon' => '01d',
+            ];
+        }
+
+        return [
+            'main' => $entry[0],
+            'description' => $entry[1],
+            'icon' => $entry[2],
+        ];
     }
 }

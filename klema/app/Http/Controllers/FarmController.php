@@ -5,16 +5,19 @@ namespace App\Http\Controllers;
 use App\Models\Farm;
 use App\Models\FarmPoint;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 
 class FarmController extends Controller
 {
     public function index()
     {
-        $farms = auth()->user()->farms()->with(['weatherData' => function($query) {
-            $query->latest('recorded_at')->limit(1);
-        }, 'alerts' => function($query) {
+        $user = auth()->user();
+        
+        $farms = Farm::with(['alerts' => function($query) {
             $query->where('resolved', false);
-        }])->get();
+        }, 'user'])
+            ->where('user_id', $user->id)
+            ->get();
         
         return view('farms.index', compact('farms'));
     }
@@ -30,14 +33,27 @@ class FarmController extends Controller
             'farm_name' => 'required|string|max:100',
             'latitude' => 'required|numeric|between:-90,90',
             'longitude' => 'required|numeric|between:-180,180',
+            'size_hectares' => 'nullable|numeric|min:0|max:100000',
+            'soil_type' => ['nullable', 'string', Rule::in(config('farm.soil_types'))],
+            'description' => 'nullable|string',
+            'boundary' => 'nullable',
         ]);
 
-        $farm = Farm::create([
+        $farm = new Farm([
             'user_id' => auth()->id(),
             'farm_name' => $validated['farm_name'],
             'latitude' => $validated['latitude'],
             'longitude' => $validated['longitude'],
+            'size_hectares' => $validated['size_hectares'] ?? null,
+            'soil_type' => $validated['soil_type'] ?? null,
+            'description' => $validated['description'] ?? null,
         ]);
+
+        if (array_key_exists('boundary', $validated)) {
+            $farm->boundary = $validated['boundary'];
+        }
+
+        $farm->save();
 
         return redirect()->route('farms.show', $farm->farm_id)
             ->with('success', 'Farm created successfully!');
@@ -48,9 +64,6 @@ class FarmController extends Controller
         $this->authorize('view', $farm);
         
         $farm->load([
-            'weatherData' => function($query) {
-                $query->latest('recorded_at')->limit(10);
-            },
             'farmPoints',
             'alerts' => function($query) {
                 $query->latest('issued_at');
@@ -74,9 +87,26 @@ class FarmController extends Controller
             'farm_name' => 'required|string|max:100',
             'latitude' => 'required|numeric|between:-90,90',
             'longitude' => 'required|numeric|between:-180,180',
+            'size_hectares' => 'nullable|numeric|min:0|max:100000',
+            'soil_type' => ['nullable', 'string', Rule::in(config('farm.soil_types'))],
+            'description' => 'nullable|string',
+            'boundary' => 'nullable',
         ]);
 
-        $farm->update($validated);
+        $farm->fill([
+            'farm_name' => $validated['farm_name'],
+            'latitude' => $validated['latitude'],
+            'longitude' => $validated['longitude'],
+            'size_hectares' => $validated['size_hectares'] ?? null,
+            'soil_type' => $validated['soil_type'] ?? null,
+            'description' => $validated['description'] ?? null,
+        ]);
+
+        if (array_key_exists('boundary', $validated)) {
+            $farm->boundary = $validated['boundary'];
+        }
+
+        $farm->save();
 
         return redirect()->route('farms.show', $farm->farm_id)
             ->with('success', 'Farm updated successfully!');

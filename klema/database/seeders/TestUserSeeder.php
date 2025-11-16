@@ -22,11 +22,5 @@ class TestUserSeeder extends Seeder
             'role' => 'farmer',
         ]);
 
-        User::create([
-            'name' => 'Test Admin',
-            'email' => 'admin@example.com',
-            'password' => Hash::make('password'),
-            'role' => 'admin',
-        ]);
     }
 }

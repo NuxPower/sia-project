@@ -2,12 +2,31 @@
 	"appId": "com.klema.weather",
 	"appName": "Klema",
 	"webDir": "dist",
-	"bundledWebRuntime": false,
 	"server": {
-		"url": "https://your-laravel-app.com",
-		"cleartext": true
+		"url": "https://klema.up.railway.app/app",
+		"cleartext": false
 	},
 	"android": {
 		"allowMixedContent": true
+	},
+	"ios": {
+		"scheme": "klema"
+	},
+	"plugins": {
+		"SplashScreen": {
+			"launchShowDuration": 2000,
+			"launchAutoHide": true,
+			"backgroundColor": "#ffffff",
+			"androidSplashResourceName": "splash",
+			"androidScaleType": "CENTER_CROP",
+			"showSpinner": true,
+			"androidSpinnerStyle": "large",
+			"iosSpinnerStyle": "small",
+			"spinnerColor": "#999999",
+			"splashFullScreen": true,
+			"splashImmersive": true,
+			"layoutName": "launch_screen",
+			"useDialog": true
+		}
 	}
 }

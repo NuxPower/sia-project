@@ -14,15 +14,44 @@
         Location Settings
       </h3>
       <div class="setting-item">
-        <label>Default Location</label>
-        <input type="text" v-model="defaultLocation" class="setting-input">
+        <label>Location Type</label>
+        <div class="radio-group">
+          <label class="radio-label">
+            <input type="radio" name="locationType" value="custom" v-model="settings.locationType">
+            <span>Custom Location</span>
+          </label>
+          <label class="radio-label">
+            <input type="radio" name="locationType" value="farm" v-model="settings.locationType">
+            <span>Farm Location</span>
+          </label>
+        </div>
       </div>
-      <div class="setting-item">
-        <label>Use Current Location</label>
-        <button class="action-button" @click="getCurrentLocation">
+      
+      <!-- Custom Location Input -->
+      <div class="setting-item" v-if="settings.locationType === 'custom'">
+        <label>Default Location</label>
+        <input type="text" v-model="settings.defaultLocation" class="setting-input" placeholder="Enter location (e.g., Butuan, Caraga, PH)">
+        <button class="action-button" @click="getCurrentLocation" style="margin-top: 10px;">
           <i class="fas fa-crosshairs"></i>
           Detect Location
         </button>
+      </div>
+      
+      <!-- Farm Location Dropdown -->
+      <div class="setting-item" v-if="settings.locationType === 'farm'">
+        <label>Select Farm</label>
+        <select v-model="settings.selectedFarmId" class="setting-select" :disabled="farmsLoading">
+          <option value="">-- Select a Farm --</option>
+          <option v-for="farm in farms" :key="farm.farm_id" :value="farm.farm_id">
+            {{ farm.farm_name }}
+          </option>
+        </select>
+        <small v-if="farmsLoading" style="color: #9ca3af; margin-top: 8px; display: block;">
+          Loading farms...
+        </small>
+        <small v-else-if="farms.length === 0" style="color: #9ca3af; margin-top: 8px; display: block;">
+          No farms available. Create a farm first.
+        </small>
       </div>
     </div>
 
@@ -36,18 +65,18 @@
         <label>Temperature Unit</label>
         <div class="radio-group">
           <label class="radio-label">
-            <input type="radio" name="temp" value="celsius" checked>
+            <input type="radio" name="temp" value="celsius" v-model="settings.temperatureUnit">
             <span>Celsius (°C)</span>
           </label>
           <label class="radio-label">
-            <input type="radio" name="temp" value="fahrenheit">
+            <input type="radio" name="temp" value="fahrenheit" v-model="settings.temperatureUnit">
             <span>Fahrenheit (°F)</span>
           </label>
         </div>
       </div>
       <div class="setting-item">
         <label>Wind Speed Unit</label>
-        <select class="setting-select">
+        <select class="setting-select" v-model="settings.windSpeedUnit">
           <option value="ms">m/s</option>
           <option value="kmh">km/h</option>
           <option value="mph">mph</option>
@@ -57,11 +86,11 @@
         <label>Time Format</label>
         <div class="radio-group">
           <label class="radio-label">
-            <input type="radio" name="time" value="24h" checked>
+            <input type="radio" name="time" value="24h" v-model="settings.timeFormat">
             <span>24-hour</span>
           </label>
           <label class="radio-label">
-            <input type="radio" name="time" value="12h">
+            <input type="radio" name="time" value="12h" v-model="settings.timeFormat">
             <span>12-hour</span>
           </label>
         </div>
@@ -80,7 +109,7 @@
           <small>Keep track of your location searches</small>
         </div>
         <label class="switch">
-          <input type="checkbox" checked>
+          <input type="checkbox" v-model="settings.saveSearchHistory">
           <span class="slider"></span>
         </label>
       </div>
@@ -90,7 +119,7 @@
           <small>Help improve the app by sharing usage data</small>
         </div>
         <label class="switch">
-          <input type="checkbox">
+          <input type="checkbox" v-model="settings.anonymousUsageData">
           <span class="slider"></span>
         </label>
       </div>
@@ -105,11 +134,11 @@
       <div class="about-info">
         <div class="info-row">
           <span class="info-label">Version:</span>
-          <span class="info-value">1.0.0</span>
+          <span class="info-value">1.1.0</span>
         </div>
         <div class="info-row">
           <span class="info-label">Weather Data:</span>
-          <span class="info-value">OpenWeatherMap API</span>
+          <span class="info-value">OpenWeatherMap API; Open-Meteo API</span>
         </div>
         <div class="info-row">
           <span class="info-label">Last Updated:</span>
@@ -120,13 +149,15 @@
 
     <!-- Actions -->
     <div class="settings-actions">
-      <button class="action-button primary">
+      <button class="action-button primary" @click="saveSettings" :disabled="isSaving">
         <i class="fas fa-save"></i>
-        Save Changes
+        <span v-if="!isSaving">Save Changes</span>
+        <span v-else>Saving...</span>
       </button>
-      <button class="action-button danger">
+      <button class="action-button danger" @click="clearAllData" :disabled="isClearing">
         <i class="fas fa-trash"></i>
-        Clear All Data
+        <span v-if="!isClearing">Clear All Data</span>
+        <span v-else>Clearing...</span>
       </button>
       <button class="action-button logout" @click="logout">
         <i class="fas fa-sign-out-alt"></i>
@@ -137,57 +168,169 @@
 </template>
 
 <script setup>
-import { ref } from 'vue';
+import { reactive, ref, onMounted, watch } from 'vue';
+import { authorizedFetch } from '../../services/http';
+import { revokeApiToken } from '../../services/auth';
+import { useGlobalAlerts } from '../../composables/useGlobalAlerts';
+import { useFarms } from '../../composables/useFarms';
+import { ensureApiToken } from '../../services/auth';
+import axios from 'axios';
 
-const defaultLocation = ref('Maramag, Northern Mindanao');
+const STORAGE_KEY = 'appSettings';
+const NOTIFICATION_SETTINGS_KEY = 'notificationSettings';
 
-const getCurrentLocation = () => {
-  if (navigator.geolocation) {
-    navigator.geolocation.getCurrentPosition(
-      (position) => {
-        console.log('Location detected:', position.coords);
-        alert(`Location detected: ${position.coords.latitude}, ${position.coords.longitude}`);
-      },
-      (error) => {
-        alert('Unable to detect location. Please check your browser permissions.');
-      }
-    );
-  } else {
-    alert('Geolocation is not supported by your browser.');
-  }
-};
+const defaultSettings = Object.freeze({
+  locationType: 'custom', // 'custom' or 'farm'
+  defaultLocation: 'Butuan, Caraga, PH',
+  selectedFarmId: '',
+  temperatureUnit: 'celsius',
+  windSpeedUnit: 'ms',
+  timeFormat: '24h',
+  saveSearchHistory: true,
+  anonymousUsageData: false
+});
 
-const logout = async () => {
-  const csrfToken = document
-    .querySelector('meta[name="csrf-token"]')
-    ?.getAttribute('content');
+const settings = reactive({ ...defaultSettings });
+const isSaving = ref(false);
+const isClearing = ref(false);
 
-  if (!csrfToken) {
-    alert('Unable to logout: CSRF token not found.');
+const { showSuccess, showError } = useGlobalAlerts();
+const { farms, loading: farmsLoading, fetchFarms } = useFarms();
+
+const loadSettings = () => {
+  if (typeof window === 'undefined') {
     return;
   }
 
   try {
-    const response = await fetch('/logout', {
-      method: 'POST',
-      headers: {
-        'X-CSRF-TOKEN': csrfToken,
-        'Accept': 'application/json',
-        'Content-Type': 'application/json',
-        'X-Requested-With': 'XMLHttpRequest'
-      },
-      credentials: 'include',
-      body: JSON.stringify({})
-    });
-
-    if (response.ok) {
-      window.location.href = '/';
-    } else {
-      throw new Error('Logout failed');
+    const stored = window.localStorage?.getItem(STORAGE_KEY);
+    if (stored) {
+      const parsed = JSON.parse(stored);
+      Object.assign(settings, { ...defaultSettings, ...parsed });
     }
   } catch (error) {
+    console.error('Failed to load settings:', error);
+    showError('Load Failed', 'Unable to load your saved settings.');
+  }
+};
+
+onMounted(async () => {
+  await ensureApiToken(axios);
+  await fetchFarms();
+  loadSettings();
+  
+  // If location type is farm but no farm is selected, and farms are available, select first farm
+  if (settings.locationType === 'farm' && !settings.selectedFarmId && farms.value.length > 0) {
+    settings.selectedFarmId = farms.value[0].farm_id;
+  }
+});
+
+// Watch for location type changes
+watch(() => settings.locationType, (newType) => {
+  // When switching to farm location, auto-select first farm if available and none selected
+  if (newType === 'farm' && !settings.selectedFarmId && farms.value.length > 0) {
+    settings.selectedFarmId = farms.value[0].farm_id;
+  }
+});
+
+const saveSettings = async () => {
+  if (isSaving.value) return;
+
+  try {
+    isSaving.value = true;
+
+    if (typeof window !== 'undefined') {
+      // Create a copy to avoid mutating the reactive object
+      const settingsToSave = { ...settings };
+      window.localStorage?.setItem(STORAGE_KEY, JSON.stringify(settingsToSave));
+      
+      // Trigger a custom event for immediate updates in the same window (before page reload)
+      // This ensures components can react to changes without waiting for reload
+      window.dispatchEvent(new CustomEvent('appSettingsUpdated', { 
+        detail: settingsToSave 
+      }));
+      
+      // Also trigger storage event so other tabs/components can update
+      // Note: storage event only fires for other tabs, not the current one
+      window.dispatchEvent(new StorageEvent('storage', {
+        key: STORAGE_KEY,
+        newValue: JSON.stringify(settingsToSave),
+        storageArea: window.localStorage
+      }));
+    }
+
+    showSuccess('Settings Saved', 'Your preferences have been updated. Reloading...');
+    
+    // Reload the page after a short delay to ensure settings are applied
+    setTimeout(() => {
+      window.location.reload();
+    }, 1000);
+  } catch (error) {
+    console.error('Save settings error:', error);
+    showError('Save Failed', 'Unable to save your settings. Please try again.');
+    isSaving.value = false;
+  }
+};
+
+const clearAllData = async () => {
+  if (isClearing.value) return;
+  if (typeof window === 'undefined') return;
+
+  const confirmed = window.confirm('This will reset your local settings. Continue?');
+  if (!confirmed) return;
+
+  try {
+    isClearing.value = true;
+
+    window.localStorage?.removeItem(STORAGE_KEY);
+    window.localStorage?.removeItem(NOTIFICATION_SETTINGS_KEY);
+
+    Object.assign(settings, { ...defaultSettings });
+
+    showSuccess('Data Cleared', 'All settings have been reset to defaults.');
+  } catch (error) {
+    console.error('Clear data error:', error);
+    showError('Reset Failed', 'Unable to clear settings. Please try again.');
+  } finally {
+    isClearing.value = false;
+  }
+};
+
+const getCurrentLocation = () => {
+  if (typeof navigator === 'undefined' || !navigator.geolocation) {
+    showError('Geolocation Unsupported', 'Your browser does not support geolocation.');
+    return;
+  }
+
+  navigator.geolocation.getCurrentPosition(
+    (position) => {
+      console.log('Location detected:', position.coords);
+      const { latitude, longitude } = position.coords;
+      settings.defaultLocation = `${latitude.toFixed(4)}, ${longitude.toFixed(4)}`;
+      showSuccess('Location Detected', 'Default location updated. Save to keep this change.');
+    },
+    () => {
+      showError('Location Error', 'Unable to detect location. Please check your browser permissions.');
+    }
+  );
+};
+
+const logout = async () => {
+  try {
+    const response = await authorizedFetch('/api/auth/logout', {
+      method: 'POST'
+    });
+
+    if (!response.ok) {
+      throw new Error('Logout failed');
+    }
+
+    revokeApiToken();
+    // For mobile, reload the app which will show login if needed
+    window.location.reload();
+  } catch (error) {
     console.error('Logout error:', error);
-    alert('Failed to logout. Please try again.');
+    showError('Logout Failed', 'Failed to logout. Please try again.');
   }
 };
 </script>
@@ -285,6 +428,23 @@ const logout = async () => {
   color: white;
   font-size: 14px;
   cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.setting-select:focus {
+  outline: none;
+  border-color: #3b82f6;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.setting-select:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.setting-select option {
+  color: black;
+  background: white;
 }
 
 .radio-group {
@@ -392,6 +552,17 @@ const logout = async () => {
   transform: translateY(-2px);
 }
 
+.action-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.action-button:disabled:hover {
+  background: inherit;
+  transform: none;
+}
+
 .action-button.primary {
   background: rgba(34, 197, 94, 0.2);
   border-color: rgba(34, 197, 94, 0.4);
@@ -464,9 +635,116 @@ input:checked + .slider:before {
   transform: translateX(24px);
 }
 
+/* Responsive Design - Mobile First Approach */
+
+/* Extra Small Devices (phones, up to 480px) */
+@media (max-width: 480px) {
+  .settings-view {
+    padding: 1rem;
+  }
+
+  .settings-header h2 {
+    font-size: 1.25rem;
+    margin-bottom: 1.5rem;
+  }
+
+  .settings-section {
+    padding: 1rem;
+    margin-bottom: 1rem;
+    border-radius: 0.75rem;
+  }
+
+  .settings-section h3 {
+    font-size: 1.125rem;
+    margin-bottom: 1rem;
+  }
+
+  .setting-item {
+    margin-bottom: 1rem;
+  }
+
+  .setting-item label {
+    font-size: 0.8125rem;
+  }
+
+  .setting-input, .setting-select {
+    padding: 0.75rem;
+    font-size: 0.8125rem;
+  }
+
+  .radio-group {
+    flex-direction: column;
+    gap: 0.625rem;
+  }
+
+  .radio-label {
+    font-size: 0.8125rem;
+  }
+
+  .toggle-item {
+    padding: 0.75rem;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.75rem;
+  }
+
+  .toggle-info span {
+    font-size: 0.875rem;
+  }
+
+  .toggle-info small {
+    font-size: 0.75rem;
+  }
+
+  .settings-actions {
+    flex-direction: column;
+    gap: 0.75rem;
+    margin-top: 1.5rem;
+  }
+
+  .action-button {
+    width: 100%;
+    padding: 0.875rem 1rem;
+    font-size: 0.875rem;
+  }
+}
+
+/* Small Devices (landscape phones, 481px to 640px) */
+@media (min-width: 481px) and (max-width: 640px) {
+  .settings-view {
+    padding: 1.25rem;
+  }
+
+  .settings-actions {
+    flex-direction: column;
+  }
+
+  .radio-group {
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+}
+
+/* Medium Devices (tablets, 641px to 768px) */
+@media (min-width: 641px) and (max-width: 768px) {
+  .settings-view {
+    padding: 1.5rem;
+  }
+
+  .settings-actions {
+    flex-direction: row;
+    flex-wrap: wrap;
+  }
+
+  .action-button {
+    flex: 1 1 calc(50% - 0.5rem);
+  }
+}
+
+/* Standard Mobile (up to 768px) */
 @media (max-width: 768px) {
   .settings-view {
-    padding: 20px;
+    padding: 1.25rem;
   }
   
   .settings-actions {
@@ -475,7 +753,37 @@ input:checked + .slider:before {
   
   .radio-group {
     flex-direction: column;
-    gap: 10px;
+    gap: 0.625rem;
+  }
+}
+
+/* Large Devices (desktops, 1024px and up) */
+@media (min-width: 1024px) {
+  .settings-view {
+    max-width: 1200px;
+    margin: 0 auto;
+  }
+
+  .settings-actions {
+    flex-direction: row;
+  }
+}
+
+/* Extra Large Devices (large desktops, 1440px and up) */
+@media (min-width: 1440px) {
+  .settings-view {
+    padding: 2rem;
+  }
+
+  .settings-section {
+    padding: 2rem;
+  }
+}
+
+/* Zoom Support - Ensure proper scaling */
+@media (min-resolution: 192dpi) {
+  .settings-section {
+    border-width: 1px;
   }
 }
 </style>

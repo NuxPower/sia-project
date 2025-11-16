@@ -25,8 +25,25 @@
         body {
             margin: 0;
             padding: 0;
-            overflow: hidden;
             background: linear-gradient(135deg, #0f172a, #1e293b);
+            transition: background 0.3s ease;
+        }
+
+        body:not(.auth-mode) {
+            overflow: hidden;
+        }
+
+        body.auth-mode {
+            min-height: 100vh;
+            overflow-x: hidden;
+            overflow-y: auto;
+            background: radial-gradient(circle at 15% 20%, rgba(59, 130, 246, 0.45), transparent 55%),
+                        radial-gradient(circle at 85% 30%, rgba(14, 165, 233, 0.40), transparent 50%),
+                        linear-gradient(135deg, #0f172a 0%, #1e293b 45%, #111827 100%);
+        }
+
+        body.auth-mode .navbar {
+            display: none;
         }
 
         /* Sidebar Container */
@@ -128,7 +145,96 @@
             animation-delay: 0.3s;
         }
 
-        /* Mobile Responsive */
+        .navbar-icon:nth-child(6) {
+            animation-delay: 0.35s;
+        }
+
+        .navbar-icon i {
+            transition: opacity 0.3s ease, filter 0.3s ease, transform 0.3s ease, color 0.3s ease;
+        }
+
+        .navbar-icon:hover i {
+            opacity: 0.85;
+            filter: grayscale(20%) brightness(1.15);
+            transform: scale(1.05);
+            color: rgba(255, 255, 255, 0.85) !important;
+        }
+
+        .navbar-icon.active i {
+            opacity: 1;
+            filter: none;
+            color: rgba(255, 255, 255, 1) !important;
+        }
+
+        /* Responsive Design - Mobile First Approach */
+        
+        /* Extra Small Devices (phones, 320px and up) */
+        @media (max-width: 480px) {
+            .navbar {
+                left: 8px;
+                gap: 8px;
+                padding: 20px 0;
+                width: 60px;
+                border-radius: 30px;
+            }
+
+            .navbar-icon {
+                width: 44px;
+                height: 44px;
+                font-size: 16px;
+            }
+
+            .navbar-icon img {
+                width: 24px;
+                height: 24px;
+            }
+
+            .navbar.hidden {
+                left: -68px;
+            }
+        }
+
+        /* Small Devices (landscape phones, 481px and up) */
+        @media (min-width: 481px) and (max-width: 640px) {
+            .navbar {
+                left: 10px;
+                gap: 10px;
+                width: 70px;
+            }
+
+            .navbar-icon {
+                width: 50px;
+                height: 50px;
+                font-size: 18px;
+            }
+
+            .navbar-icon img {
+                width: 26px;
+                height: 26px;
+            }
+        }
+
+        /* Medium Devices (tablets, 641px to 768px) */
+        @media (min-width: 641px) and (max-width: 768px) {
+            .navbar {
+                left: 12px;
+                gap: 12px;
+                width: 80px;
+            }
+
+            .navbar-icon {
+                width: 54px;
+                height: 54px;
+                font-size: 20px;
+            }
+
+            .navbar-icon img {
+                width: 28px;
+                height: 28px;
+            }
+        }
+
+        /* Standard Mobile (up to 768px) */
         @media (max-width: 768px) {
             .navbar {
                 left: 10px;
@@ -164,10 +270,47 @@
             }
         }
 
+        /* Large Devices (desktops, 1024px and up) */
+        @media (min-width: 1024px) {
+            .navbar {
+                left: 24px;
+                gap: 28px;
+                width: 92px;
+            }
+        }
+
+        /* Extra Large Devices (large desktops, 1440px and up) */
+        @media (min-width: 1440px) {
+            .navbar {
+                left: 32px;
+                gap: 32px;
+                width: 100px;
+            }
+
+            .navbar-icon {
+                width: 62px;
+                height: 62px;
+            }
+
+            .navbar-icon img {
+                width: 32px;
+                height: 32px;
+            }
+        }
+
+        /* Zoom Support - Use relative units for better zoom compatibility */
+        @media (min-resolution: 192dpi) {
+            .navbar-icon img {
+                image-rendering: -webkit-optimize-contrast;
+                image-rendering: crisp-edges;
+            }
+        }
+
         .calendar-view,
         .settings-view,
         .dashboard-view,
         .alerts-view,
+        .exports-view,
         #app {
             /* Firefox */
             scrollbar-width: none;
@@ -181,6 +324,7 @@
         .settings-view::-webkit-scrollbar,
         .dashboard-view::-webkit-scrollbar,
         .alerts-view::-webkit-scrollbar,
+        .exports-view::-webkit-scrollbar,
         #app::-webkit-scrollbar {
             display: none;
         }
@@ -189,7 +333,8 @@
         .calendar-view:hover::-webkit-scrollbar,
         .settings-view:hover::-webkit-scrollbar,
         .dashboard-view:hover::-webkit-scrollbar,
-        .alerts-view:hover::-webkit-scrollbar {
+        .alerts-view:hover::-webkit-scrollbar,
+        .exports-view:hover::-webkit-scrollbar {
             display: block;
             width: 8px;
         }
@@ -197,7 +342,8 @@
         .calendar-view:hover::-webkit-scrollbar-track,
         .settings-view:hover::-webkit-scrollbar-track,
         .dashboard-view:hover::-webkit-scrollbar-track,
-        .alerts-view:hover::-webkit-scrollbar-track {
+        .alerts-view:hover::-webkit-scrollbar-track,
+        .exports-view:hover::-webkit-scrollbar-track {
             background: rgba(0, 0, 0, 0.2);
             border-radius: 10px;
         }
@@ -205,7 +351,8 @@
         .calendar-view:hover::-webkit-scrollbar-thumb,
         .settings-view:hover::-webkit-scrollbar-thumb,
         .dashboard-view:hover::-webkit-scrollbar-thumb,
-        .alerts-view:hover::-webkit-scrollbar-thumb {
+        .alerts-view:hover::-webkit-scrollbar-thumb,
+        .exports-view:hover::-webkit-scrollbar-thumb {
             background: rgba(59, 130, 246, 0.5);
             border-radius: 10px;
             border: 2px solid rgba(0, 0, 0, 0.2);
@@ -214,7 +361,8 @@
         .calendar-view:hover::-webkit-scrollbar-thumb:hover,
         .settings-view:hover::-webkit-scrollbar-thumb:hover,
         .dashboard-view:hover::-webkit-scrollbar-thumb:hover,
-        .alerts-view:hover::-webkit-scrollbar-thumb:hover {
+        .alerts-view:hover::-webkit-scrollbar-thumb:hover,
+        .exports-view:hover::-webkit-scrollbar-thumb:hover {
             background: rgba(59, 130, 246, 0.8);
         }
 
@@ -244,11 +392,19 @@
             background: rgba(59, 130, 246, 0.6);
         }
 
+        body.drawing-boundary-mode .navbar {
+            opacity: 0;
+            pointer-events: none;
+            transform: translateX(-24px);
+            transition: opacity 0.2s ease, transform 0.2s ease;
+        }
+
         /* Smooth scrolling */
         .calendar-view,
         .settings-view,
         .dashboard-view,
-        .alerts-view {
+        .alerts-view,
+        .exports-view {
             scroll-behavior: smooth;
         }
     </style>
@@ -268,6 +424,9 @@
         </div>
         <div class="navbar-icon" onclick="setActiveView('alerts', this)" title="Alerts">
             <img src="{{ asset('assets/mingcute_notification-line.png') }}" alt="Alerts icon">
+        </div>
+        <div class="navbar-icon" onclick="setActiveView('exports', this)" title="Exports">
+            <i class="fas fa-download" style="font-size: 24px; color: rgba(255, 255, 255, 0.55);"></i>
         </div>
         <div class="navbar-icon" onclick="setActiveView('settings', this)" title="Settings">
             <img src="{{ asset('assets/uil_setting.png') }}" alt="Settings icon">

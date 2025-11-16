@@ -7,12 +7,42 @@ import 'bootstrap';
  */
 
 import axios from 'axios';
+import { getApiToken, revokeApiToken } from './services/auth';
+
+const isMobileContainer = () => {
+    if (typeof window === 'undefined') {
+        return false;
+    }
+    return window.location?.protocol === 'capacitor:' || window.location?.protocol === 'ionic:';
+};
+
+const hasSpaRoot = () => {
+    if (typeof document === 'undefined') {
+        return false;
+    }
+    return Boolean(document.getElementById('app'));
+};
 window.axios = axios;
 
 window.axios.defaults.headers.common['X-Requested-With'] = 'XMLHttpRequest';
 window.axios.defaults.withCredentials = true;
 window.axios.defaults.xsrfHeaderName = 'X-XSRF-TOKEN';
 window.axios.defaults.xsrfCookieName = 'XSRF-TOKEN';
+
+window.axios.interceptors.request.use((config) => {
+    const token = getApiToken();
+
+    if (token && !config.headers?.Authorization) {
+        config.headers = {
+            ...config.headers,
+            Authorization: `Bearer ${token}`,
+        };
+    }
+
+    config.withCredentials = true;
+
+    return config;
+});
 
 /**
  * Echo exposes an expressive API for subscribing to channels and listening
@@ -41,6 +71,20 @@ window.axios.interceptors.response.use(
     error => {
         if (error?.response?.status === 423) {
             window.location.href = '/email/verify';
+        }
+
+        if (error?.response?.status === 401) {
+            revokeApiToken();
+
+            if (isMobileContainer() || hasSpaRoot()) {
+                window.dispatchEvent(new CustomEvent('auth:required', {
+                    detail: {
+                        reason: 'unauthorized'
+                    }
+                }));
+            } else {
+                window.location.href = '/app';
+            }
         }
 
         return Promise.reject(error);

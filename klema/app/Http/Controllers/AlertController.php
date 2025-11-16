@@ -10,11 +10,14 @@ class AlertController extends Controller
 {
     public function index()
     {
-        $alerts = Alert::whereHas('farm', function($query) {
-            $query->where('user_id', auth()->id());
-        })->with('farm')
-          ->orderBy('issued_at', 'desc')
-          ->paginate(20);
+        $user = auth()->user();
+        
+        $alerts = Alert::with('farm')
+            ->whereHas('farm', function($query) use ($user) {
+                $query->where('user_id', $user->id);
+            })
+            ->orderBy('issued_at', 'desc')
+            ->paginate(20);
         
         return view('alerts.index', compact('alerts'));
     }

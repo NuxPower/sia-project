@@ -15,12 +15,19 @@ return [
     |
     */
 
-    'stateful' => explode(',', env('SANCTUM_STATEFUL_DOMAINS', sprintf(
-        '%s%s',
-        'localhost,localhost:3000,127.0.0.1,127.0.0.1:8000,::1',
+    'stateful' => explode(',', env('SANCTUM_STATEFUL_DOMAINS', implode(',', array_filter([
+        'localhost',
+        'localhost:3000',
+        'localhost:5173',
+        '127.0.0.1',
+        '127.0.0.1:8000',
+        '::1',
+        'capacitor://localhost',
+        'ionic://localhost',
+        parse_url(config('app.url'), PHP_URL_HOST),
         Sanctum::currentApplicationUrlWithPort(),
-        // Sanctum::currentRequestHost(),
-    ))),
+        Sanctum::currentRequestHost(),
+    ])))),
 
     /*
     |--------------------------------------------------------------------------
@@ -47,7 +54,7 @@ return [
     |
     */
 
-    'expiration' => null,
+    'expiration' => env('SANCTUM_EXPIRATION', 120),
 
     /*
     |--------------------------------------------------------------------------
@@ -62,7 +69,7 @@ return [
     |
     */
 
-    'token_prefix' => env('SANCTUM_TOKEN_PREFIX', ''),
+    'token_prefix' => env('SANCTUM_TOKEN_PREFIX', 'klema_'),
 
     /*
     |--------------------------------------------------------------------------

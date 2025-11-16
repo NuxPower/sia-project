@@ -75,11 +75,15 @@ const handleActionClick = (alert) => {
 <style scoped>
 .global-alerts-container {
   position: fixed;
-  top: 20px;
-  right: 20px;
+  top: 24px;
+  left: 50%;
+  transform: translateX(-50%);
   z-index: 9999;
-  max-width: 400px;
+  width: min(420px, calc(100% - 48px));
   pointer-events: none;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
 }
 
 .alert-notification {
@@ -93,21 +97,23 @@ const handleActionClick = (alert) => {
   gap: 12px;
   backdrop-filter: blur(15px);
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
-  transform: translateX(0);
+  transform: translateY(0);
   transition: all 0.3s cubic-bezier(0.68, -0.55, 0.265, 1.55);
   pointer-events: auto;
   position: relative;
   overflow: hidden;
   cursor: pointer;
+  width: 100%;
+  animation: dropDown 0.35s ease-out;
 }
 
 .alert-notification:hover {
-  transform: translateX(-5px) scale(1.02);
+  transform: translateY(2px) scale(1.02);
   box-shadow: 0 12px 40px rgba(0, 0, 0, 0.4);
 }
 
 .alert-notification.alert-sliding-out {
-  transform: translateX(100%);
+  transform: translateY(-120%);
   opacity: 0;
 }
 
@@ -236,41 +242,104 @@ const handleActionClick = (alert) => {
   }
 }
 
-/* Mobile responsive */
-@media (max-width: 768px) {
+/* Responsive Design - Mobile First Approach */
+
+/* Extra Small Devices (phones, up to 480px) */
+@media (max-width: 480px) {
   .global-alerts-container {
-    top: 10px;
-    right: 10px;
-    left: 10px;
+    top: 0.5rem;
+    left: 0.5rem;
+    right: 0.5rem;
+    transform: none;
+    width: calc(100% - 1rem);
     max-width: none;
   }
   
   .alert-notification {
-    padding: 12px;
-    margin-bottom: 8px;
+    padding: 0.75rem;
+    margin-bottom: 0.5rem;
+    border-radius: 0.5rem;
   }
   
   .alert-title {
-    font-size: 13px;
+    font-size: 0.8125rem;
   }
   
   .alert-message {
-    font-size: 12px;
+    font-size: 0.75rem;
+  }
+
+  .alert-close {
+    width: 1.5rem;
+    height: 1.5rem;
+    font-size: 0.875rem;
   }
 }
 
-/* Animation for new alerts */
-.alert-notification {
-  animation: slideInRight 0.3s ease-out;
+/* Small Devices (landscape phones, 481px to 640px) */
+@media (min-width: 481px) and (max-width: 640px) {
+  .global-alerts-container {
+    top: 0.625rem;
+    width: calc(100% - 1.5rem);
+  }
+
+  .alert-notification {
+    padding: 0.875rem;
+  }
 }
 
-@keyframes slideInRight {
+/* Medium Devices (tablets, 641px to 768px) */
+@media (min-width: 641px) and (max-width: 768px) {
+  .global-alerts-container {
+    top: 0.75rem;
+    width: calc(100% - 2rem);
+  }
+}
+
+/* Standard Mobile (up to 768px) */
+@media (max-width: 768px) {
+  .global-alerts-container {
+    top: 0.625rem;
+    left: 50%;
+    transform: translateX(-50%);
+    width: calc(100% - 1.5rem);
+  }
+  
+  .alert-notification {
+    padding: 0.75rem;
+    margin-bottom: 0.5rem;
+  }
+  
+  .alert-title {
+    font-size: 0.8125rem;
+  }
+  
+  .alert-message {
+    font-size: 0.75rem;
+  }
+}
+
+/* Large Devices (desktops, 1024px and up) */
+@media (min-width: 1024px) {
+  .global-alerts-container {
+    max-width: 500px;
+  }
+}
+
+/* Zoom Support - Ensure proper scaling */
+@media (min-resolution: 192dpi) {
+  .alert-notification {
+    border-width: 1px;
+  }
+}
+
+@keyframes dropDown {
   from {
-    transform: translateX(100%);
+    transform: translateY(-40%);
     opacity: 0;
   }
   to {
-    transform: translateX(0);
+    transform: translateY(0);
     opacity: 1;
   }
 }

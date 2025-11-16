@@ -15,15 +15,15 @@
     <div class="alerts-section">
       <h3>Active Alerts</h3>
       
-      <div v-if="loading" class="loading-state">
+      <div v-if="alertsLoadingRef" class="loading-state">
         <i class="fas fa-spinner fa-spin"></i>
         <p>Loading alerts...</p>
       </div>
       
-      <div v-else-if="error" class="error-state">
+      <div v-else-if="alertsErrorRef" class="error-state">
         <i class="fas fa-exclamation-triangle"></i>
-        <p>{{ error }}</p>
-        <button @click="fetchActiveAlerts()" class="retry-button">
+        <p>{{ alertsErrorRef }}</p>
+        <button @click="reloadActiveAlerts" class="retry-button">
           <i class="fas fa-redo"></i>
           Retry
         </button>
@@ -73,26 +73,26 @@
     <!-- Forecast Warnings -->
     <div class="warnings-section">
       <div class="warnings-header">
-        <h3>Forecast Warnings</h3>
-        <button @click="loadWeatherData" class="refresh-button" :disabled="loading" title="Refresh forecast warnings">
-          <i class="fas fa-sync-alt" :class="{ 'fa-spin': loading }"></i>
+        <h3>Forecast Warnings <span v-if="locationLabelRef" class="warnings-location">({{ locationLabelRef }})</span></h3>
+        <button @click="loadWeatherData" class="refresh-button" :disabled="alertsLoadingRef" title="Refresh forecast warnings">
+          <i class="fas fa-sync-alt" :class="{ 'fa-spin': alertsLoadingRef }"></i>
           Refresh
         </button>
       </div>
       
-      <div v-if="loading && forecastWarnings.length === 0" class="loading-state">
+      <div v-if="alertsLoadingRef && forecastWarningsList.length === 0" class="loading-state">
         <i class="fas fa-spinner fa-spin"></i>
         <p>Loading forecast warnings...</p>
       </div>
       
-      <div v-else-if="forecastWarnings.length === 0" class="no-alerts">
+      <div v-else-if="forecastWarningsList.length === 0" class="no-alerts">
         <i class="fas fa-sun"></i>
         <p>No forecast warnings at this time</p>
       </div>
       
       <div v-else class="warnings-grid">
         <div 
-          v-for="warning in forecastWarnings" 
+          v-for="warning in forecastWarningsList" 
           :key="warning.id"
           class="warning-card"
           :class="warning.severity"
@@ -115,14 +115,14 @@
     <div class="settings-section">
       <h3>Notification Preferences</h3>
       
-      <div v-if="settingsLoading" class="loading-state">
+      <div v-if="settingsLoadingRef" class="loading-state">
         <i class="fas fa-spinner fa-spin"></i>
         <p>Loading notification settings...</p>
       </div>
       
       <div v-else class="settings-list">
         <div 
-          v-for="(value, settingName) in notificationSettings" 
+          v-for="(value, settingName) in settingsList" 
           :key="settingName"
           class="setting-item"
         >
@@ -137,19 +137,19 @@
             <input 
               type="checkbox" 
               :checked="value"
-              @change="updateNotificationSetting(settingName, $event.target.checked)"
+              @change="handleNotificationSettingChange(settingName, $event.target.checked)"
             >
             <span class="slider"></span>
           </label>
         </div>
       </div>
       
-      <div v-if="settingsError" class="error-state">
+      <div v-if="settingsErrorRef" class="error-state">
         <i class="fas fa-exclamation-triangle"></i>
-        {{ settingsError }}
+        {{ settingsErrorRef }}
       </div>
       
-      <div v-if="settingsSaved" class="success-state">
+      <div v-if="settingsSavedRef" class="success-state">
         <i class="fas fa-check-circle"></i>
         Settings saved successfully!
       </div>
@@ -157,6 +157,8 @@
 
     <CreateAlertModal 
       :show="showCreateModal" 
+      :farms="farmsList"
+      :create-alert="createAlertRef"
       @close="showCreateModal = false"
       @alert-created="handleAlertCreated"
     />
@@ -164,58 +166,134 @@
 </template>
 
 <script setup>
-import { ref, onMounted, computed } from 'vue';
-import { useAlerts } from '../../composables/useAlerts';
-import { useNotificationSettings } from '../../composables/useNotificationSettings';
+import { ref, onMounted, computed, toRefs } from 'vue';
 import CreateAlertModal from '../CreateAlertModal.vue';
-import { useWeatherAPI } from '../../composables/useWeatherAPI';
 
-const { 
-  alerts, 
-  forecastWarnings, 
-  loading, 
-  error, 
-  fetchActiveAlerts, 
-  fetchForecastWarnings, 
-  resolveAlert, 
-  deleteAlert,
-  getAlertTypeInfo,
-  formatAlertTime
-} = useAlerts();
-
-const { 
-  settings: notificationSettings,
-  loading: settingsLoading,
-  error: settingsError,
-  loadSettings,
-  updateSetting,
-  getSettingInfo
-} = useNotificationSettings();
+const props = defineProps({
+  alerts: {
+    type: Array,
+    default: () => []
+  },
+  alertsLoading: {
+    type: Boolean,
+    default: false
+  },
+  alertsError: {
+    type: [String, null],
+    default: null
+  },
+  forecastWarnings: {
+    type: Array,
+    default: () => []
+  },
+  notificationSettings: {
+    type: Object,
+    default: () => ({})
+  },
+  settingsLoading: {
+    type: Boolean,
+    default: false
+  },
+  settingsError: {
+    type: [String, null],
+    default: null
+  },
+  settingsSaved: {
+    type: Boolean,
+    default: false
+  },
+  getAlertTypeInfo: {
+    type: Function,
+    required: true
+  },
+  formatAlertTime: {
+    type: Function,
+    required: true
+  },
+  getSettingInfo: {
+    type: Function,
+    required: true
+  },
+  resolveAlert: {
+    type: Function,
+    required: true
+  },
+  deleteAlert: {
+    type: Function,
+    required: true
+  },
+  updateNotificationSetting: {
+    type: Function,
+    required: true
+  },
+  fetchActiveAlerts: {
+    type: Function,
+    required: true
+  },
+  refreshForecastWarnings: {
+    type: Function,
+    required: true
+  },
+  loadNotificationSettings: {
+    type: Function,
+    required: true
+  },
+  createAlert: {
+    type: Function,
+    required: true
+  },
+  farms: {
+    type: Array,
+    default: () => []
+  },
+  locationLabel: {
+    type: String,
+    default: ''
+  }
+});
 
 const showCreateModal = ref(false);
-const settingsSaved = ref(false);
-
-const { fetchWeatherByLocation } = useWeatherAPI();
+const {
+  alerts: alertsRef,
+  alertsLoading: alertsLoadingRef,
+  alertsError: alertsErrorRef,
+  forecastWarnings: forecastWarningsRef,
+  notificationSettings: notificationSettingsRef,
+  settingsLoading: settingsLoadingRef,
+  settingsError: settingsErrorRef,
+  settingsSaved: settingsSavedRef,
+  createAlert: createAlertRef,
+  locationLabel: locationLabelRef
+} = toRefs(props);
 
 const loadWeatherData = async () => {
   try {
-    const location = 'Butuan, Caraga, PH';
-    const { forecastData } = await fetchWeatherByLocation(location);
-    await fetchForecastWarnings({ forecast: forecastData });
+    await props.refreshForecastWarnings();
   } catch (error) {
     console.error('Failed to load weather data:', error);
-    forecastWarnings.value = [];
+  }
+};
+
+const initializeData = async () => {
+  try {
+    await Promise.all([
+      props.fetchActiveAlerts(),
+      loadWeatherData(),
+      props.loadNotificationSettings()
+    ]);
+  } catch (error) {
+    console.error('Failed to initialize alerts view:', error);
   }
 };
 
 const activeAlerts = computed(() => {
-  return alerts.value.map(alert => {
-    const typeInfo = getAlertTypeInfo(alert.alert_type);
+  return (alertsRef.value || []).map(alert => {
+    const typeInfo = props.getAlertTypeInfo(alert.alert_type);
     return {
       id: alert.alert_id,
       title: typeInfo.label,
       description: alert.message,
-      time: formatAlertTime(alert.issued_at),
+      time: props.formatAlertTime(alert.issued_at),
       icon: typeInfo.icon,
       severity: typeInfo.color,
       farmName: alert.farm?.farm_name || 'Unknown Farm',
@@ -224,17 +302,17 @@ const activeAlerts = computed(() => {
   });
 });
 
+const farmsList = computed(() => props.farms ?? []);
+const forecastWarningsList = computed(() => forecastWarningsRef.value ?? []);
+const settingsList = computed(() => notificationSettingsRef.value ?? {});
+
 onMounted(async () => {
-  await Promise.all([
-    fetchActiveAlerts(),
-    loadWeatherData(),
-    loadSettings()
-  ]);
+  await initializeData();
 });
 
 const dismissAlert = async (alertId) => {
   try {
-    await resolveAlert(alertId);
+    await props.resolveAlert(alertId);
   } catch (err) {
     console.error('Failed to dismiss alert:', err);
   }
@@ -243,26 +321,34 @@ const dismissAlert = async (alertId) => {
 const deleteAlertHandler = async (alertId) => {
   if (confirm('Are you sure you want to delete this alert?')) {
     try {
-      await deleteAlert(alertId);
+      await props.deleteAlert(alertId);
     } catch (err) {
       console.error('Failed to delete alert:', err);
     }
   }
 };
 
-const handleAlertCreated = () => {
-  // Alert automatically added by composable
+const handleAlertCreated = async () => {
+  try {
+    await props.fetchActiveAlerts();
+  } catch (err) {
+    console.error('Failed to refresh alerts after creation:', err);
+  }
 };
 
-const updateNotificationSetting = async (settingName, value) => {
+const handleNotificationSettingChange = async (settingName, value) => {
   try {
-    await updateSetting(settingName, value);
-    settingsSaved.value = true;
-    setTimeout(() => {
-      settingsSaved.value = false;
-    }, 3000);
+    await props.updateNotificationSetting(settingName, value);
   } catch (err) {
     console.error('Failed to update setting:', err);
+  }
+};
+
+const reloadActiveAlerts = async () => {
+  try {
+    await props.fetchActiveAlerts();
+  } catch (error) {
+    console.error('Failed to reload alerts:', error);
   }
 };
 </script>
@@ -341,6 +427,11 @@ const updateNotificationSetting = async (settingName, value) => {
   color: white;
   font-size: 20px;
   margin: 0;
+}
+.warnings-header .warnings-location {
+  font-size: 14px;
+  color: #9ca3af;
+  margin-left: 8px;
 }
 
 .refresh-button {
@@ -738,19 +829,170 @@ input:checked + .slider:before {
   transform: translateX(24px);
 }
 
-@media (max-width: 768px) {
+/* Responsive Design - Mobile First Approach */
+
+/* Extra Small Devices (phones, up to 480px) */
+@media (max-width: 480px) {
   .alerts-view {
-    padding: 20px;
+    padding: 0.75rem;
   }
   
   .alerts-header {
     flex-direction: column;
     align-items: flex-start;
-    gap: 15px;
+    gap: 0.9375rem;
+    margin-bottom: 1.5rem;
+  }
+
+  .alerts-header h2 {
+    font-size: 1.25rem;
+  }
+
+  .add-alert-button {
+    width: 100%;
+    justify-content: center;
+    padding: 0.75rem 1rem;
+    font-size: 0.8125rem;
+  }
+  
+  .alerts-section, .warnings-section, .settings-section {
+    padding: 1rem;
+    margin-bottom: 1rem;
+  }
+
+  .alerts-section h3, .settings-section h3 {
+    font-size: 1.125rem;
+    margin-bottom: 1rem;
+  }
+
+  .warnings-header h3 {
+    font-size: 1.125rem;
+  }
+
+  .warnings-grid {
+    grid-template-columns: 1fr;
+    gap: 0.75rem;
+  }
+
+  .warning-card {
+    padding: 1rem;
+  }
+
+  .alert-card {
+    padding: 1rem;
+    gap: 0.75rem;
+    flex-direction: column;
+  }
+
+  .alert-icon {
+    font-size: 1.5rem;
+  }
+
+  .alert-content h4 {
+    font-size: 1rem;
+  }
+
+  .alert-actions {
+    flex-direction: row;
+    width: 100%;
+    justify-content: flex-end;
+  }
+
+  .settings-list {
+    gap: 0.75rem;
+  }
+
+  .setting-item {
+    padding: 0.75rem;
+    flex-direction: row;
+    align-items: center;
+    gap: 0.75rem;
+  }
+
+  .setting-info {
+    width: auto;
+    flex: 1;
+  }
+}
+
+/* Small Devices (landscape phones, 481px to 640px) */
+@media (min-width: 481px) and (max-width: 640px) {
+  .alerts-view {
+    padding: 0.9rem;
+  }
+
+  .warnings-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .alert-card {
+    flex-direction: row;
+  }
+}
+
+/* Medium Devices (tablets, 641px to 768px) */
+@media (min-width: 641px) and (max-width: 768px) {
+  .alerts-view {
+    padding: 1rem;
+  }
+
+  .warnings-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+/* Standard Mobile (up to 768px) */
+@media (max-width: 768px) {
+  .alerts-view {
+    padding: 0.9rem;
+  }
+  
+  .alerts-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.9375rem;
   }
   
   .warnings-grid {
     grid-template-columns: 1fr;
+  }
+  
+  .setting-item {
+    flex-direction: row;
+    align-items: center;
+  }
+  
+  .setting-info {
+    flex: 1;
+  }
+}
+
+/* Large Devices (desktops, 1024px and up) */
+@media (min-width: 1024px) {
+  .warnings-grid {
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  }
+}
+
+/* Extra Large Devices (large desktops, 1440px and up) */
+@media (min-width: 1440px) {
+  .alerts-view {
+    padding: 2rem;
+  }
+
+  .alerts-section, .warnings-section, .settings-section {
+    padding: 1.875rem;
+  }
+}
+
+/* Zoom Support - Ensure proper scaling */
+@media (min-resolution: 192dpi) {
+  .alert-card {
+    border-left-width: 3px;
+  }
+
+  .warning-card {
+    border-left-width: 3px;
   }
 }
 </style>

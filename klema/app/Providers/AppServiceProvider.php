@@ -2,29 +2,66 @@
 
 namespace App\Providers;
 
-use Illuminate\Support\ServiceProvider;
-use Illuminate\Support\Facades\Http;
 use App\Services\WeatherService;
+use Illuminate\Cache\RateLimiting\Limit;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\RateLimiter;
+use Illuminate\Support\Facades\URL;
+use Illuminate\Support\ServiceProvider;
+use Illuminate\Support\Str;
 
 class AppServiceProvider extends ServiceProvider
 {
-    public function register()
+    public function register(): void
     {
-        $this->app->singleton(WeatherService::class, function ($app) {
-            return new WeatherService();
+        $this->app->singleton(WeatherService::class, fn () => new WeatherService());
+    }
+
+    public function boot(): void
+    {
+        if (app()->isProduction()) {
+            URL::forceScheme('https');
+        }
+
+        $this->configureHttpMacros();
+        $this->configureRateLimiting();
+    }
+
+    private function configureHttpMacros(): void
+    {
+        if (Http::hasMacro('weather')) {
+            return;
+        }
+
+        Http::macro('weather', function () {
+            $options = [
+                'timeout' => 10,
+            ];
+
+            if (app()->environment('local')) {
+                $options['verify'] = false;
+            }
+
+            return Http::withOptions($options);
         });
     }
 
-    public function boot()
+    private function configureRateLimiting(): void
     {
-        // Configure HTTP client for development (XAMPP SSL issues)
-        if (app()->environment('local')) {
-            Http::macro('weather', function () {
-                return Http::withOptions([
-                    'verify' => false, // Disable SSL verification for XAMPP
-                    'timeout' => 10,
-                ]);
-            });
-        }
+        RateLimiter::for('login', function (Request $request) {
+            $key = Str::lower((string) $request->input('email')) . '|' . $request->ip();
+
+            return [
+                Limit::perMinute(5)->by($key),
+                Limit::perMinute(30)->by($request->ip())->response(function () {
+                    return response()->json([
+                        'message' => 'Too many login attempts. Please slow down.',
+                    ], 429);
+                }),
+            ];
+        });
+
+        RateLimiter::for('register', fn (Request $request) => Limit::perMinute(3)->by($request->ip()));
     }
 }

@@ -7,6 +7,7 @@ use App\Models\Farm;
 use App\Models\FarmPoint;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Validation\Rule;
 
 class FarmApiController extends Controller
 {
@@ -15,14 +16,17 @@ class FarmApiController extends Controller
      */
     public function index(): JsonResponse
     {
-        $farms = auth()->user()->farms()->with([
-            'weatherData' => function($query) {
-                $query->latest('recorded_at')->limit(1);
-            },
-            'alerts' => function($query) {
-                $query->where('resolved', false);
-            }
-        ])->get();
+        $user = auth()->user();
+        
+        $farms = Farm::query()
+            ->where('user_id', $user->id)
+            ->with([
+                'alerts' => function ($query) {
+                    $query->where('resolved', false);
+                },
+                'user',
+            ])
+            ->get();
         
         return response()->json([
             'success' => true,
@@ -39,14 +43,27 @@ class FarmApiController extends Controller
             'farm_name' => 'required|string|max:100',
             'latitude' => 'required|numeric|between:-90,90',
             'longitude' => 'required|numeric|between:-180,180',
+            'size_hectares' => 'nullable|numeric|min:0|max:100000',
+            'soil_type' => ['nullable', 'string', Rule::in(config('farm.soil_types'))],
+            'description' => 'nullable|string',
+            'boundary' => 'nullable',
         ]);
 
-        $farm = Farm::create([
+        $farm = new Farm([
             'user_id' => auth()->id(),
             'farm_name' => $validated['farm_name'],
             'latitude' => $validated['latitude'],
             'longitude' => $validated['longitude'],
+            'size_hectares' => $validated['size_hectares'] ?? null,
+            'soil_type' => $validated['soil_type'] ?? null,
+            'description' => $validated['description'] ?? null,
         ]);
+
+        if (array_key_exists('boundary', $validated)) {
+            $farm->boundary = $validated['boundary'];
+        }
+
+        $farm->save();
 
         return response()->json([
             'success' => true,
@@ -60,22 +77,22 @@ class FarmApiController extends Controller
      */
     public function show(Farm $farm): JsonResponse
     {
-        // Check if user owns the farm
-        if ($farm->user_id !== auth()->id()) {
+        $user = auth()->user();
+        
+        // Check authorization: users can only view their own farms
+        if ($farm->user_id !== $user->id) {
             return response()->json([
                 'success' => false,
-                'message' => 'Unauthorized access to farm'
+                'message' => 'Unauthorized. You can only view your own farms.'
             ], 403);
         }
-
+        
         $farm->load([
-            'weatherData' => function($query) {
-                $query->latest('recorded_at')->limit(10);
-            },
             'farmPoints',
             'alerts' => function($query) {
                 $query->latest('issued_at');
-            }
+            },
+            'user' // Include user relationship for owner information
         ]);
 
         return response()->json([
@@ -89,26 +106,54 @@ class FarmApiController extends Controller
      */
     public function update(Request $request, Farm $farm): JsonResponse
     {
-        // Check if user owns the farm
-        if ($farm->user_id !== auth()->id()) {
+        $user = auth()->user();
+        
+        // Check authorization: users can only update their own farms
+        if ($farm->user_id !== $user->id) {
             return response()->json([
                 'success' => false,
-                'message' => 'Unauthorized access to farm'
+                'message' => 'Unauthorized. You can only update your own farms.'
             ], 403);
         }
-
+        
         $validated = $request->validate([
             'farm_name' => 'sometimes|string|max:100',
             'latitude' => 'sometimes|numeric|between:-90,90',
             'longitude' => 'sometimes|numeric|between:-180,180',
+            'size_hectares' => 'sometimes|nullable|numeric|min:0|max:100000',
+            'soil_type' => ['sometimes','nullable','string', Rule::in(config('farm.soil_types'))],
+            'description' => 'sometimes|nullable|string',
+            'boundary' => 'nullable',
         ]);
 
-        $farm->update($validated);
+        $farm->fill($request->only([
+            'farm_name',
+            'latitude',
+            'longitude',
+            'size_hectares',
+            'soil_type',
+            'description',
+        ]));
+
+        if ($request->exists('boundary')) {
+            $farm->boundary = $request->input('boundary');
+            // Area is automatically calculated when boundary is set (see Farm model)
+        }
+
+        $farm->save();
+        
+        // Refresh to get calculated area if boundary was set
+        $farm->refresh();
+
+        $message = 'Farm updated successfully!';
+        if ($request->exists('boundary') && $request->input('boundary') !== null && $farm->size_hectares) {
+            $message .= sprintf(' Farm area calculated: %.2f hectares.', $farm->size_hectares);
+        }
 
         return response()->json([
             'success' => true,
-            'farm' => $farm,
-            'message' => 'Farm updated successfully!'
+            'farm' => $farm->load('user'), // Include user relationship
+            'message' => $message
         ]);
     }
 
@@ -117,14 +162,16 @@ class FarmApiController extends Controller
      */
     public function destroy(Farm $farm): JsonResponse
     {
-        // Check if user owns the farm
-        if ($farm->user_id !== auth()->id()) {
+        $user = auth()->user();
+        
+        // Check authorization: users can only delete their own farms
+        if ($farm->user_id !== $user->id) {
             return response()->json([
                 'success' => false,
-                'message' => 'Unauthorized access to farm'
+                'message' => 'Unauthorized. You can only delete your own farms.'
             ], 403);
         }
-
+        
         $farm->delete();
 
         return response()->json([
@@ -138,25 +185,28 @@ class FarmApiController extends Controller
      */
     public function addPoint(Request $request, Farm $farm): JsonResponse
     {
-        // Check if user owns the farm
-        if ($farm->user_id !== auth()->id()) {
+        $user = auth()->user();
+        
+        // Check authorization: users can only add points to their own farms
+        if ($farm->user_id !== $user->id) {
             return response()->json([
                 'success' => false,
-                'message' => 'Unauthorized access to farm'
+                'message' => 'Unauthorized. You can only add points to your own farms.'
             ], 403);
         }
-
+        
         $validated = $request->validate([
+            'label' => 'required|string|max:100',
             'latitude' => 'required|numeric|between:-90,90',
             'longitude' => 'required|numeric|between:-180,180',
-            'point_name' => 'sometimes|string|max:100',
+            'point_type' => 'nullable|string|max:50',
         ]);
 
-        $point = FarmPoint::create([
-            'farm_id' => $farm->farm_id,
+        $point = $farm->farmPoints()->create([
+            'label' => $validated['label'],
             'latitude' => $validated['latitude'],
             'longitude' => $validated['longitude'],
-            'point_name' => $validated['point_name'] ?? 'Point ' . ($farm->farmPoints()->count() + 1),
+            'point_type' => $validated['point_type'] ?? null,
         ]);
 
         return response()->json([
@@ -168,25 +218,113 @@ class FarmApiController extends Controller
 
     /**
      * Get weather data for a specific farm.
+     * Now fetches from API instead of database.
      */
     public function getWeatherData(Farm $farm): JsonResponse
     {
-        // Check if user owns the farm
-        if ($farm->user_id !== auth()->id()) {
+        $user = auth()->user();
+        
+        // Check authorization: users can only view weather for their own farms
+        if ($farm->user_id !== $user->id) {
             return response()->json([
                 'success' => false,
-                'message' => 'Unauthorized access to farm'
+                'message' => 'Unauthorized. You can only view weather data for your own farms.'
             ], 403);
         }
+        
+        // Fetch current weather from API
+        try {
+            $weatherService = app(\App\Services\WeatherService::class);
+            $currentWeather = $weatherService->getCurrentWeatherByCoordinates(
+                (float) $farm->latitude,
+                (float) $farm->longitude
+            );
 
-        $weatherData = $farm->weatherData()
-            ->orderBy('recorded_at', 'desc')
-            ->limit(24) // Last 24 hours
+            return response()->json([
+                'success' => true,
+                'weather_data' => $currentWeather
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to fetch weather data: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    public function mapData(): JsonResponse
+    {
+        $user = auth()->user();
+        
+        // Get farms for the logged-in user only
+        $farms = Farm::with(['farmPoints', 'user'])
+            ->where('user_id', $user->id)
             ->get();
+
+        $farmFeatures = [];
+        $pointFeatures = [];
+
+        foreach ($farms as $farm) {
+            $properties = [
+                'farm_id' => $farm->farm_id,
+                'farm_name' => $farm->farm_name,
+                'size_hectares' => $farm->size_hectares,
+                'soil_type' => $farm->soil_type,
+                'description' => $farm->description,
+            ];
+
+            $boundary = $farm->boundary;
+
+            if ($boundary) {
+                $farmFeatures[] = [
+                    'type' => 'Feature',
+                    'geometry' => $boundary,
+                    'properties' => array_merge($properties, [
+                        'type' => 'boundary',
+                    ]),
+                ];
+            } else {
+                $farmFeatures[] = [
+                    'type' => 'Feature',
+                    'geometry' => [
+                        'type' => 'Point',
+                        'coordinates' => [(float) $farm->longitude, (float) $farm->latitude],
+                    ],
+                    'properties' => array_merge($properties, [
+                        'type' => 'centroid',
+                    ]),
+                ];
+            }
+
+            foreach ($farm->farmPoints as $point) {
+                $pointFeatures[] = [
+                    'type' => 'Feature',
+                    'geometry' => [
+                        'type' => 'Point',
+                        'coordinates' => [(float) $point->longitude, (float) $point->latitude],
+                    ],
+                    'properties' => [
+                        'point_id' => $point->point_id,
+                        'farm_id' => $farm->farm_id,
+                        'label' => $point->label,
+                        'point_type' => $point->point_type,
+                    ],
+                ];
+            }
+        }
 
         return response()->json([
             'success' => true,
-            'weather_data' => $weatherData
+            'farms' => $farms,
+            'soil_types' => config('farm.soil_types'),
+            'farm_features' => [
+                'type' => 'FeatureCollection',
+                'features' => $farmFeatures,
+            ],
+            'point_features' => [
+                'type' => 'FeatureCollection',
+                'features' => $pointFeatures,
+            ],
         ]);
     }
 }

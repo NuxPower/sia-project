@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\Storage;
 
 class Export extends Model
 {
@@ -14,7 +15,8 @@ class Export extends Model
     protected $fillable = [
         'user_id',
         'file_name',
-        'file_path'
+        'file_path',
+        'disk'
     ];
 
     public function user()
@@ -24,21 +26,28 @@ class Export extends Model
 
     public function getFileSizeAttribute()
     {
-        $filePath = storage_path('app/' . $this->file_path);
-        if (file_exists($filePath)) {
-            $bytes = filesize($filePath);
-            $units = ['B', 'KB', 'MB', 'GB', 'TB'];
-            $bytes = max($bytes, 0);
-            $pow = floor(($bytes ? log($bytes) : 0) / log(1024));
-            $pow = min($pow, count($units) - 1);
-            $bytes /= pow(1024, $pow);
-            return round($bytes, 2) . ' ' . $units[$pow];
+        $disk = $this->disk ?? 'local';
+        
+        try {
+            if (\Storage::disk($disk)->exists($this->file_path)) {
+                $bytes = \Storage::disk($disk)->size($this->file_path);
+                $units = ['B', 'KB', 'MB', 'GB', 'TB'];
+                $bytes = max($bytes, 0);
+                $pow = floor(($bytes ? log($bytes) : 0) / log(1024));
+                $pow = min($pow, count($units) - 1);
+                $bytes /= pow(1024, $pow);
+                return round($bytes, 2) . ' ' . $units[$pow];
+            }
+        } catch (\Exception $e) {
+            // Log error but don't break the application
+            \Log::warning('Failed to get file size for export: ' . $e->getMessage());
         }
+        
         return 'Unknown';
     }
 
     public function getDownloadUrlAttribute()
     {
-        return route('exports.download', $this->export_id);
+        return route('api.exports.download', $this->export_id);
     }
 }

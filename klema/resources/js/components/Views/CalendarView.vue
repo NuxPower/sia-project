@@ -10,15 +10,10 @@
         </button>
       </div>
       <h2>{{ currentMonthYear }}</h2>
-      <button class="add-activity-button" type="button" @click="openActivityModal()">
+      <button class="add-activity-button" type="button" @click="openCreateViewForDate()">
         <i class="fas fa-plus"></i>
         <span>Add New Activity</span>
       </button>
-    </div>
-
-    <div v-if="activityFeedback" class="activity-feedback" :class="activityFeedbackType">
-      <i :class="feedbackIconMap[activityFeedbackType]"></i>
-      <span>{{ activityFeedback }}</span>
     </div>
 
     <div v-if="activityError" class="activity-feedback error">
@@ -32,45 +27,32 @@
     </div>
 
     <div class="calendar-grid">
-      <div class="calendar-weekdays">
-        <div v-for="day in weekdays" :key="day" class="weekday">{{ day }}</div>
-      </div>
-      
-      <div class="calendar-days">
-        <div
-          v-for="(day, index) in calendarDays"
-          :key="index"
-          class="calendar-day"
-          :class="{
-            'other-month': !day.currentMonth,
-            'today': day.isToday,
-            'has-weather': day.weather,
-            'has-activities': day.activities?.length
-          }"
-          @click="handleDayClick(day)"
-        >
-          <div class="day-number">{{ day.date }}</div>
-          <div v-if="day.weather" class="day-weather">
-            <i :class="getWeatherIcon(day.weather.condition)"></i>
-            <span class="day-temp">{{ day.weather.temp }}°</span>
-          </div>
-          <div v-if="day.activities?.length" class="day-activities">
-            <div
-              v-for="(activity, activityIndex) in day.activities.slice(0, 3)"
-              :key="activity.id ?? `${activity.start_date}-${activityIndex}`"
-              class="activity-chip"
-              :class="activity.status || 'pending'"
-            >
-              <span class="chip-title">{{ activity.activity_type }}</span>
-              <span class="chip-field">{{ activity.field }}</span>
-              <i
-                v-if="activity.weather_warning"
-                class="fas fa-exclamation-circle warning-icon"
-                :title="activity.weather_warning"
-              ></i>
+      <div class="calendar-scroll">
+        <div class="calendar-weekdays">
+          <div v-for="day in weekdays" :key="day" class="weekday">{{ day }}</div>
+        </div>
+        
+        <div class="calendar-days">
+          <div
+            v-for="(day, index) in calendarDays"
+            :key="index"
+            class="calendar-day"
+            :class="{
+              'other-month': !day.currentMonth,
+              'today': day.isToday,
+              'has-weather': day.hasWeather,
+              'no-data': day.weather?.noData,
+              'has-activities': day.activities?.length
+            }"
+            @click="handleDayClick(day)"
+          >
+            <div class="day-number">{{ day.date }}</div>
+            <div v-if="day.hasWeather" class="day-weather">
+              <i :class="getWeatherIcon({ condition: day.weather.condition, icon: day.weather.icon })"></i>
+              <span class="day-temp">{{ day.weather.temp !== null && day.weather.temp !== undefined ? formatTemperature(day.weather.temp, { decimals: 0 }).replace('°C', '°').replace('°F', '°') : '—' }}</span>
             </div>
-            <div v-if="day.activities.length > 3" class="activity-more">
-              +{{ day.activities.length - 3 }} more
+            <div v-else-if="day.weather?.noData" class="day-no-data">
+              <span>No data available</span>
             </div>
           </div>
         </div>
@@ -92,96 +74,31 @@
       </div>
     </div>
 
-    <transition name="modal-fade">
-      <div v-if="showActivityModal" class="modal-backdrop" @click.self="closeActivityModal">
-        <div class="modal-content">
-          <div class="modal-header">
-            <h3>Schedule New Activity</h3>
-            <button type="button" class="modal-close" @click="closeActivityModal" aria-label="Close activity form">
-              <i class="fas fa-times"></i>
-            </button>
-          </div>
-
-          <form class="modal-body" @submit.prevent="submitActivity">
-            <div v-if="formSubmitError" class="form-error-banner">
-              <i class="fas fa-exclamation-circle"></i>
-              <span>{{ formSubmitError }}</span>
-            </div>
-
-            <label class="form-field">
-              <span>Activity Type</span>
-              <input
-                v-model="form.activity_type"
-                type="text"
-                placeholder="e.g. Planting, Irrigation"
-                :class="{ invalid: formErrors.activity_type }"
-                required
-              />
-              <small v-if="formErrors.activity_type" class="field-error">
-                {{ formErrors.activity_type[0] }}
-              </small>
-            </label>
-
-            <label class="form-field">
-              <span>Field</span>
-              <input
-                v-model="form.field"
-                type="text"
-                placeholder="Field identifier or location"
-                :class="{ invalid: formErrors.field }"
-                required
-              />
-              <small v-if="formErrors.field" class="field-error">
-                {{ formErrors.field[0] }}
-              </small>
-            </label>
-
-            <label class="form-field">
-              <span>Start Date</span>
-              <input
-                v-model="form.start_date"
-                type="date"
-                :class="{ invalid: formErrors.start_date }"
-                required
-              />
-              <small v-if="formErrors.start_date" class="field-error">
-                {{ formErrors.start_date[0] }}
-              </small>
-            </label>
-
-            <label class="form-field">
-              <span>Notes (optional)</span>
-              <textarea
-                v-model="form.notes"
-                placeholder="Add any additional details"
-              ></textarea>
-              <small v-if="formErrors.notes" class="field-error">
-                {{ formErrors.notes[0] }}
-              </small>
-            </label>
-
-            <div class="modal-footer">
-              <button type="button" class="secondary-button" @click="closeActivityModal">Cancel</button>
-              <button type="submit" class="primary-button" :disabled="isSubmittingActivity">
-                <i v-if="isSubmittingActivity" class="fas fa-spinner fa-spin"></i>
-                <span>{{ isSubmittingActivity ? 'Saving...' : 'Save Activity' }}</span>
-              </button>
-            </div>
-          </form>
-        </div>
-      </div>
-    </transition>
   </div>
 </template>
 
 <script setup>
 import { ref, computed, onMounted, watch } from 'vue';
 import axios from 'axios';
+import { ensureApiToken } from '../../services/auth';
+import { useDisplaySettings } from '../../composables/useDisplaySettings';
 
 const props = defineProps({
-  forecast: Array,
-  getWeatherIcon: Function
+  getWeatherIcon: {
+    type: Function,
+    required: true
+  },
+  timeline: {
+    type: Array,
+    default: () => []
+  },
+  refreshToken: {
+    type: Number,
+    default: 0
+  }
 });
+
+const emit = defineEmits(['open-day']);
 
 const weekdays = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const feedbackIconMap = {
@@ -189,6 +106,24 @@ const feedbackIconMap = {
   warning: 'fas fa-exclamation-triangle',
   error: 'fas fa-times-circle'
 };
+const CUSTOM_ACTIVITY_KEY = 'custom';
+
+const fallbackActivityOptions = [
+  { key: 'planting', label: 'Planting', description: 'Field prep, seedbed, transplanting.' },
+  { key: 'irrigation', label: 'Irrigation', description: 'Irrigation or fertigation runs.' },
+  { key: 'harvesting', label: 'Harvesting', description: 'Cutting, threshing, hauling.' },
+  { key: 'fertilizing', label: 'Fertilizing', description: 'Broadcast or foliar applications.' },
+  { key: 'pest_control', label: 'Pest & Disease Control', description: 'Spraying pesticides/fungicides.' }
+];
+
+const activityTypeOptions = ref([...fallbackActivityOptions]);
+const activityTypeLoading = ref(false);
+const activityTypeError = ref('');
+const selectedActivityTypeKey = ref(fallbackActivityOptions[0]?.key ?? '');
+const recommendation = ref(null);
+const recommendationLoading = ref(false);
+const recommendationError = ref('');
+const advisorRequestToken = ref(0);
 
 const currentDate = ref(new Date());
 const activities = ref([]);
@@ -200,6 +135,11 @@ const showActivityModal = ref(false);
 const isSubmittingActivity = ref(false);
 const formErrors = ref({});
 const formSubmitError = ref('');
+
+const forecastDays = computed(() => Array.isArray(props.timeline) ? props.timeline : []);
+
+const { getWeatherIcon } = props;
+const { formatTemperature } = useDisplaySettings();
 
 function toDateOnly(value) {
   if (!value) return null;
@@ -243,7 +183,56 @@ const defaultFormState = () => ({
   status: 'pending'
 });
 
-const form = ref(defaultFormState());
+const selectedActivityOption = computed(() =>
+  activityTypeOptions.value.find((option) => option.key === selectedActivityTypeKey.value)
+);
+
+function applySelectedActivityLabel() {
+  if (selectedActivityTypeKey.value === CUSTOM_ACTIVITY_KEY) {
+    return;
+  }
+  if (!selectedActivityTypeKey.value) {
+    form.value.activity_type = '';
+    return;
+  }
+  const match = selectedActivityOption.value;
+  form.value.activity_type = match?.label ?? '';
+}
+
+const todayDateKey = formatDateKey(new Date());
+const form = ref({
+  ...defaultFormState(),
+  start_date: todayDateKey
+});
+applySelectedActivityLabel();
+
+const recommendationStatusMap = {
+  go: {
+    label: 'Good window',
+    icon: 'fas fa-check-circle',
+    class: 'advisor-status success'
+  },
+  caution: {
+    label: 'Proceed with caution',
+    icon: 'fas fa-exclamation-triangle',
+    class: 'advisor-status warning'
+  },
+  delay: {
+    label: 'Delay activity',
+    icon: 'fas fa-times-circle',
+    class: 'advisor-status danger'
+  },
+  unknown: {
+    label: 'Guidance unavailable',
+    icon: 'fas fa-info-circle',
+    class: 'advisor-status neutral'
+  }
+};
+
+const recommendationStatusMeta = computed(() => {
+  const status = recommendation.value?.status ?? 'unknown';
+  return recommendationStatusMap[status] || recommendationStatusMap.unknown;
+});
 
 const currentMonthYear = computed(() => {
   return currentDate.value.toLocaleDateString('en-US', {
@@ -251,6 +240,15 @@ const currentMonthYear = computed(() => {
     year: 'numeric'
   });
 });
+
+const changeMonth = (delta) => {
+  const baseDate = currentDate.value instanceof Date ? currentDate.value : new Date();
+  const nextDate = new Date(baseDate.getFullYear(), baseDate.getMonth() + delta, 1);
+  currentDate.value = nextDate;
+};
+
+const previousMonth = () => changeMonth(-1);
+const nextMonth = () => changeMonth(1);
 
 const activitiesByDate = computed(() => {
   const grouped = activities.value.reduce((map, activity) => {
@@ -277,6 +275,17 @@ const activitiesByDate = computed(() => {
   return grouped;
 });
 
+const forecastByDate = computed(() => {
+  return forecastDays.value.reduce((map, entry) => {
+    if (!entry) return map;
+    const dateKey = entry.date || (entry.dt ? new Date(entry.dt * 1000).toISOString().slice(0, 10) : null);
+    if (dateKey) {
+      map[dateKey] = entry;
+    }
+    return map;
+  }, {});
+});
+
 const calendarDays = computed(() => {
   const year = currentDate.value.getFullYear();
   const month = currentDate.value.getMonth();
@@ -293,11 +302,43 @@ const calendarDays = computed(() => {
   const addDay = (dateObj, { currentMonth }) => {
     const normalized = new Date(dateObj.getFullYear(), dateObj.getMonth(), dateObj.getDate());
     const dateKey = formatDateKey(normalized);
+    const forecastEntry = forecastByDate.value[dateKey];
+
+    let weatherSummary = null;
+    let hasWeather = false;
+
+    if (forecastEntry) {
+      if (forecastEntry.noData || forecastEntry.isPlaceholder) {
+        weatherSummary = {
+          noData: true,
+          message: forecastEntry.description || 'No data available',
+          raw: forecastEntry
+        };
+      } else {
+        const rawTemp =
+          forecastEntry.temp_max
+          ?? forecastEntry.temp_min
+          ?? forecastEntry.main?.temp
+          ?? forecastEntry.temperature
+          ?? null;
+        const temperature = rawTemp !== null && rawTemp !== undefined ? rawTemp : null;
+
+        weatherSummary = {
+          condition: forecastEntry.condition,
+          temp: temperature,
+          icon: forecastEntry.icon,
+          raw: forecastEntry
+        };
+        hasWeather = true;
+      }
+    }
+
     return {
       date: normalized.getDate(),
       currentMonth,
       isToday: normalized.getTime() === today.getTime(),
-      weather: props.forecast?.find((f) => f.date === dateKey) ?? null,
+      weather: weatherSummary,
+      hasWeather,
       activities: activitiesByDate.value[dateKey] ?? [],
       fullDate: dateKey
     };
@@ -323,15 +364,98 @@ const calendarDays = computed(() => {
   return days;
 });
 
+const fetchActivityTypes = async () => {
+  activityTypeLoading.value = true;
+  activityTypeError.value = '';
+  try {
+    await ensureApiToken();
+    const axiosInstance = window.axios || axios;
+    const { data } = await axiosInstance.get('/api/activities/meta');
+    const options = Array.isArray(data?.types) && data.types.length ? data.types : fallbackActivityOptions;
+    activityTypeOptions.value = options;
+
+    if (!selectedActivityTypeKey.value && options.length) {
+      selectedActivityTypeKey.value = options[0].key;
+    }
+    applySelectedActivityLabel();
+  } catch (error) {
+    console.error('Failed to load activity types', error);
+    activityTypeError.value =
+      error.response?.data?.message || 'Unable to load activity types right now.';
+    activityTypeOptions.value = [...fallbackActivityOptions];
+    if (!selectedActivityTypeKey.value && fallbackActivityOptions.length) {
+      selectedActivityTypeKey.value = fallbackActivityOptions[0].key;
+    }
+    applySelectedActivityLabel();
+  } finally {
+    activityTypeLoading.value = false;
+  }
+};
+
+const fetchActivityRecommendation = async () => {
+  if (
+    !selectedActivityTypeKey.value ||
+    selectedActivityTypeKey.value === CUSTOM_ACTIVITY_KEY ||
+    !form.value.start_date
+  ) {
+    recommendation.value = null;
+    recommendationError.value = '';
+    recommendationLoading.value = false;
+    return;
+  }
+
+  const requestToken = Date.now();
+  advisorRequestToken.value = requestToken;
+  recommendationLoading.value = true;
+  recommendationError.value = '';
+
+  try {
+    await ensureApiToken();
+    const axiosInstance = window.axios || axios;
+    const { data } = await axiosInstance.get('/api/activities/recommendation', {
+      params: {
+        activity_type: selectedActivityTypeKey.value,
+        date: form.value.start_date
+      }
+    });
+
+    if (advisorRequestToken.value !== requestToken) {
+      return;
+    }
+
+    recommendation.value = data?.recommendation || null;
+  } catch (error) {
+    if (advisorRequestToken.value !== requestToken) {
+      return;
+    }
+    console.error('Failed to fetch recommendation', error);
+    recommendation.value = null;
+    recommendationError.value =
+      error.response?.data?.message ||
+      error.response?.data?.errors?.activity_type?.[0] ||
+      'Unable to fetch activity guidance.';
+  } finally {
+    if (advisorRequestToken.value === requestToken) {
+      recommendationLoading.value = false;
+    }
+  }
+};
+
 const fetchActivities = async () => {
   isLoadingActivities.value = true;
   activityError.value = '';
   try {
+    // Ensure API token is available before making the request
+    await ensureApiToken();
+    
     const params = {
       month: currentDate.value.getMonth() + 1,
       year: currentDate.value.getFullYear()
     };
-    const { data } = await axios.get('/api/activities', { params });
+    
+    // Use window.axios to ensure we're using the configured instance with interceptors
+    const axiosInstance = window.axios || axios;
+    const { data } = await axiosInstance.get('/api/activities', { params });
     const fetched = Array.isArray(data?.activities) ? [...data.activities] : [];
     fetched.sort((a, b) => {
       const aTime = toDateOnly(a.start_date)?.getTime() ?? 0;
@@ -354,6 +478,9 @@ const resetForm = (dateKey = formatDateKey(currentDate.value)) => {
   };
   formErrors.value = {};
   formSubmitError.value = '';
+  if (selectedActivityTypeKey.value && selectedActivityTypeKey.value !== CUSTOM_ACTIVITY_KEY) {
+    applySelectedActivityLabel();
+  }
 };
 
 const openActivityModal = (dateKey = formatDateKey(currentDate.value)) => {
@@ -365,70 +492,162 @@ const closeActivityModal = () => {
   showActivityModal.value = false;
 };
 
-const handleDayClick = (day) => {
-  openActivityModal(day.fullDate);
-};
-
 const submitActivity = async () => {
+  if (isSubmittingActivity.value) {
+    return;
+  }
+
   isSubmittingActivity.value = true;
   formErrors.value = {};
   formSubmitError.value = '';
+  activityFeedback.value = '';
+  activityFeedbackType.value = 'success';
 
   try {
-    const payload = { ...form.value };
-    const { data } = await axios.post('/api/activities', payload);
-    const responseMessage = data?.message || 'Activity scheduled successfully!';
-    activityFeedback.value = responseMessage;
-    activityFeedbackType.value = data?.suitable === false ? 'warning' : 'success';
-    await fetchActivities();
-    showActivityModal.value = false;
-  } catch (error) {
-    if (error.response?.status === 422) {
-      formErrors.value = error.response.data.errors || {};
+    // Ensure API token is available before making the request
+    await ensureApiToken();
+
+    const payload = {
+      activity_type: form.value.activity_type.trim(),
+      field: form.value.field.trim(),
+      start_date: form.value.start_date,
+      notes: form.value.notes?.trim() || null,
+      status: form.value.status || 'pending'
+    };
+
+    // Use window.axios to ensure we're using the configured instance with interceptors
+    const axiosInstance = window.axios || axios;
+    const { data } = await axiosInstance.post('/api/activities', payload);
+
+    if (data?.success) {
+      activityFeedback.value = data.message || 'Activity saved successfully!';
+      activityFeedbackType.value = data.suitable !== false ? 'success' : 'warning';
+      
+      // Refresh activities list
+      await fetchActivities();
+      
+      // Close modal after a short delay
+      setTimeout(() => {
+        closeActivityModal();
+        activityFeedback.value = '';
+      }, 1500);
     } else {
-      console.error('Failed to save activity', error);
-      const message = error.response?.data?.message || 'Failed to save activity. Please try again.';
-      formSubmitError.value = message;
-      activityFeedback.value = message;
+      formSubmitError.value = data?.message || 'Failed to save activity';
       activityFeedbackType.value = 'error';
     }
+  } catch (error) {
+    console.error('Failed to save activity', error);
+    
+    if (error.response?.status === 422) {
+      // Validation errors
+      formErrors.value = error.response.data.errors || {};
+      formSubmitError.value = 'Please fix the errors below';
+    } else if (error.response?.status === 401) {
+      // Unauthorized - token might be missing or invalid
+      formSubmitError.value = 'Authentication required. Please refresh the page and try again.';
+    } else {
+      formSubmitError.value = error.response?.data?.message || 'Failed to save activity. Please try again.';
+    }
+    
+    activityFeedbackType.value = 'error';
   } finally {
     isSubmittingActivity.value = false;
   }
 };
 
-const previousMonth = () => {
-  currentDate.value = new Date(
-    currentDate.value.getFullYear(),
-    currentDate.value.getMonth() - 1,
-    1
-  );
+const emitSelectedDay = (dateKey, dayMeta = null, mode = 'create') => {
+  if (!dateKey) {
+    return;
+  }
+
+  const payload = {
+    date: dateKey,
+    forecast: forecastByDate.value[dateKey] ?? null,
+    activities: activitiesByDate.value[dateKey] ?? [],
+    dayMeta,
+    mode
+  };
+  emit('open-day', payload);
 };
 
-const nextMonth = () => {
-  currentDate.value = new Date(
-    currentDate.value.getFullYear(),
-    currentDate.value.getMonth() + 1,
-    1
-  );
+const openCreateViewForDate = (dateKey = formatDateKey(new Date())) => {
+  const selectedDate = toDateOnly(dateKey);
+  const today = toDateOnly(new Date());
+  const safeDate =
+    selectedDate && today && selectedDate.getTime() < today.getTime()
+      ? formatDateKey(today)
+      : dateKey;
+
+  emitSelectedDay(safeDate, null, 'create');
 };
 
-watch(currentDate, () => {
-  fetchActivities();
-}, { immediate: true });
+const handleDayClick = (day) => {
+  if (!day?.fullDate) {
+    return;
+  }
+
+  const dayDate = toDateOnly(day.fullDate);
+  const today = toDateOnly(new Date());
+  const isPast =
+    dayDate && today ? dayDate.getTime() < today.getTime() : false;
+
+  emitSelectedDay(day.fullDate, day, isPast ? 'view' : 'create');
+};
 
 onMounted(() => {
   resetForm(formatDateKey(new Date()));
+  fetchActivityTypes();
+  fetchActivities();
 });
+
+watch(selectedActivityTypeKey, () => {
+  if (selectedActivityTypeKey.value === CUSTOM_ACTIVITY_KEY) {
+    form.value.activity_type = '';
+    recommendation.value = null;
+    recommendationError.value = '';
+    recommendationLoading.value = false;
+    return;
+  }
+  applySelectedActivityLabel();
+});
+
+watch(
+  [selectedActivityTypeKey, () => form.value.start_date],
+  () => {
+    fetchActivityRecommendation();
+  }
+);
+
+watch(currentDate, (newDate, oldDate) => {
+  if (
+    !newDate ||
+    (oldDate &&
+      newDate.getMonth() === oldDate.getMonth() &&
+      newDate.getFullYear() === oldDate.getFullYear())
+  ) {
+    return;
+  }
+  resetForm(formatDateKey(newDate));
+  fetchActivities();
+});
+
+watch(
+  () => props.refreshToken,
+  () => {
+    fetchActivities();
+  }
+);
 </script>
 
 <style scoped>
 .calendar-view {
   padding: 40px;
-  max-width: 1200px;
-  margin: 0 auto;
+  width: 100%;
+  max-width: none;
+  margin: 0;
   height: 100vh;
   overflow-y: auto;
+  box-sizing: border-box;
   
   /* Hide scrollbar */
   scrollbar-width: none; /* Firefox */
@@ -555,11 +774,31 @@ onMounted(() => {
   margin-bottom: 20px;
 }
 
+.calendar-scroll {
+  width: 100%;
+  overflow: auto;
+  padding-bottom: 6px;
+  border-radius: 12px;
+  scroll-behavior: smooth;
+  scroll-snap-type: both proximity;
+  touch-action: pan-x pan-y;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+
+.calendar-scroll::-webkit-scrollbar {
+  display: none;
+}
+
 .calendar-weekdays {
   display: grid;
-  grid-template-columns: repeat(7, 1fr);
+  grid-template-columns: repeat(7, minmax(80px, 1fr));
   gap: 10px;
   margin-bottom: 15px;
+  width: max(640px, 100%);
+  min-width: max(640px, 100%);
+  margin-left: auto;
+  margin-right: auto;
 }
 
 .weekday {
@@ -572,8 +811,11 @@ onMounted(() => {
 
 .calendar-days {
   display: grid;
-  grid-template-columns: repeat(7, 1fr);
+  grid-template-columns: repeat(7, minmax(80px, 1fr));
   gap: 10px;
+  width: max(640px, 100%);
+  min-width: max(640px, 100%);
+  margin: 0 auto;
 }
 
 .calendar-day {
@@ -587,6 +829,9 @@ onMounted(() => {
   border: 1px solid rgba(255, 255, 255, 0.05);
   transition: all 0.3s ease;
   cursor: pointer;
+  min-width: 0;
+  overflow: hidden;
+  scroll-snap-align: center;
 }
 
 .calendar-day:hover {
@@ -610,6 +855,11 @@ onMounted(() => {
 .calendar-day.has-activities {
   border-color: rgba(250, 204, 21, 0.45);
   box-shadow: 0 0 0 1px rgba(250, 204, 21, 0.2);
+}
+
+.calendar-day.no-data {
+  border-color: rgba(148, 163, 184, 0.35);
+  border-style: dashed;
 }
 
 .day-number {
@@ -636,12 +886,238 @@ onMounted(() => {
   font-size: 14px;
   font-weight: bold;
 }
+.activity-type-select {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.activity-type-select select {
+  flex: 1;
+  min-width: 220px;
+  background: rgba(15, 23, 42, 0.6);
+  border: 1px solid rgba(59, 130, 246, 0.4);
+  color: white;
+  padding: 10px 12px;
+  border-radius: 10px;
+}
+
+.activity-type-select select.invalid {
+  border-color: rgba(248, 113, 113, 0.6);
+}
+
+.advisor-refresh {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(59, 130, 246, 0.2);
+  border: 1px solid rgba(59, 130, 246, 0.5);
+  color: #bfdbfe;
+  padding: 8px 12px;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-size: 13px;
+}
+
+.advisor-refresh.secondary {
+  background: transparent;
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+.advisor-refresh:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.advisor-panel {
+  margin-top: 20px;
+  background: rgba(15, 23, 42, 0.7);
+  border: 1px solid rgba(59, 130, 246, 0.25);
+  border-radius: 16px;
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.advisor-panel-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.advisor-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.advisor-status.success {
+  background: rgba(22, 163, 74, 0.15);
+  color: #bbf7d0;
+  border: 1px solid rgba(22, 163, 74, 0.4);
+}
+
+.advisor-status.warning {
+  background: rgba(250, 204, 21, 0.15);
+  color: #fcd34d;
+  border: 1px solid rgba(250, 204, 21, 0.4);
+}
+
+.advisor-status.danger {
+  background: rgba(239, 68, 68, 0.15);
+  color: #fecaca;
+  border: 1px solid rgba(239, 68, 68, 0.4);
+}
+
+.advisor-status.neutral {
+  background: rgba(148, 163, 184, 0.2);
+  color: #e5e7eb;
+  border: 1px solid rgba(148, 163, 184, 0.3);
+}
+
+.advisor-panel-loading,
+.advisor-panel-error,
+.advisor-panel-empty {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: #e0e7ff;
+  font-size: 14px;
+}
+
+.advisor-panel-error {
+  color: #fecaca;
+}
+
+.advisor-summary {
+  margin: 0;
+  color: #e0f2fe;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.advisor-actions {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.advisor-actions li {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  color: #dbeafe;
+  font-size: 13px;
+}
+
+.advisor-actions i {
+  color: #fde68a;
+  margin-top: 2px;
+}
+
+.advisor-metrics {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.metric-chip {
+  background: rgba(59, 130, 246, 0.15);
+  border: 1px solid rgba(59, 130, 246, 0.3);
+  border-radius: 12px;
+  padding: 10px 12px;
+  min-width: 120px;
+}
+
+.metric-chip span {
+  display: block;
+  font-size: 12px;
+  color: #bfdbfe;
+  margin-bottom: 4px;
+}
+
+.metric-chip strong {
+  font-size: 16px;
+  color: #fff;
+}
+
+.advisor-alerts {
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  padding-top: 12px;
+}
+
+.alerts-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #fde68a;
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+
+.advisor-alerts ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.advisor-alerts li {
+  font-size: 13px;
+  color: #fef3c7;
+  display: flex;
+  gap: 8px;
+}
+
+.advisor-alerts .alert-type {
+  text-transform: capitalize;
+  color: #fef3c7;
+  min-width: 80px;
+}
 
 .day-activities {
   margin-top: 8px;
   display: flex;
   flex-direction: column;
   gap: 6px;
+  flex: 1 1 auto;
+  overflow-y: auto;
+  padding-right: 2px;
+}
+
+.day-activities::-webkit-scrollbar {
+  width: 3px;
+}
+
+.day-activities::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.6);
+  border-radius: 999px;
+}
+
+.day-activities::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.day-no-data {
+  margin-top: 8px;
+  font-size: 12px;
+  color: #94a3b8;
+  text-align: center;
+  font-weight: 500;
 }
 
 .activity-chip {
@@ -656,6 +1132,8 @@ onMounted(() => {
   background: rgba(255, 255, 255, 0.08);
   border: 1px solid rgba(148, 163, 184, 0.25);
   color: #f8fafc;
+  min-width: 0;
+  flex-wrap: wrap;
 }
 
 .activity-chip.pending {
@@ -891,19 +1369,228 @@ onMounted(() => {
   background: rgba(148, 163, 184, 0.25);
 }
 
-@media (max-width: 768px) {
+/* Responsive Design - Mobile First Approach */
+
+/* Extra Small Devices (phones, up to 480px) */
+@media (max-width: 480px) {
   .calendar-view {
-    padding: 20px 10px;
+    padding: 0.7rem 0.4rem;
+    width: 100%;
+    max-width: 100%;
+    min-width: 100%;
+    margin-left: 0;
+    margin-right: 0;
+    align-self: stretch;
   }
   
   .calendar-header {
-    padding: 15px 20px;
+    padding: 0.75rem 0.9375rem;
+    gap: 0.625rem;
     grid-template-columns: 1fr;
-    gap: 12px;
+    border-radius: 0.75rem;
   }
   
   .calendar-header h2 {
-    font-size: 20px;
+    font-size: 1.125rem;
+  }
+  
+  .calendar-nav {
+    justify-content: space-between;
+  }
+
+  .add-activity-button {
+    font-size: 0.8125rem;
+    padding: 0.625rem;
+    width: 100%;
+    justify-content: center;
+  }
+  
+  .nav-button {
+    width: 2.25rem;
+    height: 2.25rem;
+    font-size: 0.8125rem;
+  }
+  
+  .calendar-grid {
+    padding: 0.625rem;
+    border-radius: 0.75rem;
+  }
+  
+  .weekday {
+    font-size: 0.625rem;
+    padding: 0.375rem 0.125rem;
+  }
+  
+  .calendar-scroll {
+    max-height: 70vh;
+  }
+
+  .calendar-weekdays,
+  .calendar-weekdays,
+  .calendar-days {
+    gap: 0.35rem;
+    width: max(520px, 100%);
+    min-width: max(520px, 100%);
+  }
+  
+  .calendar-day {
+    padding: 0.45rem;
+    border-radius: 0.65rem;
+  }
+  
+  .day-number {
+    font-size: 0.6875rem;
+  }
+  
+  .day-weather i {
+    font-size: 1rem;
+  }
+  
+  .day-temp {
+    font-size: 0.625rem;
+  }
+
+  .activity-chip {
+    padding: 0.375rem 0.5rem;
+    font-size: 0.6875rem;
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .chip-field {
+    margin-left: 0;
+    font-size: 0.625rem;
+  }
+
+  .activity-feedback {
+    flex-direction: column;
+    align-items: flex-start;
+    padding: 0.75rem;
+    font-size: 0.8125rem;
+  }
+  
+  .legend {
+    flex-direction: column;
+    gap: 0.625rem;
+    padding: 0.9375rem;
+  }
+  
+  .legend-item {
+    font-size: 0.8125rem;
+    color: white;
+  }
+
+  .modal-content {
+    width: 95%;
+    max-width: none;
+    margin: 0.5rem;
+  }
+
+  .modal-header {
+    padding: 1rem;
+  }
+
+  .modal-body {
+    padding: 1rem;
+  }
+}
+
+/* Small Devices (landscape phones, 481px to 640px) */
+@media (min-width: 481px) and (max-width: 640px) {
+  .calendar-view {
+    padding: 0.9rem 0.5rem;
+    width: 100%;
+    max-width: 100%;
+    min-width: 100%;
+    margin-left: 0;
+    margin-right: 0;
+    align-self: stretch;
+  }
+
+  .calendar-header {
+    padding: 1rem 1.25rem;
+  }
+
+  .calendar-header h2 {
+    font-size: 1.25rem;
+  }
+
+  .nav-button {
+    width: 2.5rem;
+    height: 2.5rem;
+  }
+
+  .calendar-grid {
+    padding: 1rem;
+  }
+
+  .weekday {
+    font-size: 0.75rem;
+    padding: 0.5rem 0.25rem;
+  }
+
+  .calendar-weekdays,
+  .calendar-days {
+    gap: 0.4rem;
+    width: max(560px, 100%);
+    min-width: max(560px, 100%);
+  }
+  
+  .calendar-day {
+    padding: 0.5rem 0.6rem;
+  }
+
+  .day-number {
+    font-size: 0.875rem;
+  }
+}
+
+/* Medium Devices (tablets, 641px to 768px) */
+@media (min-width: 641px) and (max-width: 768px) {
+  .calendar-view {
+    padding: 1rem 0.6rem;
+    width: 100%;
+    max-width: 100%;
+    min-width: 100%;
+    margin-left: 0;
+    margin-right: 0;
+    align-self: stretch;
+  }
+
+  .calendar-header {
+    padding: 1.25rem 1.5rem;
+  }
+
+  .calendar-header h2 {
+    font-size: 1.375rem;
+  }
+
+  .nav-button {
+    width: 2.75rem;
+    height: 2.75rem;
+  }
+}
+
+/* Standard Mobile (up to 768px) */
+@media (max-width: 768px) {
+  .calendar-view {
+    padding: 0.9rem 0.5rem;
+    width: 100%;
+    max-width: 100%;
+    min-width: 100%;
+    margin-left: 0;
+    margin-right: 0;
+    align-self: stretch;
+  }
+  
+  .calendar-header {
+    padding: 0.9375rem 1.25rem;
+    grid-template-columns: 1fr;
+    gap: 0.75rem;
+  }
+  
+  .calendar-header h2 {
+    font-size: 1.25rem;
   }
   
   .calendar-nav {
@@ -916,39 +1603,42 @@ onMounted(() => {
   }
 
   .nav-button {
-    width: 40px;
-    height: 40px;
-    font-size: 14px;
+    width: 2.5rem;
+    height: 2.5rem;
+    font-size: 0.875rem;
   }
   
   .calendar-grid {
-    padding: 15px;
+    padding: 0.9375rem;
   }
   
   .weekday {
-    font-size: 11px;
-    padding: 8px 4px;
+    font-size: 0.6875rem;
+    padding: 0.5rem 0.25rem;
   }
   
+  .calendar-weekdays,
   .calendar-days {
-    gap: 6px;
+    gap: 0.35rem;
+    width: max(600px, 100%);
+    min-width: max(600px, 100%);
   }
   
   .calendar-day {
-    padding: 6px;
-    border-radius: 8px;
+    padding: 0.5rem;
+    border-radius: 0.55rem;
   }
   
   .day-number {
-    font-size: 12px;
+    font-size: 0.75rem;
   }
   
   .day-weather i {
-    font-size: 18px;
+    font-size: 1.125rem;
   }
   
   .day-temp {
-    font-size: 11px;
+    font-size: 0.6875rem;
   }
 
   .activity-chip {
@@ -962,77 +1652,50 @@ onMounted(() => {
   
   .legend {
     flex-direction: column;
-    gap: 10px;
-    padding: 15px;
+    gap: 0.625rem;
+    padding: 0.9375rem;
   }
   
   .legend-item {
-    font-size: 13px;
+    font-size: 0.8125rem;
   }
 }
 
-@media (max-width: 480px) {
+/* Large Devices (desktops, 1024px and up) */
+@media (min-width: 1024px) {
   .calendar-view {
-    padding: 15px 8px;
+    width: 100%;
+    max-width: none;
+    margin: 0;
   }
-  
+
   .calendar-header {
-    padding: 12px 15px;
-    gap: 10px;
-    grid-template-columns: 1fr;
+    grid-template-columns: auto 1fr auto;
   }
-  
+}
+
+/* Extra Large Devices (large desktops, 1440px and up) */
+@media (min-width: 1440px) {
+  .calendar-view {
+    padding: 2.5rem;
+    width: 100%;
+    max-width: none;
+    margin: 0;
+  }
+
+  .calendar-header {
+    padding: 1.875rem 2.5rem;
+  }
+
   .calendar-header h2 {
-    font-size: 18px;
+    font-size: 1.75rem;
   }
-  
-  .calendar-nav {
-    justify-content: space-between;
-  }
+}
 
-  .add-activity-button {
-    font-size: 13px;
-    padding: 10px;
-  }
-  
-  .nav-button {
-    width: 36px;
-    height: 36px;
-    font-size: 13px;
-  }
-  
-  .calendar-grid {
-    padding: 10px;
-  }
-  
-  .weekday {
-    font-size: 10px;
-    padding: 6px 2px;
-  }
-  
-  .calendar-days {
-    gap: 4px;
-  }
-  
+/* Zoom Support - Ensure proper scaling */
+@media (min-resolution: 192dpi) {
   .calendar-day {
-    padding: 4px;
-  }
-  
-  .day-number {
-    font-size: 11px;
-  }
-  
-  .day-weather i {
-    font-size: 16px;
-  }
-  
-  .day-temp {
-    font-size: 10px;
-  }
-
-  .activity-feedback {
-    flex-direction: column;
-    align-items: flex-start;
+    border-width: 1px;
   }
 }
 </style>

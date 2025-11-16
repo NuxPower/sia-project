@@ -4,9 +4,14 @@
 namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
+use Illuminate\Http\JsonResponse;
 use App\Services\WeatherService;
 use App\Models\Farm;
 use App\Models\Alert;
+use App\Models\User;
+use App\Models\Activity;
+use App\Models\WeatherData;
+use Illuminate\Support\Str;
 use Carbon\Carbon;
 
 class DashboardController extends Controller
@@ -23,35 +28,37 @@ class DashboardController extends Controller
         $user = auth()->user();
         $location = $request->get('location', 'Butuan, Caraga, PH');
         
-        // Get user's farms
-        $farms = $user->farms()->with(['weatherData' => function($query) {
-            $query->latest('recorded_at')->limit(1);
-        }, 'alerts' => function($query) {
+        // Get farms for the logged-in user only
+        $farmsQuery = Farm::with(['alerts' => function($query) {
             $query->where('resolved', false);
-        }])->get();
+        }, 'user'])
+            ->where('user_id', $user->id);
+        
+        $farms = $farmsQuery->get();
 
         // Get current weather data from API
         $currentWeather = $this->weatherService->getCurrentWeather($location);
         $forecast = $this->weatherService->getForecast($location);
         
-        // Store weather data for user's farms if they have any
-        if ($farms->isNotEmpty()) {
-            $this->storeWeatherDataForFarms($farms, $currentWeather);
-        }
-        
         // Get farming tips based on weather
         $farmingTips = $this->generateFarmingTips($currentWeather);
         
-        // Get recent alerts
-        $recentAlerts = Alert::whereHas('farm', function($query) use ($user) {
-            $query->where('user_id', $user->id);
-        })->where('resolved', false)
-          ->orderBy('issued_at', 'desc')
-          ->limit(5)
-          ->get();
+        // Get recent alerts for the user's farms only
+        $recentAlertsQuery = Alert::with('farm.user')
+            ->where('resolved', false)
+            ->whereHas('farm', function($query) use ($user) {
+                $query->where('user_id', $user->id);
+            });
+        
+        $recentAlerts = $recentAlertsQuery->orderBy('issued_at', 'desc')
+            ->limit(5)
+            ->get();
 
-        // Get weather statistics
-        $weatherStats = $this->getWeatherStatistics($farms);
+        // Weather statistics removed - now using API directly
+        $weatherStats = null;
+        
+        // Get system-wide statistics (without weather data)
+        $systemStats = $this->getSystemStatistics();
 
         return view('dashboard', compact(
             'currentWeather', 
@@ -60,7 +67,8 @@ class DashboardController extends Controller
             'farms', 
             'recentAlerts', 
             'location',
-            'weatherStats'
+            'weatherStats',
+            'systemStats'
         ));
     }
 
@@ -86,25 +94,6 @@ class DashboardController extends Controller
         return view('calendar', compact('alerts', 'farms'));
     }
 
-    private function storeWeatherDataForFarms($farms, $weatherData)
-    {
-        foreach ($farms as $farm) {
-            $recentData = $farm->weatherData()
-                ->where('recorded_at', '>', Carbon::now()->subHour())
-                ->exists();
-
-            if ($recentData || !isset($weatherData['main'])) {
-                continue;
-            }
-
-            $this->weatherService->storeWeatherSnapshot($weatherData, [
-                'farm_id' => $farm->farm_id,
-                'location' => $farm->farm_name,
-                'lat' => $farm->latitude,
-                'lon' => $farm->longitude,
-            ]);
-        }
-    }
 
     private function generateFarmingTips($weather)
     {
@@ -136,21 +125,84 @@ class DashboardController extends Controller
         return $tips;
     }
 
-    private function getWeatherStatistics($farms)
+
+    /**
+     * Get system-wide statistics for admin dashboard.
+     */
+    private function getSystemStatistics()
     {
-        if ($farms->isEmpty()) {
-            return null;
-        }
-
-        $allWeatherData = WeatherData::whereIn('farm_id', $farms->pluck('farm_id'))
-            ->where('recorded_at', '>=', Carbon::now()->subDays(7))
-            ->get();
-
+        $totalFarms = Farm::count();
+        $totalUsers = User::count();
+        $totalAlerts = Alert::where('resolved', false)->count();
+        $totalActivities = Activity::where('start_date', '>=', Carbon::now()->subDays(30))->count();
+        
+        // Weather data statistics
+        $weatherDataPoints = WeatherData::count();
+        $avgTemperature = WeatherData::whereNotNull('temperature')
+            ->avg('temperature');
+        
         return [
-            'avg_temperature' => $allWeatherData->avg('temperature'),
-            'avg_humidity' => $allWeatherData->avg('humidity'),
-            'total_rainfall' => $allWeatherData->sum('rainfall'),
-            'avg_wind_speed' => $allWeatherData->avg('wind_speed'),
+            'total_farms' => $totalFarms,
+            'total_users' => $totalUsers,
+            'active_alerts' => $totalAlerts,
+            'recent_activities' => $totalActivities,
+            'weather_data_points' => $weatherDataPoints,
+            'avg_temperature' => $avgTemperature ? round($avgTemperature, 2) : null,
         ];
+    }
+
+    /**
+     * API endpoint to get system statistics.
+     */
+    public function getSystemStats(Request $request)
+    {
+        $stats = $this->getSystemStatistics();
+
+        return response()->json([
+            'success' => true,
+            'stats' => $stats
+        ]);
+    }
+
+    /**
+     * API endpoint to get all farmers with their farms.
+     * This helps see which farmer is registered to which farm.
+     */
+    public function getFarmersWithFarms(Request $request): JsonResponse
+    {
+        $farmers = User::where('role', 'farmer')
+            ->with(['farms' => function($query) {
+                $query->withCount(['alerts' => function($q) {
+                    $q->where('resolved', false);
+                }]);
+            }])
+            ->get()
+            ->map(function($farmer) {
+                return [
+                    'user_id' => $farmer->id,
+                    'name' => $farmer->name,
+                    'email' => $farmer->email,
+                    'email_verified_at' => $farmer->email_verified_at,
+                    'farms_count' => $farmer->farms->count(),
+                    'farms' => $farmer->farms->map(function($farm) {
+                        return [
+                            'farm_id' => $farm->farm_id,
+                            'farm_name' => $farm->farm_name,
+                            'latitude' => $farm->latitude,
+                            'longitude' => $farm->longitude,
+                            'size_hectares' => $farm->size_hectares,
+                            'soil_type' => $farm->soil_type,
+                            'active_alerts_count' => $farm->alerts_count ?? 0,
+                            'created_at' => $farm->created_at,
+                        ];
+                    }),
+                ];
+            });
+
+        return response()->json([
+            'success' => true,
+            'farmers' => $farmers,
+            'total_farmers' => $farmers->count(),
+        ]);
     }
 }

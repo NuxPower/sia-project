@@ -8,12 +8,10 @@ use App\Http\Controllers\AlertController;
 use App\Http\Controllers\WeatherController;
 use App\Http\Controllers\ExportController;
 use App\Http\Controllers\ActivityController;
-use App\Http\Controllers\Auth\AuthController;
 use App\Http\Controllers\Auth\EmailVerificationController;
 
-Route::get('/', function () {
-    return redirect()->route('login');
-});
+Route::view('/', 'dashboard')->name('spa.dashboard');
+Route::view('/app', 'dashboard');
 
 // Weather dashboard test route (requires authentication)
 Route::get('/weather-test', function () {
@@ -60,13 +58,11 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/exports/{export:export_id}/download', [ExportController::class, 'download'])->name('exports.download');
 });
 
-// Authentication routes
-Route::get('/login', [AuthController::class, 'showLogin'])->name('login');
-Route::post('/login', [AuthController::class, 'login']);
-Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
-Route::get('/register', [AuthController::class, 'showRegister'])->name('register');
-Route::post('/register', [AuthController::class, 'register']);
 // Email verification
-Route::get('/email/verify', [EmailVerificationController::class, 'notice'])->middleware('auth')->name('verification.notice');
-Route::get('/email/verify/{id}/{hash}', [EmailVerificationController::class, 'verify'])->middleware(['auth', 'signed'])->name('verification.verify');
+Route::get('/email/verify', [EmailVerificationController::class, 'notice'])->name('verification.notice');
+Route::get('/email/verify/{id}/{hash}', [EmailVerificationController::class, 'verifySigned'])->middleware(['signed'])->name('verification.verify');
 Route::post('/email/verification-notification', [EmailVerificationController::class, 'resend'])->middleware(['auth', 'throttle:6,1'])->name('verification.send');
+
+Route::fallback(function () {
+    return view('dashboard');
+});
