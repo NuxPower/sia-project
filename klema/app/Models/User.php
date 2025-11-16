@@ -8,6 +8,7 @@ use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Illuminate\Support\Facades\Log;
 use Laravel\Sanctum\HasApiTokens;
 
 class User extends Authenticatable implements MustVerifyEmail
@@ -60,8 +61,19 @@ class User extends Authenticatable implements MustVerifyEmail
      */
     public function sendEmailVerificationNotification()
     {
-        // Queue the verification email to prevent blocking HTTP requests
-        $this->notify(new QueuedVerifyEmail);
+        // Queue the notification - it implements ShouldQueue so it will be queued
+        // If QUEUE_CONNECTION=sync, it runs immediately but we catch errors
+        // If QUEUE_CONNECTION=database, it gets queued and processed by worker
+        try {
+            $this->notify(new QueuedVerifyEmail);
+        } catch (\Exception $e) {
+            // Log error but don't throw - registration should succeed even if email fails
+            Log::warning('Failed to queue email verification notification', [
+                'user_id' => $this->id,
+                'email' => $this->email,
+                'error' => $e->getMessage(),
+            ]);
+        }
     }
 
     /**
