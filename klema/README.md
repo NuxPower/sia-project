@@ -437,6 +437,78 @@ docker build -t klema .
 docker run -p 8000:8000 klema
 ```
 
+### Railway Deployment
+When deploying to Railway, ensure you configure the following:
+
+#### Email Configuration
+**Important:** Railway blocks direct SMTP connections to external services like Gmail. You must use a cloud email service.
+
+**Note:** Setting `MAIL_MAILER=resend` does NOT delete or overwrite your SMTP configuration. All mailer configurations coexist - this just selects which one to use. Your SMTP settings remain in the config file and can be switched back by changing `MAIL_MAILER=smtp`.
+
+**Recommended Email Services:**
+1. **Resend** (Recommended for Railway)
+   ```env
+   # On Railway - use Resend
+   MAIL_MAILER=resend
+   RESEND_KEY=your_resend_api_key
+   MAIL_FROM_ADDRESS=noreply@yourdomain.com
+   MAIL_FROM_NAME="KLEMA"
+   
+   # Your SMTP config stays in config/mail.php - just not used when MAIL_MAILER=resend
+   # To switch back to SMTP locally, just set: MAIL_MAILER=smtp
+   ```
+
+2. **Postmark**
+   ```env
+   MAIL_MAILER=postmark
+   POSTMARK_TOKEN=your_postmark_token
+   MAIL_FROM_ADDRESS=noreply@yourdomain.com
+   MAIL_FROM_NAME="KLEMA"
+   ```
+
+3. **SendGrid**
+   ```env
+   MAIL_MAILER=smtp
+   MAIL_HOST=smtp.sendgrid.net
+   MAIL_PORT=587
+   MAIL_USERNAME=apikey
+   MAIL_PASSWORD=your_sendgrid_api_key
+   MAIL_ENCRYPTION=tls
+   MAIL_FROM_ADDRESS=noreply@yourdomain.com
+   MAIL_FROM_NAME="KLEMA"
+   ```
+
+4. **AWS SES**
+   ```env
+   MAIL_MAILER=ses
+   AWS_ACCESS_KEY_ID=your_access_key
+   AWS_SECRET_ACCESS_KEY=your_secret_key
+   AWS_DEFAULT_REGION=us-east-1
+   MAIL_FROM_ADDRESS=noreply@yourdomain.com
+   MAIL_FROM_NAME="KLEMA"
+   ```
+
+#### Queue Worker Configuration
+Email sending is queued to prevent blocking HTTP requests. Ensure you run a queue worker:
+
+1. **Add a Railway service** for the queue worker
+2. **Set the command** to: `php artisan queue:work --tries=3`
+3. **Or use Railway's built-in process manager** if available
+
+#### Required Environment Variables
+```env
+# Queue (required for email sending)
+QUEUE_CONNECTION=database
+
+# Email timeout (prevents long waits on failures)
+MAIL_TIMEOUT=5
+
+# Application
+APP_URL=https://your-app.railway.app
+APP_ENV=production
+APP_DEBUG=false
+```
+
 ### Production Checklist
 - [ ] Set `APP_ENV=production` in `.env`
 - [ ] Set `APP_DEBUG=false` in `.env`
@@ -505,8 +577,27 @@ SANCTUM_STATEFUL_DOMAINS=localhost,127.0.0.1
 SANCTUM_EXPIRATION=120
 SANCTUM_TOKEN_PREFIX=klema_
 
-# Queue
+# Queue (required for email queuing)
 QUEUE_CONNECTION=database
+
+# Email Configuration
+MAIL_MAILER=resend  # or postmark, ses, smtp
+MAIL_FROM_ADDRESS=noreply@yourdomain.com
+MAIL_FROM_NAME="KLEMA"
+MAIL_TIMEOUT=5  # Timeout in seconds for SMTP connections
+
+# For Resend
+RESEND_KEY=your_resend_api_key
+
+# For Postmark
+POSTMARK_TOKEN=your_postmark_token
+
+# For SMTP (not recommended on Railway)
+MAIL_HOST=smtp.example.com
+MAIL_PORT=587
+MAIL_USERNAME=your_username
+MAIL_PASSWORD=your_password
+MAIL_ENCRYPTION=tls
 ```
 
 ## 👥 Target Users

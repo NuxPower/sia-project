@@ -12,9 +12,16 @@ return [
     | the message. All additional mailers can be configured within the
     | "mailers" array. Examples of each type of mailer are provided.
     |
+    | Note: Setting MAIL_MAILER does NOT delete or overwrite other mailer
+    | configurations. All mailers remain configured and available. This only
+    | selects which one to use by default.
+    |
+    | For Railway/production: Set MAIL_MAILER=resend (or postmark, ses)
+    | For local development: Set MAIL_MAILER=smtp (or log)
+    |
     */
 
-    'default' => env('MAIL_MAILER', 'log'),
+    'default' => env('MAIL_MAILER', 'smtp'),
 
     /*
     |--------------------------------------------------------------------------
@@ -45,7 +52,7 @@ return [
             'port' => env('MAIL_PORT', 2525),
             'username' => env('MAIL_USERNAME'),
             'password' => env('MAIL_PASSWORD'),
-            'timeout' => null,
+            'timeout' => env('MAIL_TIMEOUT', 5),
             'local_domain' => env('MAIL_EHLO_DOMAIN', parse_url((string) env('APP_URL', 'http://localhost'), PHP_URL_HOST)),
         ],
 

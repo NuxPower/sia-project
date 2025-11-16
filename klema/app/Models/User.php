@@ -3,6 +3,7 @@
 // app/Models/User.php
 namespace App\Models;
 
+use App\Notifications\QueuedVerifyEmail;
 use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
@@ -48,6 +49,19 @@ class User extends Authenticatable implements MustVerifyEmail
     public function isFarmer(): bool
     {
         return $this->role === 'farmer';
+    }
+
+    /**
+     * Send the email verification notification.
+     * Override to queue the notification instead of sending synchronously.
+     * This prevents email connection timeouts from blocking HTTP requests.
+     *
+     * @return void
+     */
+    public function sendEmailVerificationNotification()
+    {
+        // Queue the verification email to prevent blocking HTTP requests
+        $this->notify(new QueuedVerifyEmail);
     }
 
     /**
