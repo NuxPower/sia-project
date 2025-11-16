@@ -248,6 +248,16 @@ const fetchExports = async () => {
   }
 };
 
+const isMobile = () => {
+  return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) ||
+         (window.matchMedia && window.matchMedia('(max-width: 768px)').matches);
+};
+
+const isIOS = () => {
+  return /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+         (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+};
+
 const extractFilename = (contentDisposition) => {
   if (!contentDisposition) return null;
   const match = /filename\*?=(?:UTF-8''|)([^;]+)/i.exec(contentDisposition);
@@ -264,8 +274,11 @@ const downloadExportFile = async (exportItem) => {
   }
 
   downloadingExportId.value = exportItem.export_id;
+  
   try {
     await ensureApiToken(axios);
+    
+    // Always fetch the blob first (preserves authentication)
     const response = await axios.get(exportItem.download_url, {
       responseType: 'blob',
       headers: {
@@ -278,22 +291,122 @@ const downloadExportFile = async (exportItem) => {
       exportItem.file_name ||
       'export.dat';
 
+    const contentType = response.headers['content-type'] || 'application/octet-stream';
     const blob = new Blob([response.data], {
-      type: response.headers['content-type'] || 'application/octet-stream',
+      type: contentType,
     });
 
-    const url = window.URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = filename;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    window.URL.revokeObjectURL(url);
+    // Create blob URL (works with authentication since we already fetched the blob)
+    const objectUrl = window.URL.createObjectURL(blob);
+    
+    if (isMobile()) {
+      // Mobile devices: Use Web Share API if available, otherwise fallback to blob URL
+      
+      // Check if Web Share API is available (works well on mobile)
+      if (navigator.share && navigator.canShare) {
+        try {
+          // Try to use Share API first - works great on mobile
+          const file = new File([blob], filename, { type: contentType });
+          if (navigator.canShare({ files: [file] })) {
+            await navigator.share({
+              files: [file],
+              title: filename,
+            });
+            window.URL.revokeObjectURL(objectUrl);
+            downloadingExportId.value = null;
+            return;
+          }
+        } catch (shareError) {
+          // Share API failed or was cancelled, fall through to blob download
+          console.log('Share API not available or cancelled:', shareError);
+        }
+      }
+      
+      // Fallback: Use blob URL with download link
+      // On Android Chrome, this should trigger download manager
+      const link = document.createElement('a');
+      link.href = objectUrl;
+      link.download = filename;
+      link.setAttribute('download', filename);
+      link.setAttribute('target', '_blank');
+      
+      // Make link visible but off-screen for better mobile browser compatibility
+      link.style.position = 'fixed';
+      link.style.top = '0';
+      link.style.left = '0';
+      link.style.width = '1px';
+      link.style.height = '1px';
+      link.style.opacity = '0.01';
+      
+      document.body.appendChild(link);
+      
+      // Force layout recalculation
+      void link.offsetWidth;
+      
+      // Trigger download
+      try {
+        // Trigger click event programmatically
+        const clickEvent = new MouseEvent('click', {
+          bubbles: true,
+          cancelable: true,
+          view: window,
+          buttons: 1,
+        });
+        link.dispatchEvent(clickEvent);
+        
+        // Also try native click method as fallback
+        setTimeout(() => {
+          link.click();
+        }, 50);
+        
+        // Clean up after delay
+        setTimeout(() => {
+          if (link.parentNode) {
+            document.body.removeChild(link);
+          }
+          // Keep blob URL alive longer on mobile for download
+          setTimeout(() => {
+            window.URL.revokeObjectURL(objectUrl);
+          }, 10000);
+          downloadingExportId.value = null;
+        }, 2000);
+        
+      } catch (error) {
+        console.error('Download failed:', error);
+        
+        // Last resort: try window.open
+        try {
+          const newWindow = window.open(objectUrl, '_blank');
+          if (newWindow) {
+            showSuccess('Download Started', 'The file should download. If it opens in a new tab, use your browser\'s menu to save it.');
+          } else {
+            showError('Download Blocked', 'Please allow popups and try again, or use the Share API if available.');
+          }
+        } catch (err) {
+          showError('Download Failed', 'Unable to start download. Please try using a different browser or device.');
+        }
+        
+        if (link.parentNode) {
+          document.body.removeChild(link);
+        }
+        window.URL.revokeObjectURL(objectUrl);
+        downloadingExportId.value = null;
+      }
+      
+    } else {
+      // Desktop: Standard blob download approach
+      const link = document.createElement('a');
+      link.href = objectUrl;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(objectUrl);
+      downloadingExportId.value = null;
+    }
   } catch (error) {
     console.error('Failed to download export:', error);
     showError('Download Failed', error.response?.data?.message || 'Unable to download export file.');
-  } finally {
     downloadingExportId.value = null;
   }
 };

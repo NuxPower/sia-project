@@ -32,3 +32,6 @@ yarn-error.log
 # Build outputs
 *.log
 .vercel
+.env
+klema/.env
+klema/.env
