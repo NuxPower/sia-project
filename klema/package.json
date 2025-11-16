@@ -1,7 +1,7 @@
 {
     "$schema": "https://json.schemastore.org/package.json",
     "name": "klema",
-    "version": "1.0.0",
+    "version": "1.1.0",
     "description": "KLEMA - Climate-Smart Agriculture Monitoring System",
     "homepage": "https://klema.up.railway.app/app",
     "author": {

@@ -171,3 +171,4 @@ npm run build:desktop
 # Check the built app icon in release/ folder
 ```
 
+
