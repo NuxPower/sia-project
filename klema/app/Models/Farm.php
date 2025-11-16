@@ -78,19 +78,30 @@ class Farm extends Model
 
     public function getBoundaryAttribute(): ?array
     {
-        $raw = $this->attributes['boundary_geojson'] ?? null;
+        // Check if the attribute exists in the original attributes
+        if (!array_key_exists('boundary_geojson', $this->getOriginal())) {
+            return null;
+        }
+
+        // Get the raw original value to avoid cast interference
+        $raw = $this->getRawOriginal('boundary_geojson');
 
         if ($raw === null) {
             return null;
         }
 
+        // If it's already an array (shouldn't happen with getRawOriginal, but be safe)
         if (is_array($raw)) {
             return $raw;
         }
 
-        $decoded = json_decode($raw, true);
+        // Decode JSON string
+        if (is_string($raw)) {
+            $decoded = json_decode($raw, true);
+            return json_last_error() === JSON_ERROR_NONE ? $decoded : null;
+        }
 
-        return json_last_error() === JSON_ERROR_NONE ? $decoded : null;
+        return null;
     }
 
     private function normalizeBoundary($value): ?array
