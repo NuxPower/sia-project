@@ -245,8 +245,8 @@ const getDefaultLocation = () => {
   }
   return Promise.resolve(DEFAULT_LOCATION_STRING);
 };
-const INITIAL_HISTORY_DAYS = 3;
-const INITIAL_FORECAST_DAYS = 4;
+const INITIAL_HISTORY_DAYS = 3; // 3 days before today
+const INITIAL_FORECAST_DAYS = 3; // 3 days after today (total: 7 days including today)
 const MAX_HISTORY_WINDOW = 90; // Increased from 30 to 90 days
 const MAX_FORECAST_WINDOW = 16;
 const searchLocation = ref(DEFAULT_LOCATION_STRING);
@@ -1239,8 +1239,9 @@ const handleMapReady = async () => {
   
   // If we haven't initialized location yet (farms might not be loaded), try now
   if (!farmPrefillComplete.value) {
-    const prefilled = await initializeDefaultLocation();
-    if (!prefilled) {
+    const appSettings = loadAppSettings();
+    const prefilled = await initializeDefaultLocation({ settingsOverride: appSettings });
+    if (!prefilled && !hasPendingFarmPreference(appSettings)) {
       await searchWeather();
     }
   }
@@ -1265,6 +1266,16 @@ const loadAppSettings = () => {
   return null;
 };
 
+function hasPendingFarmPreference(settingsOverride = null) {
+  const effectiveSettings = settingsOverride ?? loadAppSettings();
+  return Boolean(
+    effectiveSettings &&
+    effectiveSettings.locationType === 'farm' &&
+    effectiveSettings.selectedFarmId &&
+    !(rawFarms.value?.length > 0)
+  );
+}
+
 const initializeDefaultLocation = async ({ force = false, settingsOverride = null } = {}) => {
   if (farmPrefillComplete.value && !force) {
     return true;
@@ -1280,6 +1291,9 @@ const initializeDefaultLocation = async ({ force = false, settingsOverride = nul
 
   const runInitialization = async () => {
     const appSettings = settingsOverride ?? loadAppSettings();
+    if (hasPendingFarmPreference(appSettings)) {
+      return false;
+    }
 
     const tryCoordinates = async ({ lat, lon, name, zoom = 12 }) => {
       const parsedLat = Number.parseFloat(lat);

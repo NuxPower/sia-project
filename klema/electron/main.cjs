@@ -1,5 +1,30 @@
-const { app, BrowserWindow } = require('electron');
 const path = require('path');
+const fs = require('fs');
+const dotenv = require('dotenv');
+const { app, BrowserWindow } = require('electron');
+
+function loadEnvironment() {
+  const rootDir = path.resolve(__dirname, '..');
+  const isDevRuntime = process.env.NODE_ENV === 'development' || process.defaultApp;
+  const defaultFile = isDevRuntime ? '.env' : '.env.production';
+  const candidates = [
+    process.env.KLEMA_ENV_FILE,
+    defaultFile,
+    '.env.production',
+    '.env',
+  ].filter(Boolean);
+
+  for (const candidate of candidates) {
+    const envPath = path.resolve(rootDir, candidate);
+    if (fs.existsSync(envPath)) {
+      dotenv.config({ path: envPath });
+      return;
+    }
+  }
+}
+
+loadEnvironment();
+
 const isDev = process.env.NODE_ENV === 'development';
 
 let mainWindow;
@@ -13,7 +38,7 @@ function createWindow() {
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
-      preload: path.join(__dirname, 'preload.js'),
+      preload: path.join(__dirname, 'preload.cjs'),
       webSecurity: true
     },
     icon: path.join(__dirname, '../assets/icon.png'), // Update path if you have an icon
@@ -32,7 +57,7 @@ function createWindow() {
   } else {
     // Production: Connect to deployed Laravel application
     // Set ELECTRON_APP_URL environment variable or modify this URL
-    const appUrl = process.env.ELECTRON_APP_URL || 'https://your-laravel-app.com';
+    const appUrl = process.env.ELECTRON_APP_URL || 'https://klema.up.railway.app/app';
     mainWindow.loadURL(appUrl);
   }
 

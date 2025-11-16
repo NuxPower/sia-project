@@ -3,10 +3,14 @@
     "name": "klema",
     "version": "1.0.0",
     "description": "KLEMA - Climate-Smart Agriculture Monitoring System",
-    "author": "KLEMA Team",
+    "homepage": "https://klema.up.railway.app/app",
+    "author": {
+        "name": "KLEMA Team",
+        "email": "nahoynikulcallanta@gmail.com"
+    },
     "private": true,
     "type": "module",
-    "main": "electron/main.js",
+    "main": "electron/main.cjs",
     "scripts": {
         "build": "npx vite build",
         "dev": "npx vite",
@@ -50,6 +54,7 @@
         "@capacitor/ios": "^6.0.0",
         "@vitejs/plugin-vue": "^6.0.1",
         "cesium": "^1.135.0",
+        "dotenv": "^17.2.3",
         "leaflet": "^1.9.4",
         "three": "^0.181.1",
         "vanta": "^0.5.24",

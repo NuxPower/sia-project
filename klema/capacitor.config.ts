@@ -1,8 +1,25 @@
 import { CapacitorConfig } from '@capacitor/cli';
+import path from 'node:path';
+import fs from 'node:fs';
+import dotenv from 'dotenv';
 
-const env = (globalThis as unknown as { process?: { env?: Record<string, string | undefined> } }).process?.env ?? {};
+const envCandidates = [
+  process.env.KLEMA_ENV_FILE,
+  process.env.NODE_ENV === 'development' ? '.env' : '.env.production',
+  '.env.production',
+  '.env',
+].filter(Boolean) as string[];
+
+const envPath = envCandidates
+  .map((file) => path.resolve(process.cwd(), file))
+  .find((candidate) => fs.existsSync(candidate));
+
+if (envPath) {
+  dotenv.config({ path: envPath });
+}
+
 const defaultServerUrl = 'http://192.168.1.18:8000/app';
-const serverUrl = env.CAPACITOR_SERVER_URL || defaultServerUrl;
+const serverUrl = process.env.CAPACITOR_SERVER_URL || defaultServerUrl;
 const isHttps = serverUrl.startsWith('https://');
 
 const config: CapacitorConfig = {

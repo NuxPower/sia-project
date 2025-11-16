@@ -54,25 +54,6 @@
             <div v-else-if="day.weather?.noData" class="day-no-data">
               <span>No data available</span>
             </div>
-            <div v-if="day.activities?.length" class="day-activities">
-              <div
-                v-for="(activity, activityIndex) in day.activities.slice(0, 3)"
-                :key="activity.id ?? `${activity.start_date}-${activityIndex}`"
-                class="activity-chip"
-                :class="activity.status || 'pending'"
-              >
-                <span class="chip-title">{{ activity.activity_type }}</span>
-                <span class="chip-field">{{ activity.field }}</span>
-                <i
-                  v-if="activity.weather_warning"
-                  class="fas fa-exclamation-circle warning-icon"
-                  :title="activity.weather_warning"
-                ></i>
-              </div>
-              <div v-if="day.activities.length > 3" class="activity-more">
-                +{{ day.activities.length - 3 }} more
-              </div>
-            </div>
           </div>
         </div>
       </div>
@@ -1496,6 +1477,7 @@ watch(
   
   .legend-item {
     font-size: 0.8125rem;
+    color: white;
   }
 
   .modal-content {

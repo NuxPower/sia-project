@@ -134,11 +134,11 @@
       <div class="about-info">
         <div class="info-row">
           <span class="info-label">Version:</span>
-          <span class="info-value">1.0.0</span>
+          <span class="info-value">1.1.0</span>
         </div>
         <div class="info-row">
           <span class="info-label">Weather Data:</span>
-          <span class="info-value">OpenWeatherMap API</span>
+          <span class="info-value">OpenWeatherMap API; Open-Meteo API</span>
         </div>
         <div class="info-row">
           <span class="info-label">Last Updated:</span>
@@ -240,13 +240,23 @@ const saveSettings = async () => {
     isSaving.value = true;
 
     if (typeof window !== 'undefined') {
-      window.localStorage?.setItem(STORAGE_KEY, JSON.stringify(settings));
+      // Create a copy to avoid mutating the reactive object
+      const settingsToSave = { ...settings };
+      window.localStorage?.setItem(STORAGE_KEY, JSON.stringify(settingsToSave));
       
-      // Trigger storage event so other components can update
-      window.dispatchEvent(new Event('storage'));
+      // Trigger a custom event for immediate updates in the same window (before page reload)
+      // This ensures components can react to changes without waiting for reload
+      window.dispatchEvent(new CustomEvent('appSettingsUpdated', { 
+        detail: settingsToSave 
+      }));
       
-      // Also trigger a custom event for immediate updates in the same window
-      window.dispatchEvent(new CustomEvent('appSettingsUpdated', { detail: settings }));
+      // Also trigger storage event so other tabs/components can update
+      // Note: storage event only fires for other tabs, not the current one
+      window.dispatchEvent(new StorageEvent('storage', {
+        key: STORAGE_KEY,
+        newValue: JSON.stringify(settingsToSave),
+        storageArea: window.localStorage
+      }));
     }
 
     showSuccess('Settings Saved', 'Your preferences have been updated. Reloading...');

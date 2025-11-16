@@ -312,6 +312,10 @@ const exportWeatherData = async () => {
       showSuccess('Export Complete', response.data.message || 'Weather data has been exported successfully.');
       if (response.data.export) {
         exports.value.unshift(response.data.export);
+        // Immediately download the file
+        if (response.data.export.download_url) {
+          await downloadExportFile(response.data.export);
+        }
       }
       await fetchExports();
     }
@@ -336,6 +340,10 @@ const exportFarmData = async () => {
       showSuccess('Export Complete', response.data.message || 'Farm data has been exported successfully.');
       if (response.data.export) {
         exports.value.unshift(response.data.export);
+        // Immediately download the file
+        if (response.data.export.download_url) {
+          await downloadExportFile(response.data.export);
+        }
       }
       await fetchExports();
     }
@@ -360,6 +368,10 @@ const exportActivityData = async () => {
       showSuccess('Export Complete', response.data.message || 'Activity data has been exported successfully.');
       if (response.data.export) {
         exports.value.unshift(response.data.export);
+        // Immediately download the file
+        if (response.data.export.download_url) {
+          await downloadExportFile(response.data.export);
+        }
       }
       await fetchExports();
     }

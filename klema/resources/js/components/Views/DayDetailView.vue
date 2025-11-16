@@ -94,22 +94,24 @@
       <section class="temperature-section detail-panel">
         <h2>Temperature Trend</h2>
         <p class="panel-description">{{ temperatureExplanation }}</p>
-        <div v-if="hourlySeries.length" class="temperature-table">
-          <div class="table-row table-header">
-            <span>Time</span>
-            <span>Temp</span>
-            <span>Feels Like</span>
-            <span>Humidity</span>
-            <span>Cloud Cover</span>
-            <span>Wind</span>
-          </div>
-          <div class="table-row" v-for="hour in hourlySeries" :key="`${hour.time}-temp`">
-            <span>{{ hour.displayTime }}</span>
-            <span>{{ hour.temperature ?? '—' }}°</span>
-            <span>{{ hour.feelsLike ?? '—' }}°</span>
-            <span>{{ hour.humidity ?? '—' }}%</span>
-            <span>{{ hour.clouds ?? 0 }}%</span>
-            <span>{{ hour.wind ?? '—' }}</span>
+        <div v-if="hourlySeries.length" class="temperature-table-wrapper">
+          <div class="temperature-table">
+            <div class="table-row table-header">
+              <span>Time</span>
+              <span>Temp</span>
+              <span>Feels Like</span>
+              <span>Humidity</span>
+              <span>Cloud Cover</span>
+              <span>Wind</span>
+            </div>
+            <div class="table-row" v-for="hour in hourlySeries" :key="`${hour.time}-temp`">
+              <span>{{ hour.displayTime }}</span>
+              <span>{{ hour.temperature ?? '—' }}°</span>
+              <span>{{ hour.feelsLike ?? '—' }}°</span>
+              <span>{{ hour.humidity ?? '—' }}%</span>
+              <span>{{ hour.clouds ?? 0 }}%</span>
+              <span>{{ hour.wind ?? '—' }}</span>
+            </div>
           </div>
         </div>
         <p v-else class="missing-data">
@@ -670,7 +672,7 @@ const temperatureExplanation = computed(() => {
 });
 
 const precipitationTooltip = (hour) => {
-  if (!hour) return '';
+  if (!hour) return 
   const hasAmount = hour.precipitationDisplay !== null && hour.precipitationDisplay !== undefined;
   const amountText = hasAmount ? `${hour.precipitationDisplay}mm` : '—';
   const hasProbability = isFiniteNumber(hour.precipitationProbability);
@@ -926,6 +928,34 @@ const precipitationTooltip = (hour) => {
   text-align: center;
 }
 
+.temperature-table-wrapper {
+  width: 100%;
+  overflow-x: auto;
+  overflow-y: visible;
+  -webkit-overflow-scrolling: touch;
+  scroll-snap-type: x proximity;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(59, 130, 246, 0.3) rgba(15, 23, 42, 0.5);
+}
+
+.temperature-table-wrapper::-webkit-scrollbar {
+  height: 8px;
+}
+
+.temperature-table-wrapper::-webkit-scrollbar-track {
+  background: rgba(15, 23, 42, 0.5);
+  border-radius: 4px;
+}
+
+.temperature-table-wrapper::-webkit-scrollbar-thumb {
+  background: rgba(59, 130, 246, 0.3);
+  border-radius: 4px;
+}
+
+.temperature-table-wrapper::-webkit-scrollbar-thumb:hover {
+  background: rgba(59, 130, 246, 0.5);
+}
+
 .temperature-table {
   display: flex;
   flex-direction: column;
@@ -933,6 +963,7 @@ const precipitationTooltip = (hour) => {
   border-radius: 14px;
   overflow: hidden;
   background: rgba(30, 41, 59, 0.6);
+  min-width: fit-content;
 }
 
 .table-row {
@@ -943,12 +974,21 @@ const precipitationTooltip = (hour) => {
   color: #e2e8f0;
 }
 
+.table-row span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+  text-align: center;
+}
+
 .table-header {
   background: rgba(59, 130, 246, 0.15);
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.08em;
   font-size: 11px;
+  text-align: center;
 }
 
 .table-row:nth-child(even) {
@@ -1026,14 +1066,20 @@ const precipitationTooltip = (hour) => {
     flex-direction: column;
   }
 
-  .temperature-table .table-row {
-    grid-template-columns: repeat(2, 1fr);
-    row-gap: 0.5rem;
-    font-size: 0.75rem;
+  .temperature-table-wrapper {
+    margin: 0 -1rem;
+    padding: 0 1rem;
   }
 
-  .temperature-table .table-row span:nth-child(n + 5) {
-    display: none;
+  .temperature-table {
+    min-width: 620px;
+  }
+
+  .temperature-table .table-row {
+    grid-template-columns: 85px 80px 90px 85px 95px 140px;
+    row-gap: 0.5rem;
+    font-size: 0.75rem;
+    min-width: 620px;
   }
 }
 
@@ -1061,8 +1107,18 @@ const precipitationTooltip = (hour) => {
     flex: 0 0 230px;
   }
 
+  .temperature-table-wrapper {
+    margin: 0 -1.25rem;
+    padding: 0 1.25rem;
+  }
+
+  .temperature-table {
+    min-width: 600px;
+  }
+
   .temperature-table .table-row {
-    grid-template-columns: repeat(3, minmax(80px, 1fr));
+    grid-template-columns: 90px 85px 95px 90px 100px 140px;
+    min-width: 600px;
   }
 }
 
@@ -1103,13 +1159,19 @@ const precipitationTooltip = (hour) => {
     padding: 1.5rem;
   }
 
-  .temperature-table .table-row {
-    grid-template-columns: repeat(4, minmax(100px, 1fr));
-    row-gap: 0.5rem;
+  .temperature-table-wrapper {
+    margin: 0 -1.5rem;
+    padding: 0 1.5rem;
   }
 
-  .temperature-table .table-row span:nth-child(n + 5) {
-    display: none;
+  .temperature-table {
+    min-width: 650px;
+  }
+
+  .temperature-table .table-row {
+    grid-template-columns: 95px 90px 100px 95px 105px 150px;
+    row-gap: 0.5rem;
+    min-width: 650px;
   }
 }
 

@@ -1,4 +1,4 @@
-import { ref, computed } from 'vue';
+import { ref, computed, reactive } from 'vue';
 
 const STORAGE_KEY = 'appSettings';
 
@@ -30,7 +30,7 @@ const loadSettings = () => {
   return { ...defaultSettings };
 };
 
-// Reactive settings
+// Reactive settings - use ref to ensure reactivity
 const settings = ref(loadSettings());
 
 // Watch for changes in localStorage (in case settings are updated in another tab/component)
@@ -68,13 +68,15 @@ export function useDisplaySettings() {
   };
 
   // Format temperature based on unit setting
+  // Access settings.value directly so Vue tracks the dependency during render
   const formatTemperature = (celsius, options = {}) => {
     if (celsius === null || celsius === undefined || isNaN(celsius)) {
       return 'N/A';
     }
     
     const temp = parseFloat(celsius);
-    const unit = settings.value.temperatureUnit || 'celsius';
+    // Access settings.value here to ensure reactivity tracking
+    const unit = settings.value?.temperatureUnit || defaultSettings.temperatureUnit;
     const decimals = options.decimals ?? 0;
     
     if (unit === 'fahrenheit') {
@@ -92,7 +94,8 @@ export function useDisplaySettings() {
     }
     
     const speed = parseFloat(ms);
-    const unit = settings.value.windSpeedUnit || 'ms';
+    // Access settings.value here to ensure reactivity tracking
+    const unit = settings.value?.windSpeedUnit || defaultSettings.windSpeedUnit;
     const decimals = options.decimals ?? 1;
     
     if (unit === 'kmh') {
@@ -113,7 +116,8 @@ export function useDisplaySettings() {
     const dateObj = date instanceof Date ? date : new Date(date);
     if (isNaN(dateObj.getTime())) return '';
     
-    const format = settings.value.timeFormat || '24h';
+    // Access settings.value here to ensure reactivity tracking
+    const format = settings.value?.timeFormat || defaultSettings.timeFormat;
     const includeSeconds = options.includeSeconds ?? false;
     
     if (format === '12h') {
@@ -140,7 +144,8 @@ export function useDisplaySettings() {
     const dateObj = date instanceof Date ? date : new Date(date);
     if (isNaN(dateObj.getTime())) return '';
     
-    const format = settings.value.timeFormat || '24h';
+    // Access settings.value here to ensure reactivity tracking
+    const format = settings.value?.timeFormat || defaultSettings.timeFormat;
     const dateFormat = options.dateFormat ?? { month: 'short', day: 'numeric', year: 'numeric' };
     
     const dateStr = dateObj.toLocaleDateString('en-US', dateFormat);
@@ -156,7 +161,8 @@ export function useDisplaySettings() {
     }
     
     const temp = parseFloat(celsius);
-    const unit = settings.value.temperatureUnit || 'celsius';
+    // Access settings.value here to ensure reactivity tracking
+    const unit = settings.value?.temperatureUnit || defaultSettings.temperatureUnit;
     
     if (unit === 'fahrenheit') {
       return celsiusToFahrenheit(temp);
@@ -172,7 +178,8 @@ export function useDisplaySettings() {
     }
     
     const speed = parseFloat(ms);
-    const unit = settings.value.windSpeedUnit || 'ms';
+    // Access settings.value here to ensure reactivity tracking
+    const unit = settings.value?.windSpeedUnit || defaultSettings.windSpeedUnit;
     
     if (unit === 'kmh') {
       return msToKmh(speed);
@@ -189,10 +196,10 @@ export function useDisplaySettings() {
   };
 
   return {
-    // Settings
+    // Settings - return computed to ensure reactivity
     settings: computed(() => settings.value),
     
-    // Formatting functions
+    // Formatting functions - these will be reactive because they access settings.value
     formatTemperature,
     formatWindSpeed,
     formatTime,
