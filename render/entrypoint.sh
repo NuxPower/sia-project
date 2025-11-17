@@ -60,8 +60,10 @@ else
   log "WARNING: If this is first deploy or after adding new migrations, you must run migrations manually!"
 fi
 
-log "Starting queue worker in background"
-php artisan queue:work --tries=3 --timeout=60 > /proc/1/fd/1 2>&1 &
+log "Starting queue worker in background (processing 'weather' and 'default' queues)"
+# Process weather queue first (higher priority), then default queue
+# Increased timeout to 300s for historical weather jobs that process 30 days of data
+php artisan queue:work --queue=weather,default --tries=3 --timeout=300 --sleep=3 > /proc/1/fd/1 2>&1 &
 
 log "Starting Laravel HTTP server on port ${PORT:-8000}"
 exec php artisan serve --host 0.0.0.0 --port "${PORT:-8000}"
