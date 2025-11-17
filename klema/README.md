@@ -585,6 +585,49 @@ docker run -p 8000:8000 klema
 ### Railway Deployment
 When deploying to Railway, ensure you configure the following:
 
+#### Database Migrations
+**Important:** After deploying to Railway, you must run database migrations to create all necessary tables (including the `forecasts` table).
+
+**Check Environment Variable First:**
+The entrypoint script (`render/entrypoint.sh`) automatically runs migrations unless `RUN_MIGRATIONS=0` is set. Check your Railway environment variables:
+
+1. Go to Railway Dashboard → Your Service → Variables
+2. Look for `RUN_MIGRATIONS`
+3. If it's set to `0`, either:
+   - **Delete it** (migrations will run by default), OR
+   - **Change it to `1`** to explicitly enable migrations
+
+**Option 1: Enable Auto-Migrations (Recommended)**
+Set the environment variable in Railway:
+```bash
+# In Railway Dashboard → Variables, set:
+RUN_MIGRATIONS=1
+```
+Migrations will run automatically on each deploy.
+
+**Option 2: Railway CLI (One-time)**
+```bash
+# Install Railway CLI if you haven't
+npm i -g @railway/cli
+
+# Login to Railway
+railway login
+
+# Link to your project
+railway link
+
+# Run migrations manually
+railway run php artisan migrate --force
+```
+
+**Option 3: Railway Web Dashboard Shell**
+1. Go to your Railway project dashboard
+2. Navigate to your service
+3. Click on "Deploy" → "Shell" or use the terminal feature
+4. Run: `php artisan migrate --force`
+
+**Note:** The `--force` flag is required when running migrations in production (when `APP_ENV=production`).
+
 #### Email Configuration
 **Important:** Railway blocks direct SMTP connections to external services like Gmail. You must use a cloud email service.
 

@@ -46,14 +46,18 @@ php artisan config:cache
 php artisan route:cache
 php artisan view:cache
 
+# Run migrations by default unless RUN_MIGRATIONS=0 is explicitly set
+# Default behavior: migrations run automatically on deploy
 if [ "${RUN_MIGRATIONS:-1}" != "0" ]; then
-  log "Running database migrations (RUN_MIGRATIONS=${RUN_MIGRATIONS})"
+  log "Running database migrations (RUN_MIGRATIONS=${RUN_MIGRATIONS:-1})"
   until php artisan migrate --force --no-interaction; do
     log "Migration failed (likely DB not ready). Retrying in 5 seconds..."
     sleep 5
   done
+  log "Database migrations completed successfully"
 else
   log "RUN_MIGRATIONS=0, skipping php artisan migrate"
+  log "WARNING: If this is first deploy or after adding new migrations, you must run migrations manually!"
 fi
 
 log "Starting queue worker in background"

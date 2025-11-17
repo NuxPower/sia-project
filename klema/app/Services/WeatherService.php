@@ -8,6 +8,7 @@ use App\Models\Farm;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Schema;
 use Carbon\Carbon;
 use Illuminate\Support\Str;
 use Illuminate\Support\Collection;
@@ -1198,22 +1199,37 @@ class WeatherService
      */
     private function getStoredForecastByLocation(string $locationName, int $days): ?array
     {
-        $today = Carbon::today('UTC');
-        $endDate = $today->copy()->addDays($days - 1);
+        try {
+            // Check if forecasts table exists
+            if (!Schema::hasTable('forecasts')) {
+                \Log::warning('Forecasts table does not exist - migrations may need to be run');
+                return null;
+            }
 
-        $forecasts = Forecast::query()
-            ->notExpired()
-            ->forLocation($locationName)
-            ->forDateRange($today, $endDate)
-            ->orderBy('forecast_date')
-            ->get();
+            $today = Carbon::today('UTC');
+            $endDate = $today->copy()->addDays($days - 1);
 
-        // Check if we have all requested days
-        if ($forecasts->count() >= $days) {
-            return $this->formatForecastCollection($forecasts);
+            $forecasts = Forecast::query()
+                ->notExpired()
+                ->forLocation($locationName)
+                ->forDateRange($today, $endDate)
+                ->orderBy('forecast_date')
+                ->get();
+
+            // Check if we have all requested days
+            if ($forecasts->count() >= $days) {
+                return $this->formatForecastCollection($forecasts);
+            }
+
+            return null;
+        } catch (\Exception $e) {
+            // Gracefully handle if table doesn't exist
+            \Log::warning('Error querying forecasts table', [
+                'error' => $e->getMessage(),
+                'location' => $locationName,
+            ]);
+            return null;
         }
-
-        return null;
     }
 
     /**
@@ -1222,24 +1238,40 @@ class WeatherService
      */
     private function getStoredForecastByCoordinates(float $lat, float $lon, int $days): ?array
     {
-        $lat = round($lat, 3);
-        $lon = round($lon, 3);
-        $today = Carbon::today('UTC');
-        $endDate = $today->copy()->addDays($days - 1);
+        try {
+            // Check if forecasts table exists
+            if (!Schema::hasTable('forecasts')) {
+                \Log::warning('Forecasts table does not exist - migrations may need to be run');
+                return null;
+            }
 
-        $forecasts = Forecast::query()
-            ->notExpired()
-            ->forCoordinates($lat, $lon)
-            ->forDateRange($today, $endDate)
-            ->orderBy('forecast_date')
-            ->get();
+            $lat = round($lat, 3);
+            $lon = round($lon, 3);
+            $today = Carbon::today('UTC');
+            $endDate = $today->copy()->addDays($days - 1);
 
-        // Check if we have all requested days
-        if ($forecasts->count() >= $days) {
-            return $this->formatForecastCollection($forecasts);
+            $forecasts = Forecast::query()
+                ->notExpired()
+                ->forCoordinates($lat, $lon)
+                ->forDateRange($today, $endDate)
+                ->orderBy('forecast_date')
+                ->get();
+
+            // Check if we have all requested days
+            if ($forecasts->count() >= $days) {
+                return $this->formatForecastCollection($forecasts);
+            }
+
+            return null;
+        } catch (\Exception $e) {
+            // Gracefully handle if table doesn't exist
+            \Log::warning('Error querying forecasts table', [
+                'error' => $e->getMessage(),
+                'lat' => $lat,
+                'lon' => $lon,
+            ]);
+            return null;
         }
-
-        return null;
     }
 
     /**
@@ -1248,6 +1280,12 @@ class WeatherService
     private function storeForecastData(array $forecastData, ?string $locationName, ?float $lat, ?float $lon): void
     {
         if (empty($forecastData) || !is_array($forecastData)) {
+            return;
+        }
+
+        // Check if forecasts table exists before trying to store
+        if (!Schema::hasTable('forecasts')) {
+            \Log::warning('Cannot store forecast data - forecasts table does not exist. Run migrations.');
             return;
         }
 
