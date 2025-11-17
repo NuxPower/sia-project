@@ -16,7 +16,7 @@ return [
     | configurations. All mailers remain configured and available. This only
     | selects which one to use by default.
     |
-    | For Railway/production: Set MAIL_MAILER=resend (or postmark, ses)
+    | For Railway/production: Set MAIL_MAILER=sendgrid (or postmark, ses, resend)
     | For local development: Set MAIL_MAILER=smtp (or log)
     |
     */
@@ -37,7 +37,7 @@ return [
     | your mailers below. You may also add additional mailers if needed.
     |
     | Supported: "smtp", "sendmail", "mailgun", "ses", "ses-v2",
-    |            "postmark", "resend", "log", "array",
+    |            "postmark", "resend", "sendgrid", "log", "array",
     |            "failover", "roundrobin"
     |
     */
@@ -70,6 +70,10 @@ return [
 
         'resend' => [
             'transport' => 'resend',
+        ],
+
+        'sendgrid' => [
+            'transport' => 'sendgrid',
         ],
 
         'sendmail' => [

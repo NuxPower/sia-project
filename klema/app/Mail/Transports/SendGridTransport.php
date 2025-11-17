@@ -1,0 +1,80 @@
+<?php
+
+namespace App\Mail\Transports;
+
+use Illuminate\Support\Facades\Http;
+use Symfony\Component\Mailer\SentMessage;
+use Symfony\Component\Mailer\Transport\AbstractTransport;
+use Symfony\Component\Mime\MessageConverter;
+
+class SendGridTransport extends AbstractTransport
+{
+    protected $apiKey;
+
+    public function __construct(string $apiKey)
+    {
+        parent::__construct();
+        $this->apiKey = $apiKey;
+    }
+
+    protected function doSend(SentMessage $message): void
+    {
+        $email = MessageConverter::toEmail($message->getOriginalMessage());
+        
+        $from = $email->getFrom()[0];
+        $to = array_map(fn($addr) => $addr->getAddress(), $email->getTo());
+        
+        $body = [
+            'personalizations' => [
+                [
+                    'to' => array_map(fn($email) => ['email' => $email], $to),
+                ],
+            ],
+            'from' => [
+                'email' => $from->getAddress(),
+                'name' => $from->getName() ?: null,
+            ],
+            'subject' => $email->getSubject(),
+            'content' => [
+                [
+                    'type' => $email->getHtmlBody() ? 'text/html' : 'text/plain',
+                    'value' => $email->getHtmlBody() ?: $email->getTextBody(),
+                ],
+            ],
+        ];
+
+        // Handle CC
+        if (!empty($email->getCc())) {
+            $body['personalizations'][0]['cc'] = array_map(
+                fn($addr) => ['email' => $addr->getAddress()],
+                $email->getCc()
+            );
+        }
+
+        // Handle BCC
+        if (!empty($email->getBcc())) {
+            $body['personalizations'][0]['bcc'] = array_map(
+                fn($addr) => ['email' => $addr->getAddress()],
+                $email->getBcc()
+            );
+        }
+
+        $response = Http::withHeaders([
+            'Authorization' => 'Bearer ' . $this->apiKey,
+            'Content-Type' => 'application/json',
+        ])->timeout(10)->post('https://api.sendgrid.com/v3/mail/send', $body);
+
+        if ($response->failed()) {
+            throw new \RuntimeException(
+                sprintf('SendGrid API error: %s', $response->body()),
+                $response->status()
+            );
+        }
+    }
+
+    public function __toString(): string
+    {
+        return sprintf('sendgrid+api://%s', 'sendgrid');
+    }
+}
+
