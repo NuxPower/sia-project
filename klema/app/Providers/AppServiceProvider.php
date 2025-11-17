@@ -73,11 +73,14 @@ class AppServiceProvider extends ServiceProvider
         $apiKey = config('services.sendgrid.api_key');
 
         if (! $apiKey) {
+            \Log::warning('SendGrid API key not configured. Emails may fail.');
             return;
         }
 
         Mail::extend('sendgrid', function (array $config) use ($apiKey) {
             return new SendGridTransport($apiKey);
         });
+
+        \Log::info('SendGrid transport configured successfully');
     }
 }

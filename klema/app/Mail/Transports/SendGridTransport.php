@@ -3,6 +3,7 @@
 namespace App\Mail\Transports;
 
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 use Symfony\Component\Mailer\SentMessage;
 use Symfony\Component\Mailer\Transport\AbstractTransport;
 use Symfony\Component\Mime\MessageConverter;
@@ -59,16 +60,38 @@ class SendGridTransport extends AbstractTransport
             );
         }
 
-        $response = Http::withHeaders([
-            'Authorization' => 'Bearer ' . $this->apiKey,
-            'Content-Type' => 'application/json',
-        ])->timeout(10)->post('https://api.sendgrid.com/v3/mail/send', $body);
+        try {
+            $response = Http::withHeaders([
+                'Authorization' => 'Bearer ' . $this->apiKey,
+                'Content-Type' => 'application/json',
+            ])->timeout(10)->post('https://api.sendgrid.com/v3/mail/send', $body);
 
-        if ($response->failed()) {
-            throw new \RuntimeException(
-                sprintf('SendGrid API error: %s', $response->body()),
-                $response->status()
-            );
+            if ($response->failed()) {
+                Log::error('SendGrid API error', [
+                    'status' => $response->status(),
+                    'body' => $response->body(),
+                    'to' => $to,
+                    'subject' => $email->getSubject(),
+                ]);
+                
+                throw new \RuntimeException(
+                    sprintf('SendGrid API error: %s', $response->body()),
+                    $response->status()
+                );
+            }
+
+            Log::info('SendGrid email sent successfully', [
+                'to' => $to,
+                'subject' => $email->getSubject(),
+                'status' => $response->status(),
+            ]);
+        } catch (\Exception $e) {
+            Log::error('SendGrid transport exception', [
+                'message' => $e->getMessage(),
+                'to' => $to,
+                'subject' => $email->getSubject(),
+            ]);
+            throw $e;
         }
     }
 
