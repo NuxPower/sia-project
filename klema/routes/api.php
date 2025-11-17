@@ -8,6 +8,7 @@ use App\Http\Controllers\API\AlertApiController;
 use App\Http\Controllers\API\AuthApiController;
 use App\Http\Controllers\API\ActivityApiController;
 use App\Http\Controllers\API\ExportApiController;
+use App\Http\Controllers\API\SettingsApiController;
 
 Route::prefix('auth')->group(function () {
     Route::middleware('throttle:login')->post('/login', [AuthApiController::class, 'login']);
@@ -66,6 +67,11 @@ Route::middleware(['auth:sanctum', 'verified'])
     Route::post('/exports/farms', [ExportApiController::class, 'exportFarmData']);
     Route::post('/exports/activities', [ExportApiController::class, 'exportActivityData']);
     Route::get('/exports/{export:export_id}/download', [ExportApiController::class, 'download'])->name('exports.download');
+
+    // Settings endpoints
+    Route::get('/settings', [SettingsApiController::class, 'index']);
+    Route::put('/settings', [SettingsApiController::class, 'update']);
+    Route::post('/settings/reset', [SettingsApiController::class, 'reset']);
 
     // Admin endpoints (now accessible to all farmers)
     Route::prefix('admin')->group(function () {

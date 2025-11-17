@@ -47,6 +47,11 @@ class User extends Authenticatable implements MustVerifyEmail
         return $this->hasMany(Activity::class);
     }
 
+    public function userSettings()
+    {
+        return $this->hasOne(UserSettings::class);
+    }
+
     public function isFarmer(): bool
     {
         return $this->role === 'farmer';
