@@ -730,7 +730,7 @@ const selectVantaEffect = (condition = '') => {
   return CLOUDS;
 };
 
-const initVanta = () => {
+const initVanta = async () => {
   if (typeof window === 'undefined' || !weatherCard.value) {
     return;
   }
@@ -761,7 +761,19 @@ const initVanta = () => {
   };
 
   try {
+    // Ensure THREE.js is available before initializing
+    if (!THREE) {
+      console.warn('THREE.js not available for Vanta effect');
+      return;
+    }
+
     const { minHeight, scale, scaleMobile } = getVantaViewportConfig();
+    
+    // Check if element still exists before initializing
+    if (!weatherCard.value) {
+      return;
+    }
+
     vantaEffect = effectType({
       el: weatherCard.value,
       THREE,
@@ -777,7 +789,8 @@ const initVanta = () => {
     });
 
     isVantaActive.value = true;
-  } catch {
+  } catch (error) {
+    console.warn('Failed to initialize Vanta effect:', error);
     destroyVanta();
   }
 };
@@ -787,23 +800,48 @@ const scheduleVantaInit = () => {
     return;
   }
 
-  nextTick(() => {
-    initVanta();
-  });
+  // Optimized: Defer Vanta initialization to avoid blocking initial render
+  // Use requestIdleCallback for better performance, fallback to setTimeout
+  const deferredInit = () => {
+    nextTick(() => {
+      initVanta();
+    });
+  };
+
+  if (typeof requestIdleCallback !== 'undefined') {
+    // Use idle time to initialize Vanta (non-blocking)
+    requestIdleCallback(deferredInit, { timeout: 300 });
+  } else {
+    // Fallback: Defer to next animation frame
+    setTimeout(deferredInit, 100);
+  }
 };
 
+let vantaInitTimeout = null;
+
 onMounted(() => {
+  // Don't block mount - schedule Vanta for later
   scheduleVantaInit();
 });
 
 onBeforeUnmount(() => {
+  if (vantaInitTimeout) {
+    clearTimeout(vantaInitTimeout);
+    vantaInitTimeout = null;
+  }
   destroyVanta();
 });
 
 watch(
   () => props.currentWeather?.weather?.[0]?.main,
   () => {
-    scheduleVantaInit();
+    // Debounce Vanta re-initialization to avoid excessive recreations
+    if (vantaInitTimeout) {
+      clearTimeout(vantaInitTimeout);
+    }
+    vantaInitTimeout = setTimeout(() => {
+      scheduleVantaInit();
+    }, 150);
   }
 );
 
