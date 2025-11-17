@@ -123,10 +123,39 @@ class WeatherService
             ]);
 
             if (!$response->successful()) {
-                throw new \RuntimeException('Failed to fetch forecast: '.$response->status());
+                $errorData = $response->json();
+                $errorMessage = data_get($errorData, 'message', 'HTTP ' . $response->status());
+                \Log::error('Weather forecast API error', [
+                    'status' => $response->status(),
+                    'location' => $location,
+                    'error' => $errorData,
+                ]);
+                throw new \RuntimeException('Failed to fetch forecast: ' . $errorMessage);
             }
 
             $data = $response->json();
+            
+            // Check for API error response (even if HTTP status is 200)
+            if (isset($data['cod']) && $data['cod'] != 200) {
+                $errorMessage = data_get($data, 'message', 'API returned error code: ' . ($data['cod'] ?? 'unknown'));
+                \Log::error('Weather forecast API returned error code', [
+                    'code' => $data['cod'],
+                    'location' => $location,
+                    'error' => $data,
+                ]);
+                throw new \RuntimeException('Failed to fetch forecast: ' . $errorMessage);
+            }
+            
+            // Validate API response structure
+            if (!isset($data['list']) || !is_array($data['list'])) {
+                $errorMessage = data_get($data, 'message', 'Invalid forecast data structure');
+                \Log::error('Invalid forecast API response structure', [
+                    'location' => $location,
+                    'response' => $data,
+                ]);
+                throw new \RuntimeException('Failed to fetch forecast: ' . $errorMessage);
+            }
+            
             $processedData = $this->processForecastData($data, $days);
             
             // Store forecast data to database
@@ -161,10 +190,42 @@ class WeatherService
             ]);
 
             if (!$response->successful()) {
-                throw new \RuntimeException('Failed to fetch forecast by coordinates: '.$response->status());
+                $errorData = $response->json();
+                $errorMessage = data_get($errorData, 'message', 'HTTP ' . $response->status());
+                \Log::error('Weather forecast API error (coordinates)', [
+                    'status' => $response->status(),
+                    'lat' => $lat,
+                    'lon' => $lon,
+                    'error' => $errorData,
+                ]);
+                throw new \RuntimeException('Failed to fetch forecast by coordinates: ' . $errorMessage);
             }
 
             $data = $response->json();
+            
+            // Check for API error response (even if HTTP status is 200)
+            if (isset($data['cod']) && $data['cod'] != 200) {
+                $errorMessage = data_get($data, 'message', 'API returned error code: ' . ($data['cod'] ?? 'unknown'));
+                \Log::error('Weather forecast API returned error code (coordinates)', [
+                    'code' => $data['cod'],
+                    'lat' => $lat,
+                    'lon' => $lon,
+                    'error' => $data,
+                ]);
+                throw new \RuntimeException('Failed to fetch forecast by coordinates: ' . $errorMessage);
+            }
+            
+            // Validate API response structure
+            if (!isset($data['list']) || !is_array($data['list'])) {
+                $errorMessage = data_get($data, 'message', 'Invalid forecast data structure');
+                \Log::error('Invalid forecast API response structure (coordinates)', [
+                    'lat' => $lat,
+                    'lon' => $lon,
+                    'response' => $data,
+                ]);
+                throw new \RuntimeException('Failed to fetch forecast by coordinates: ' . $errorMessage);
+            }
+            
             $processedData = $this->processForecastData($data, $days);
             
             // Store forecast data to database
@@ -778,6 +839,11 @@ class WeatherService
 
     private function processForecastData($data, int $days = 7)
     {
+        // Validate input data
+        if (!is_array($data) || !isset($data['list']) || !is_array($data['list'])) {
+            throw new \InvalidArgumentException('Invalid forecast data: missing or invalid list');
+        }
+
         $dailyForecasts = [];
         $currentDate = null;
         $dayData = [];
