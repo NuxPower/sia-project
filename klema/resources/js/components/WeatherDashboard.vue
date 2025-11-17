@@ -523,17 +523,31 @@ const handleActivityDelete = async (activityId) => {
   }
 };
 
+// Optimized: Only load dashboard data when view is actually active (lazy loading)
 watch(
   activeView,
   (view) => {
     if (view === 'dashboard') {
-      ensureDashboardActivitiesLoaded();
+      // Use requestIdleCallback or setTimeout to defer non-critical operations
+      const loadDashboardData = () => {
+        ensureDashboardActivitiesLoaded();
+        // Fetch system stats only when dashboard is shown
+        if (!systemStats.value) {
+          fetchUserInfo();
+        }
+      };
+      
+      // Defer to avoid blocking view switch
+      if (typeof requestIdleCallback !== 'undefined') {
+        requestIdleCallback(loadDashboardData, { timeout: 100 });
+      } else {
+        setTimeout(loadDashboardData, 0);
+      }
     }
-  },
-  { immediate: true }
+  }
 );
 
-// Fetch user info and system stats
+// Fetch user info and system stats (only called when needed)
 const fetchUserInfo = async () => {
   try {
     await ensureApiToken(axios);
@@ -541,18 +555,26 @@ const fetchUserInfo = async () => {
     if (response.data?.user) {
       currentUser.value = response.data.user;
       
-      // Fetch system stats
-      try {
-        const statsResponse = await axios.get('/api/admin/stats');
-        if (statsResponse.data?.success && statsResponse.data?.stats) {
-          systemStats.value = statsResponse.data.stats;
-        }
-      } catch (err) {
-        console.warn('Could not fetch system stats:', err);
-      }
+      // Fetch system stats separately and asynchronously
+      fetchSystemStats();
     }
   } catch (error) {
     console.warn('Could not fetch user info:', error);
+  }
+};
+
+// Separate system stats fetch for better performance
+const fetchSystemStats = async () => {
+  if (systemStats.value) return; // Already loaded
+  
+  try {
+    await ensureApiToken(axios);
+    const statsResponse = await axios.get('/api/admin/stats');
+    if (statsResponse.data?.success && statsResponse.data?.stats) {
+      systemStats.value = statsResponse.data.stats;
+    }
+  } catch (err) {
+    console.warn('Could not fetch system stats:', err);
   }
 };
 
@@ -1429,7 +1451,12 @@ const bootstrapApp = async () => {
   bootstrapInProgress.value = true;
   try {
     await ensureApiToken(window.axios);
-    await fetchUserInfo();
+    
+    // Optimized: Only fetch user info if needed (not blocking)
+    // System stats will be fetched lazily when dashboard is shown
+    fetchUserInfo().catch(err => {
+      console.warn('Non-critical: Could not fetch user info:', err);
+    });
 
     // Load farms first so we can use saved farm selection
     await refreshFarmLayers({ reloadData: true });

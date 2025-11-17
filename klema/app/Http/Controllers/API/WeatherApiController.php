@@ -33,18 +33,12 @@ class WeatherApiController extends Controller
         
         try {
             if ($lat && $lon) {
-                // Use coordinates
+                // Use coordinates - WeatherService automatically stores to database
                 $weather = $this->weatherService->getCurrentWeatherByCoordinates($lat, $lon);
             } else {
-                // Use location name
+                // Use location name - WeatherService automatically stores to database
                 $weather = $this->weatherService->getCurrentWeather($location);
             }
-
-            $this->weatherService->storeWeatherSnapshot($weather, [
-                'location' => $weather['name'] ?? $location,
-                'lat' => $lat,
-                'lon' => $lon,
-            ]);
 
             return response()->json($weather);
         } catch (\Throwable $e) {

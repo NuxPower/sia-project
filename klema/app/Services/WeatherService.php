@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\WeatherData;
+use App\Models\Forecast;
 use App\Models\Farm;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Cache;
@@ -27,9 +28,21 @@ class WeatherService
 
     public function getCurrentWeather($location)
     {
+        $locationName = Str::of($location ?? '')->trim()->lower();
+        if ($locationName->isEmpty()) {
+            throw new \RuntimeException('Location is required');
+        }
+
+        // Check database first (data from last 30 minutes is considered fresh)
+        $storedWeather = $this->getStoredCurrentWeatherByLocation($locationName);
+        if ($storedWeather !== null) {
+            return $storedWeather;
+        }
+
+        // Fallback to API
         $cacheKey = "weather_current_{$location}";
         
-        return Cache::remember($cacheKey, 600, function () use ($location) {
+        return Cache::remember($cacheKey, 600, function () use ($location, $locationName) {
             $response = Http::weather()->get("{$this->baseUrl}/weather", [
                 'q' => $location,
                 'appid' => $this->apiKey,
@@ -40,12 +53,26 @@ class WeatherService
                 throw new \RuntimeException('Failed to fetch current weather: '.$response->status());
             }
 
-            return $response->json();
+            $weather = $response->json();
+            
+            // Store to database for future requests
+            $this->storeWeatherSnapshot($weather, [
+                'location' => $weather['name'] ?? $location,
+            ]);
+
+            return $weather;
         });
     }
 
     public function getCurrentWeatherByCoordinates($lat, $lon)
     {
+        // Check database first (data from last 30 minutes is considered fresh)
+        $storedWeather = $this->getStoredCurrentWeatherByCoordinates($lat, $lon);
+        if ($storedWeather !== null) {
+            return $storedWeather;
+        }
+
+        // Fallback to API
         $cacheKey = "weather_current_coords_{$lat}_{$lon}";
         
         return Cache::remember($cacheKey, 600, function () use ($lat, $lon) {
@@ -60,15 +87,34 @@ class WeatherService
                 throw new \RuntimeException('Failed to fetch current weather by coordinates: '.$response->status());
             }
 
-            return $response->json();
+            $weather = $response->json();
+            
+            // Store to database for future requests
+            $this->storeWeatherSnapshot($weather, [
+                'lat' => $lat,
+                'lon' => $lon,
+                'location' => $weather['name'] ?? null,
+            ]);
+
+            return $weather;
         });
     }
 
     public function getForecast($location, $days = 7)
     {
+        $days = max(1, min($days, 16));
+        $locationName = Str::of($location ?? '')->trim()->lower();
+        
+        // Check database first
+        $storedForecast = $this->getStoredForecastByLocation($locationName, $days);
+        if ($storedForecast !== null) {
+            return $storedForecast;
+        }
+
+        // Fallback to API
         $cacheKey = "weather_forecast_{$location}_{$days}";
         
-        return Cache::remember($cacheKey, 3600, function () use ($location, $days) {
+        return Cache::remember($cacheKey, 3600, function () use ($location, $locationName, $days) {
             $response = Http::weather()->get("{$this->baseUrl}/forecast", [
                 'q' => $location,
                 'appid' => $this->apiKey,
@@ -81,12 +127,28 @@ class WeatherService
             }
 
             $data = $response->json();
-            return $this->processForecastData($data, $days);
+            $processedData = $this->processForecastData($data, $days);
+            
+            // Store forecast data to database
+            $lat = data_get($data, 'city.coord.lat');
+            $lon = data_get($data, 'city.coord.lon');
+            $this->storeForecastData($processedData, $locationName, $lat, $lon);
+
+            return $processedData;
         });
     }
 
     public function getForecastByCoordinates($lat, $lon, $days = 7)
     {
+        $days = max(1, min($days, 16));
+        
+        // Check database first
+        $storedForecast = $this->getStoredForecastByCoordinates($lat, $lon, $days);
+        if ($storedForecast !== null) {
+            return $storedForecast;
+        }
+
+        // Fallback to API
         $cacheKey = "weather_forecast_coords_{$lat}_{$lon}_{$days}";
         
         return Cache::remember($cacheKey, 3600, function () use ($lat, $lon, $days) {
@@ -103,7 +165,12 @@ class WeatherService
             }
 
             $data = $response->json();
-            return $this->processForecastData($data, $days);
+            $processedData = $this->processForecastData($data, $days);
+            
+            // Store forecast data to database
+            $this->storeForecastData($processedData, null, $lat, $lon);
+
+            return $processedData;
         });
     }
 
@@ -1008,5 +1075,200 @@ class WeatherService
             'description' => $entry[1],
             'icon' => $entry[2],
         ];
+    }
+
+    /**
+     * Get stored current weather from database by location name.
+     * Returns data if it's less than 30 minutes old.
+     */
+    private function getStoredCurrentWeatherByLocation(string $locationName): ?array
+    {
+        $thirtyMinutesAgo = Carbon::now()->subMinutes(30);
+        
+        $record = WeatherData::query()
+            ->whereNotNull('location_name')
+            ->where('location_name', $locationName)
+            ->where('recorded_at', '>=', $thirtyMinutesAgo)
+            ->orderByDesc('recorded_at')
+            ->first();
+
+        if ($record) {
+            return $this->createSnapshotFromRecord($record);
+        }
+
+        return null;
+    }
+
+    /**
+     * Get stored current weather from database by coordinates.
+     * Returns data if it's less than 30 minutes old.
+     */
+    private function getStoredCurrentWeatherByCoordinates(float $lat, float $lon): ?array
+    {
+        $lat = round($lat, 3);
+        $lon = round($lon, 3);
+        $thirtyMinutesAgo = Carbon::now()->subMinutes(30);
+        $tolerance = 0.01;
+
+        $record = WeatherData::query()
+            ->whereNotNull('latitude')
+            ->whereNotNull('longitude')
+            ->whereBetween('latitude', [$lat - $tolerance, $lat + $tolerance])
+            ->whereBetween('longitude', [$lon - $tolerance, $lon + $tolerance])
+            ->where('recorded_at', '>=', $thirtyMinutesAgo)
+            ->orderByDesc('recorded_at')
+            ->first();
+
+        if ($record) {
+            return $this->createSnapshotFromRecord($record);
+        }
+
+        return null;
+    }
+
+    /**
+     * Get stored forecast from database by location name.
+     * Returns forecast if all requested days are available and not expired.
+     */
+    private function getStoredForecastByLocation(string $locationName, int $days): ?array
+    {
+        $today = Carbon::today('UTC');
+        $endDate = $today->copy()->addDays($days - 1);
+
+        $forecasts = Forecast::query()
+            ->notExpired()
+            ->forLocation($locationName)
+            ->forDateRange($today, $endDate)
+            ->orderBy('forecast_date')
+            ->get();
+
+        // Check if we have all requested days
+        if ($forecasts->count() >= $days) {
+            return $this->formatForecastCollection($forecasts);
+        }
+
+        return null;
+    }
+
+    /**
+     * Get stored forecast from database by coordinates.
+     * Returns forecast if all requested days are available and not expired.
+     */
+    private function getStoredForecastByCoordinates(float $lat, float $lon, int $days): ?array
+    {
+        $lat = round($lat, 3);
+        $lon = round($lon, 3);
+        $today = Carbon::today('UTC');
+        $endDate = $today->copy()->addDays($days - 1);
+
+        $forecasts = Forecast::query()
+            ->notExpired()
+            ->forCoordinates($lat, $lon)
+            ->forDateRange($today, $endDate)
+            ->orderBy('forecast_date')
+            ->get();
+
+        // Check if we have all requested days
+        if ($forecasts->count() >= $days) {
+            return $this->formatForecastCollection($forecasts);
+        }
+
+        return null;
+    }
+
+    /**
+     * Store forecast data to database.
+     */
+    private function storeForecastData(array $forecastData, ?string $locationName, ?float $lat, ?float $lon): void
+    {
+        if (empty($forecastData) || !is_array($forecastData)) {
+            return;
+        }
+
+        $lat = $lat !== null ? round($lat, 6) : null;
+        $lon = $lon !== null ? round($lon, 6) : null;
+        $locationName = $locationName ? Str::lower(trim($locationName)) : null;
+
+        // Try to find associated farm
+        $farmId = null;
+        if ($lat !== null && $lon !== null) {
+            $farm = $this->findFarmByCoordinates($lat, $lon);
+            if ($farm) {
+                $farmId = $farm->farm_id;
+            }
+        }
+
+        // Calculate expiration: forecasts expire at the end of the forecast date
+        $now = Carbon::now('UTC');
+        $maxForecastDate = null;
+
+        foreach ($forecastData as $dayForecast) {
+            $forecastDateStr = $dayForecast['date'] ?? null;
+            if (!$forecastDateStr) {
+                continue;
+            }
+
+            try {
+                $forecastDate = Carbon::parse($forecastDateStr, 'UTC')->startOfDay();
+                $expiresAt = $forecastDate->copy()->endOfDay()->addHours(2); // Expire 2 hours after the day ends
+                
+                if ($maxForecastDate === null || $expiresAt->gt($maxForecastDate)) {
+                    $maxForecastDate = $expiresAt;
+                }
+
+                // Store or update forecast record
+                Forecast::updateOrCreate(
+                    [
+                        'farm_id' => $farmId,
+                        'location_name' => $locationName,
+                        'latitude' => $lat,
+                        'longitude' => $lon,
+                        'forecast_date' => $forecastDate,
+                    ],
+                    [
+                        'temp_max' => $dayForecast['temp_max'] ?? null,
+                        'temp_min' => $dayForecast['temp_min'] ?? null,
+                        'condition' => $dayForecast['condition'] ?? null,
+                        'condition_icon' => $dayForecast['icon'] ?? null,
+                        'description' => $dayForecast['description'] ?? null,
+                        'precip_probability' => $dayForecast['precip_probability'] ?? null,
+                        'sunrise' => $dayForecast['sunrise'] ?? null,
+                        'sunset' => $dayForecast['sunset'] ?? null,
+                        'timezone_offset' => $dayForecast['timezone_offset'] ?? 0,
+                        'hourly_data' => $dayForecast['hourly'] ?? null,
+                        'cached_at' => $now,
+                        'expires_at' => $expiresAt,
+                    ]
+                );
+            } catch (\Exception $e) {
+                Log::warning('Failed to store forecast day', [
+                    'date' => $forecastDateStr,
+                    'error' => $e->getMessage(),
+                ]);
+            }
+        }
+    }
+
+    /**
+     * Format forecast collection to match API response format.
+     */
+    private function formatForecastCollection(Collection $forecasts): array
+    {
+        return $forecasts->map(function (Forecast $forecast) {
+            return [
+                'date' => $forecast->forecast_date->format('Y-m-d'),
+                'day' => $forecast->forecast_date->format('l'),
+                'temp_max' => $forecast->temp_max,
+                'temp_min' => $forecast->temp_min,
+                'condition' => $forecast->condition,
+                'icon' => $forecast->condition_icon,
+                'description' => $forecast->description,
+                'precip_probability' => $forecast->precip_probability,
+                'sunrise' => $forecast->sunrise,
+                'sunset' => $forecast->sunset,
+                'hourly' => $forecast->hourly_data ?? [],
+                'timezone_offset' => $forecast->timezone_offset ?? 0,
+            ];
+        })->toArray();
     }
 }

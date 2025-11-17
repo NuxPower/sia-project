@@ -41,6 +41,11 @@ class Farm extends Model
         return $this->hasMany(WeatherData::class, 'farm_id');
     }
 
+    public function forecasts()
+    {
+        return $this->hasMany(Forecast::class, 'farm_id');
+    }
+
     public function farmPoints()
     {
         return $this->hasMany(FarmPoint::class, 'farm_id');

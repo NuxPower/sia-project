@@ -1,7 +1,73 @@
 import { authorizedFetch } from '../services/http';
 
+// Client-side cache for weather data (stored in memory)
+const weatherCache = new Map();
+const CACHE_DURATION = {
+  current: 30 * 60 * 1000,      // 30 minutes for current weather
+  forecast: 60 * 60 * 1000,     // 1 hour for forecasts
+  history: 2 * 60 * 60 * 1000,  // 2 hours for historical data
+};
+
+/**
+ * Generate a cache key for weather data
+ */
+function getCacheKey(type, identifier, options = {}) {
+  const parts = [type, identifier];
+  if (options.days) parts.push(`days:${options.days}`);
+  if (options.historyDays) parts.push(`history:${options.historyDays}`);
+  if (options.includeHistory !== undefined) parts.push(`incHist:${options.includeHistory}`);
+  return parts.join('|');
+}
+
+/**
+ * Check if cached data is still valid
+ */
+function isCacheValid(entry, type) {
+  if (!entry || !entry.timestamp) return false;
+  const age = Date.now() - entry.timestamp;
+  const maxAge = CACHE_DURATION[type] || CACHE_DURATION.current;
+  return age < maxAge;
+}
+
+/**
+ * Get cached data if valid
+ */
+function getCached(key, type) {
+  const entry = weatherCache.get(key);
+  if (isCacheValid(entry, type)) {
+    return entry.data;
+  }
+  // Remove expired cache
+  if (entry) {
+    weatherCache.delete(key);
+  }
+  return null;
+}
+
+/**
+ * Store data in cache
+ */
+function setCache(key, data, type) {
+  weatherCache.set(key, {
+    data,
+    timestamp: Date.now(),
+    type,
+  });
+  // Limit cache size (keep only last 50 entries)
+  if (weatherCache.size > 50) {
+    const firstKey = weatherCache.keys().next().value;
+    weatherCache.delete(firstKey);
+  }
+}
+
 export function useWeatherAPI() {
   const fetchWeatherByCoordinates = async (lat, lng, options = {}) => {
+    // Check cache first
+    const cacheKey = getCacheKey('coords', `${lat},${lng}`, options);
+    const cached = getCached(cacheKey, 'current');
+    if (cached) {
+      return cached;
+    }
     const days = Math.max(1, Math.min(options.days ?? 7, 16));
     const requestedHistoryDays = options.historyDays ?? 30;
     const historyDays = Math.max(1, Math.min(requestedHistoryDays, 30));
@@ -30,10 +96,22 @@ export function useWeatherAPI() {
     const forecastData = await forecastResponse.json();
     const history = includeHistory && historyResponse?.ok ? await historyResponse.json() : [];
     
-    return { current, forecastData, history };
+    const result = { current, forecastData, history };
+    
+    // Store in cache
+    setCache(cacheKey, result, 'current');
+    
+    return result;
   };
   
   const fetchWeatherByLocation = async (location, options = {}) => {
+    // Check cache first
+    const cacheKey = getCacheKey('location', location, options);
+    const cached = getCached(cacheKey, 'current');
+    if (cached) {
+      return cached;
+    }
+
     const days = Math.max(1, Math.min(options.days ?? 7, 16));
     const requestedHistoryDays = options.historyDays ?? 30;
     const historyDays = Math.max(1, Math.min(requestedHistoryDays, 30));
@@ -55,7 +133,12 @@ export function useWeatherAPI() {
       history = historyResponse?.ok ? await historyResponse.json() : [];
     }
     
-    return { current, forecastData, history };
+    const result = { current, forecastData, history };
+    
+    // Store in cache
+    setCache(cacheKey, result, 'current');
+    
+    return result;
   };
   
   const fetchWeatherHistory = async ({ lat, lon, location, farmId, days = 30 } = {}) => {
@@ -69,6 +152,29 @@ export function useWeatherAPI() {
     };
 
     const historyDays = Math.max(1, Math.min(days ?? 30, 90)); // Increased from 30 to 90 days
+    
+    // Generate cache key
+    let cacheIdentifier;
+    if (farmId !== null && farmId !== undefined) {
+      cacheIdentifier = `farm:${farmId}`;
+    } else {
+      const normalizedLat = normalizeCoordinate(lat);
+      const normalizedLon = normalizeCoordinate(lon);
+      if (Number.isFinite(normalizedLat) && Number.isFinite(normalizedLon)) {
+        cacheIdentifier = `coords:${normalizedLat},${normalizedLon}`;
+      } else if (typeof location === 'string' && location.trim()) {
+        cacheIdentifier = `location:${location.trim()}`;
+      } else {
+        cacheIdentifier = 'unknown';
+      }
+    }
+    
+    const cacheKey = getCacheKey('history', cacheIdentifier, { days: historyDays });
+    const cached = getCached(cacheKey, 'history');
+    if (cached) {
+      return cached;
+    }
+
     const params = new URLSearchParams();
     params.set('days', historyDays.toString());
 
@@ -91,7 +197,12 @@ export function useWeatherAPI() {
       throw new Error(`Failed to fetch extended weather history: ${response.status}`);
     }
 
-    return await response.json();
+    const result = await response.json();
+    
+    // Store in cache
+    setCache(cacheKey, result, 'history');
+    
+    return result;
   };
 
   const fetchWeatherForecast = async ({ lat, lon, location, days = 16 } = {}) => {
@@ -105,11 +216,27 @@ export function useWeatherAPI() {
     };
 
     const forecastDays = Math.max(1, Math.min(days ?? 16, 16));
-    const params = new URLSearchParams();
-    params.set('days', forecastDays.toString());
-
+    
+    // Generate cache key
     const normalizedLat = normalizeCoordinate(lat);
     const normalizedLon = normalizeCoordinate(lon);
+    let cacheIdentifier;
+    if (Number.isFinite(normalizedLat) && Number.isFinite(normalizedLon)) {
+      cacheIdentifier = `coords:${normalizedLat},${normalizedLon}`;
+    } else if (typeof location === 'string' && location.trim()) {
+      cacheIdentifier = `location:${location.trim()}`;
+    } else {
+      cacheIdentifier = 'unknown';
+    }
+    
+    const cacheKey = getCacheKey('forecast', cacheIdentifier, { days: forecastDays });
+    const cached = getCached(cacheKey, 'forecast');
+    if (cached) {
+      return cached;
+    }
+
+    const params = new URLSearchParams();
+    params.set('days', forecastDays.toString());
 
     if (Number.isFinite(normalizedLat) && Number.isFinite(normalizedLon)) {
       params.set('lat', normalizedLat.toString());
@@ -124,7 +251,12 @@ export function useWeatherAPI() {
       throw new Error(`Failed to fetch extended weather forecast: ${response.status}`);
     }
 
-    return await response.json();
+    const result = await response.json();
+    
+    // Store in cache
+    setCache(cacheKey, result, 'forecast');
+    
+    return result;
   };
   
   const createWeatherTimeline = (historyData, currentWeather, forecastData, options = {}) => {
