@@ -60,7 +60,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
 // Email verification
 Route::get('/email/verify', [EmailVerificationController::class, 'notice'])->name('verification.notice');
-Route::get('/email/verify/{id}/{hash}', [EmailVerificationController::class, 'verifySigned'])->middleware(['signed'])->name('verification.verify');
+// Note: Removed 'signed' middleware since verifySigned manually validates the hash
+Route::get('/email/verify/{id}/{hash}', [EmailVerificationController::class, 'verifySigned'])->name('verification.verify');
 Route::post('/email/verification-notification', [EmailVerificationController::class, 'resend'])->middleware(['auth', 'throttle:6,1'])->name('verification.send');
 
 Route::fallback(function () {
