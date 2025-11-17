@@ -2,10 +2,12 @@
 
 namespace App\Providers;
 
+use App\Mail\Transports\SendGridTransport;
 use App\Services\WeatherService;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\URL;
 use Illuminate\Support\ServiceProvider;
@@ -26,6 +28,7 @@ class AppServiceProvider extends ServiceProvider
 
         $this->configureHttpMacros();
         $this->configureRateLimiting();
+        $this->configureSendGridTransport();
     }
 
     private function configureHttpMacros(): void
@@ -63,5 +66,18 @@ class AppServiceProvider extends ServiceProvider
         });
 
         RateLimiter::for('register', fn (Request $request) => Limit::perMinute(3)->by($request->ip()));
+    }
+
+    private function configureSendGridTransport(): void
+    {
+        $apiKey = config('services.sendgrid.api_key');
+
+        if (! $apiKey) {
+            return;
+        }
+
+        Mail::extend('sendgrid', function (array $config) use ($apiKey) {
+            return new SendGridTransport($apiKey);
+        });
     }
 }

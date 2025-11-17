@@ -443,37 +443,30 @@ When deploying to Railway, ensure you configure the following:
 #### Email Configuration
 **Important:** Railway blocks direct SMTP connections to external services like Gmail. You must use a cloud email service.
 
-**Note:** Setting `MAIL_MAILER=resend` does NOT delete or overwrite your SMTP configuration. All mailer configurations coexist - this just selects which one to use. Your SMTP settings remain in the config file and can be switched back by changing `MAIL_MAILER=smtp`.
+**Note:** All mailer configurations coexist in `config/mail.php` - changing `MAIL_MAILER` only selects which one to use. Your settings remain in the config file.
 
 **Recommended Email Services:**
-1. **Resend** (Recommended for Railway)
+1. **SendGrid** (Recommended - Uses Web API, no domain verification required for basic usage)
    ```env
-   # On Railway - use Resend
+   MAIL_MAILER=sendgrid
+   SENDGRID_API_KEY=SG.your_sendgrid_api_key  # Your SendGrid API key (starts with SG.)
+   MAIL_FROM_ADDRESS=noreply@yourdomain.com  # Any email address
+   MAIL_FROM_NAME="KLEMA"
+   ```
+   **Note:** This uses SendGrid's Web API (not SMTP). Get your API key from https://app.sendgrid.com/settings/api_keys
+
+2. **Resend** (Requires domain verification)
+   ```env
    MAIL_MAILER=resend
    RESEND_KEY=your_resend_api_key
    MAIL_FROM_ADDRESS=noreply@yourdomain.com
    MAIL_FROM_NAME="KLEMA"
-   
-   # Your SMTP config stays in config/mail.php - just not used when MAIL_MAILER=resend
-   # To switch back to SMTP locally, just set: MAIL_MAILER=smtp
    ```
 
-2. **Postmark**
+3. **Postmark**
    ```env
    MAIL_MAILER=postmark
    POSTMARK_TOKEN=your_postmark_token
-   MAIL_FROM_ADDRESS=noreply@yourdomain.com
-   MAIL_FROM_NAME="KLEMA"
-   ```
-
-3. **SendGrid**
-   ```env
-   MAIL_MAILER=smtp
-   MAIL_HOST=smtp.sendgrid.net
-   MAIL_PORT=587
-   MAIL_USERNAME=apikey
-   MAIL_PASSWORD=your_sendgrid_api_key
-   MAIL_ENCRYPTION=tls
    MAIL_FROM_ADDRESS=noreply@yourdomain.com
    MAIL_FROM_NAME="KLEMA"
    ```
@@ -580,24 +573,19 @@ SANCTUM_TOKEN_PREFIX=klema_
 # Queue (required for email queuing)
 QUEUE_CONNECTION=database
 
-# Email Configuration
-MAIL_MAILER=resend  # or postmark, ses, smtp
+# Email Configuration - SendGrid Web API (Recommended for Railway)
+MAIL_MAILER=sendgrid
+SENDGRID_API_KEY=SG.your_sendgrid_api_key  # Your SendGrid API key (starts with SG.)
 MAIL_FROM_ADDRESS=noreply@yourdomain.com
 MAIL_FROM_NAME="KLEMA"
-MAIL_TIMEOUT=5  # Timeout in seconds for SMTP connections
 
-# For Resend
-RESEND_KEY=your_resend_api_key
+# Alternative: Resend (requires domain verification)
+# MAIL_MAILER=resend
+# RESEND_KEY=your_resend_api_key
 
-# For Postmark
-POSTMARK_TOKEN=your_postmark_token
-
-# For SMTP (not recommended on Railway)
-MAIL_HOST=smtp.example.com
-MAIL_PORT=587
-MAIL_USERNAME=your_username
-MAIL_PASSWORD=your_password
-MAIL_ENCRYPTION=tls
+# Alternative: Postmark
+# MAIL_MAILER=postmark
+# POSTMARK_TOKEN=your_postmark_token
 ```
 
 ## 👥 Target Users
