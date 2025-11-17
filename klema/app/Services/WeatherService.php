@@ -5,9 +5,13 @@ namespace App\Services;
 use App\Models\WeatherData;
 use App\Models\Forecast;
 use App\Models\Farm;
+use App\Jobs\StoreCurrentWeatherJob;
+use App\Jobs\StoreForecastJob;
+use App\Jobs\StoreHistoricalWeatherJob;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Schema;
 use Carbon\Carbon;
 use Illuminate\Support\Str;
 use Illuminate\Support\Collection;
@@ -55,8 +59,8 @@ class WeatherService
 
             $weather = $response->json();
             
-            // Store to database for future requests
-            $this->storeWeatherSnapshot($weather, [
+            // Store to database in background (non-blocking)
+            StoreCurrentWeatherJob::dispatch($weather, [
                 'location' => $weather['name'] ?? $location,
             ]);
 
@@ -89,8 +93,8 @@ class WeatherService
 
             $weather = $response->json();
             
-            // Store to database for future requests
-            $this->storeWeatherSnapshot($weather, [
+            // Store to database in background (non-blocking)
+            StoreCurrentWeatherJob::dispatch($weather, [
                 'lat' => $lat,
                 'lon' => $lon,
                 'location' => $weather['name'] ?? null,
@@ -158,10 +162,10 @@ class WeatherService
             
             $processedData = $this->processForecastData($data, $days);
             
-            // Store forecast data to database
+            // Store forecast data to database in background (non-blocking)
             $lat = data_get($data, 'city.coord.lat');
             $lon = data_get($data, 'city.coord.lon');
-            $this->storeForecastData($processedData, $locationName, $lat, $lon);
+            StoreForecastJob::dispatch($processedData, $locationName, $lat, $lon);
 
             return $processedData;
         });
@@ -228,8 +232,8 @@ class WeatherService
             
             $processedData = $this->processForecastData($data, $days);
             
-            // Store forecast data to database
-            $this->storeForecastData($processedData, null, $lat, $lon);
+            // Store forecast data to database in background (non-blocking)
+            StoreForecastJob::dispatch($processedData, null, $lat, $lon);
 
             return $processedData;
         });
@@ -363,7 +367,7 @@ class WeatherService
         $lonKey = round($lon, 3);
         $cacheKey = "historical_weather_{$latKey}_{$lonKey}_{$start}_{$end}";
 
-        return Cache::remember($cacheKey, 86400, function () use ($lat, $lon, $start, $end) {
+        $series = Cache::remember($cacheKey, 86400, function () use ($lat, $lon, $start, $end) {
             try {
                 $response = Http::withOptions([
                     'timeout' => 10,
@@ -425,6 +429,14 @@ class WeatherService
                 return [];
             }
         });
+        
+        // Store historical data in background (non-blocking) - only if we got data from API
+        // Check if this was a cache hit by checking if data exists and is recent
+        if (!empty($series)) {
+            StoreHistoricalWeatherJob::dispatch($series, $lat, $lon);
+        }
+        
+        return $series;
     }
 
     public function geocodeLocation(string $location): ?array
@@ -528,7 +540,7 @@ class WeatherService
      * Find a farm by coordinates (within 0.005 degree tolerance, ~500m).
      * Only matches farms that are very close to the weather data coordinates.
      */
-    private function findFarmByCoordinates(float $lat, float $lon): ?Farm
+    public function findFarmByCoordinates(float $lat, float $lon): ?Farm
     {
         // Don't round coordinates here - use them as-is for precise matching
         // Use a small tolerance (0.005 degrees ≈ 500m) to match nearby farms

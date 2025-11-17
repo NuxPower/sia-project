@@ -45,6 +45,10 @@ RUN mkdir -p storage bootstrap/cache \
 COPY render/entrypoint.sh /usr/local/bin/render-entrypoint.sh
 RUN chmod +x /usr/local/bin/render-entrypoint.sh
 
+# Queue worker will be started automatically by entrypoint.sh
+# To run queue worker separately, use:
+# php artisan queue:work --queue=weather --tries=3 --timeout=300
+
 EXPOSE 8000
 
 ENTRYPOINT ["/usr/bin/tini", "--"]

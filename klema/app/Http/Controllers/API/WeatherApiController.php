@@ -4,6 +4,7 @@ namespace App\Http\Controllers\API;
 
 use App\Http\Controllers\Controller;
 use App\Services\WeatherService;
+use App\Jobs\StoreHistoricalWeatherJob;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Carbon\Carbon;
@@ -220,6 +221,7 @@ class WeatherApiController extends Controller
             }
 
             // Fetch directly from API (with caching)
+            // Historical data will be stored in background via WeatherService
             $series = $this->weatherService->fetchHistoricalSeriesByCoordinates($targetLat, $targetLon, $dateObj->copy(), $dateObj->copy());
             $historical = $series[$date] ?? null;
 
