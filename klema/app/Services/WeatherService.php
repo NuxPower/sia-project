@@ -1288,12 +1288,13 @@ class WeatherService
     /**
      * Store forecast data to database.
      */
-    private function storeForecastData(array $forecastData, ?string $locationName, ?float $lat, ?float $lon): void
+    public function storeForecastData(array $forecastData, ?string $locationName, ?float $lat, ?float $lon): void
+
     {
         if (empty($forecastData) || !is_array($forecastData)) {
             return;
         }
-
+        
         // Check if forecasts table exists before trying to store
         if (!Schema::hasTable('forecasts')) {
             \Log::warning('Cannot store forecast data - forecasts table does not exist. Run migrations.');
