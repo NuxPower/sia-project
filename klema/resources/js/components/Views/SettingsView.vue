@@ -13,56 +13,58 @@
       <p>Loading settings...</p>
     </div>
 
-    <!-- Location Settings -->
-    <div v-else class="settings-section">
-      <h3>
-        <i class="fas fa-map-marker-alt"></i>
-        Location Settings
-      </h3>
-      <div class="setting-item">
-        <label>Location Type</label>
-        <div class="radio-group">
-          <label class="radio-label">
-            <input type="radio" name="locationType" value="custom" v-model="settings.locationType">
-            <span>Custom Location</span>
-          </label>
-          <label class="radio-label">
-            <input type="radio" name="locationType" value="farm" v-model="settings.locationType">
-            <span>Farm Location</span>
-          </label>
+    <!-- Settings Content -->
+    <template v-else>
+      <!-- Location Settings -->
+      <div class="settings-section">
+        <h3>
+          <i class="fas fa-map-marker-alt"></i>
+          Location Settings
+        </h3>
+        <div class="setting-item">
+          <label>Location Type</label>
+          <div class="radio-group">
+            <label class="radio-label">
+              <input type="radio" name="locationType" value="custom" v-model="settings.locationType">
+              <span>Custom Location</span>
+            </label>
+            <label class="radio-label">
+              <input type="radio" name="locationType" value="farm" v-model="settings.locationType">
+              <span>Farm Location</span>
+            </label>
+          </div>
+        </div>
+        
+        <!-- Custom Location Input -->
+        <div class="setting-item" v-if="settings.locationType === 'custom'">
+          <label>Default Location</label>
+          <input type="text" v-model="settings.defaultLocation" class="setting-input" placeholder="Enter location">
+          <button class="action-button" @click="getCurrentLocation" style="margin-top: 10px;">
+            <i class="fas fa-crosshairs"></i>
+            Detect Location
+          </button>
+        </div>
+        
+        <!-- Farm Location Dropdown -->
+        <div class="setting-item" v-if="settings.locationType === 'farm'">
+          <label>Select Farm</label>
+          <select v-model="settings.selectedFarmId" class="setting-select" :disabled="farmsLoading">
+            <option value="">-- Select a Farm --</option>
+            <option v-for="farm in farms" :key="farm.farm_id" :value="farm.farm_id">
+              {{ farm.farm_name }}
+            </option>
+          </select>
+          <small v-if="farmsLoading" style="color: #9ca3af; margin-top: 8px; display: block;">
+            Loading farms...
+          </small>
+          <small v-else-if="farms.length === 0" style="color: #9ca3af; margin-top: 8px; display: block;">
+            No farms available. Create a farm first.
+          </small>
         </div>
       </div>
-      
-      <!-- Custom Location Input -->
-      <div class="setting-item" v-if="settings.locationType === 'custom'">
-        <label>Default Location</label>
-        <input type="text" v-model="settings.defaultLocation" class="setting-input" placeholder="Enter location">
-        <button class="action-button" @click="getCurrentLocation" style="margin-top: 10px;">
-          <i class="fas fa-crosshairs"></i>
-          Detect Location
-        </button>
-      </div>
-      
-      <!-- Farm Location Dropdown -->
-      <div class="setting-item" v-if="settings.locationType === 'farm'">
-        <label>Select Farm</label>
-        <select v-model="settings.selectedFarmId" class="setting-select" :disabled="farmsLoading">
-          <option value="">-- Select a Farm --</option>
-          <option v-for="farm in farms" :key="farm.farm_id" :value="farm.farm_id">
-            {{ farm.farm_name }}
-          </option>
-        </select>
-        <small v-if="farmsLoading" style="color: #9ca3af; margin-top: 8px; display: block;">
-          Loading farms...
-        </small>
-        <small v-else-if="farms.length === 0" style="color: #9ca3af; margin-top: 8px; display: block;">
-          No farms available. Create a farm first.
-        </small>
-      </div>
-    </div>
 
-    <!-- Display Settings -->
-    <div v-else class="settings-section">
+      <!-- Display Settings -->
+      <div class="settings-section">
       <h3>
         <i class="fas fa-desktop"></i>
         Display Settings
@@ -101,10 +103,10 @@
           </label>
         </div>
       </div>
-    </div>
+      </div>
 
-    <!-- Data & Privacy -->
-    <div v-else class="settings-section">
+      <!-- Data & Privacy -->
+      <div class="settings-section">
       <h3>
         <i class="fas fa-shield-alt"></i>
         Data & Privacy
@@ -129,10 +131,10 @@
           <span class="slider"></span>
         </label>
       </div>
-    </div>
+      </div>
 
-    <!-- About -->
-    <div v-else class="settings-section">
+      <!-- About -->
+      <div class="settings-section">
       <h3>
         <i class="fas fa-info-circle"></i>
         About
@@ -151,10 +153,10 @@
           <span class="info-value">October 2025</span>
         </div>
       </div>
-    </div>
+      </div>
 
-    <!-- Actions -->
-    <div v-else class="settings-actions">
+      <!-- Actions -->
+      <div class="settings-actions">
       <button class="action-button primary" @click="saveSettings" :disabled="isSaving || isLoadingSettings">
         <i class="fas fa-save"></i>
         <span v-if="!isSaving">Save Changes</span>
@@ -169,7 +171,8 @@
         <i class="fas fa-sign-out-alt"></i>
         Logout
       </button>
-    </div>
+      </div>
+    </template>
   </div>
 </template>
 
