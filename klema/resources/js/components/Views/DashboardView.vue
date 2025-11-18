@@ -49,7 +49,7 @@
       <h3>7-Day Forecast</h3>
       <div class="forecast-cards">
         <div 
-          v-for="(day, index) in forecast" 
+          v-for="(day, index) in futureForecast" 
           :key="index"
           class="forecast-card"
           :class="{ 'today': day.isToday, 'history': day.isHistory }"
@@ -488,6 +488,49 @@ const emit = defineEmits([
 
 const farms = computed(() => props.farms ?? []);
 const activities = computed(() => props.activities ?? []);
+
+// Filter forecast to show only 7 days starting from tomorrow
+const futureForecast = computed(() => {
+  if (!Array.isArray(props.forecast) || props.forecast.length === 0) {
+    return [];
+  }
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  
+  // Filter out today and history days, only keep future days
+  const futureDays = props.forecast.filter((day) => {
+    if (!day?.date) return false;
+    if (day.isHistory) return false;
+    if (day.isToday) return false;
+    
+    // Parse the date string (format: "YYYY-MM-DD")
+    const parts = day.date.split('-');
+    if (parts.length !== 3) return false;
+    
+    const dayDate = new Date(
+      parseInt(parts[0], 10),
+      parseInt(parts[1], 10) - 1,
+      parseInt(parts[2], 10)
+    );
+    dayDate.setHours(0, 0, 0, 0);
+    
+    // Only include days after today
+    return dayDate > today;
+  });
+  
+  // Sort by date and take first 7 days
+  return futureDays
+    .sort((a, b) => {
+      const aParts = a.date.split('-');
+      const bParts = b.date.split('-');
+      const aDate = new Date(parseInt(aParts[0], 10), parseInt(aParts[1], 10) - 1, parseInt(aParts[2], 10));
+      const bDate = new Date(parseInt(bParts[0], 10), parseInt(bParts[1], 10) - 1, parseInt(bParts[2], 10));
+      return aDate - bDate;
+    })
+    .slice(0, 7);
+});
+
 const activityStatusFilter = ref('active');
 const activityWindowFilter = ref('upcoming');
 const activitySearch = ref('');
