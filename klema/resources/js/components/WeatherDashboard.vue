@@ -1461,15 +1461,25 @@ const bootstrapApp = async () => {
     // Load farms first so we can use saved farm selection
     await refreshFarmLayers({ reloadData: true });
 
+    // Initialize alerts panel in parallel with weather (doesn't depend on weather)
+    const alertsPromise = initializeAlertsPanel().catch(err => {
+      console.warn('Non-critical: Could not initialize alerts panel:', err);
+    });
+
     // Now initialize default location (which can use saved settings)
-    const prefilled = await initializeDefaultLocation();
-    if (!prefilled) {
-      await searchWeather();
-    }
+    const weatherPromise = (async () => {
+      const prefilled = await initializeDefaultLocation();
+      if (!prefilled) {
+        await searchWeather();
+      }
+    })().catch(err => {
+      console.error('Failed to initialize weather:', err);
+    });
 
     registerGlobalHandlers();
 
-    await initializeAlertsPanel();
+    // Wait for both to complete (in parallel)
+    await Promise.all([alertsPromise, weatherPromise]);
   } finally {
     bootstrapInProgress.value = false;
   }

@@ -59,10 +59,8 @@ class WeatherService
 
             $weather = $response->json();
             
-            // Store to database in background (non-blocking)
-            StoreCurrentWeatherJob::dispatch($weather, [
-                'location' => $weather['name'] ?? $location,
-            ]);
+            // Only store weather data for farm locations, not generic locations
+            // For location-based queries, we skip storage to optimize performance
 
             return $weather;
         });
@@ -93,12 +91,17 @@ class WeatherService
 
             $weather = $response->json();
             
-            // Store to database in background (non-blocking)
-            StoreCurrentWeatherJob::dispatch($weather, [
-                'lat' => $lat,
-                'lon' => $lon,
-                'location' => $weather['name'] ?? null,
-            ]);
+            // Only store weather data for farm locations
+            $farm = $this->findFarmByCoordinates($lat, $lon);
+            if ($farm) {
+                // Store to database in background (non-blocking) only if farm is found
+                StoreCurrentWeatherJob::dispatch($weather, [
+                    'lat' => $lat,
+                    'lon' => $lon,
+                    'location' => $weather['name'] ?? null,
+                    'farm_id' => $farm->farm_id,
+                ]);
+            }
 
             return $weather;
         });
@@ -162,10 +165,16 @@ class WeatherService
             
             $processedData = $this->processForecastData($data, $days);
             
-            // Store forecast data to database in background (non-blocking)
+            // Only store forecast data for farm locations
             $lat = data_get($data, 'city.coord.lat');
             $lon = data_get($data, 'city.coord.lon');
-            StoreForecastJob::dispatch($processedData, $locationName, $lat, $lon);
+            if ($lat !== null && $lon !== null) {
+                $farm = $this->findFarmByCoordinates($lat, $lon);
+                if ($farm) {
+                    // Store to database in background (non-blocking) only if farm is found
+                    StoreForecastJob::dispatch($processedData, $locationName, $lat, $lon, $farm->farm_id);
+                }
+            }
 
             return $processedData;
         });
@@ -232,8 +241,12 @@ class WeatherService
             
             $processedData = $this->processForecastData($data, $days);
             
-            // Store forecast data to database in background (non-blocking)
-            StoreForecastJob::dispatch($processedData, null, $lat, $lon);
+            // Only store forecast data for farm locations
+            $farm = $this->findFarmByCoordinates($lat, $lon);
+            if ($farm) {
+                // Store to database in background (non-blocking) only if farm is found
+                StoreForecastJob::dispatch($processedData, null, $lat, $lon, $farm->farm_id);
+            }
 
             return $processedData;
         });
@@ -430,10 +443,14 @@ class WeatherService
             }
         });
         
-        // Store historical data in background (non-blocking) - stores 30 days back to weather_data table
-        // Only dispatch if we got data from API (not empty series)
+        // Only store historical data for farm locations
+        // Only dispatch if we got data from API (not empty series) and farm is found
         if (!empty($series)) {
-            StoreHistoricalWeatherJob::dispatch($series, $lat, $lon);
+            $farm = $this->findFarmByCoordinates($lat, $lon);
+            if ($farm) {
+                // Store historical data in background (non-blocking) only if farm is found
+                StoreHistoricalWeatherJob::dispatch($series, $lat, $lon, null, $farm->farm_id);
+            }
         }
         
         return $series;
@@ -612,8 +629,9 @@ class WeatherService
             }
         }
 
-        if (!$farmId && $locationName === null && ($lat === null || $lon === null)) {
-            // Without a farm or identifiable location, skip persistence
+        // Only store weather data for farm locations (optimization)
+        // Skip storage for generic locations that don't belong to farms
+        if (!$farmId) {
             return null;
         }
 
@@ -1288,7 +1306,7 @@ class WeatherService
     /**
      * Store forecast data to database.
      */
-    public function storeForecastData(array $forecastData, ?string $locationName, ?float $lat, ?float $lon): void
+    public function storeForecastData(array $forecastData, ?string $locationName, ?float $lat, ?float $lon, ?int $farmId = null): void
 
     {
         if (empty($forecastData) || !is_array($forecastData)) {
@@ -1305,13 +1323,17 @@ class WeatherService
         $lon = $lon !== null ? round($lon, 6) : null;
         $locationName = $locationName ? Str::lower(trim($locationName)) : null;
 
-        // Try to find associated farm
-        $farmId = null;
-        if ($lat !== null && $lon !== null) {
+        // Use provided farm_id, or try to find associated farm if not provided
+        if ($farmId === null && $lat !== null && $lon !== null) {
             $farm = $this->findFarmByCoordinates($lat, $lon);
             if ($farm) {
                 $farmId = $farm->farm_id;
             }
+        }
+
+        // Only store forecast data for farm locations (optimization)
+        if ($farmId === null) {
+            return;
         }
 
         // Calculate expiration: forecasts expire at the end of the forecast date

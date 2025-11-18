@@ -34,8 +34,8 @@ class StoreForecastJob implements ShouldQueue
     public function handle(WeatherService $weatherService): void
     {
         try {
-            // Use the existing storeForecastData method
-            $weatherService->storeForecastData($this->forecastData, $this->locationName, $this->lat, $this->lon);
+            // Use the existing storeForecastData method, pass farm_id if available
+            $weatherService->storeForecastData($this->forecastData, $this->locationName, $this->lat, $this->lon, $this->farmId);
         } catch (\Throwable $e) {
             Log::error('Failed to store forecast data in background', [
                 'error' => $e->getMessage(),

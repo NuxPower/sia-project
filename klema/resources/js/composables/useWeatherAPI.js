@@ -77,22 +77,25 @@ export function useWeatherAPI() {
     const forecastUrl = `/api/weather/forecast?lat=${lat}&lon=${lng}&days=${days}`;
     const historyUrl = includeHistory ? `/api/weather/history?lat=${lat}&lon=${lng}&days=${historyDays}` : null;
     
-    const currentResponse = await authorizedFetch(currentUrl);
-    if (!currentResponse.ok) {
-      throw new Error(`Failed to fetch current weather: ${currentResponse.status}`);
-    }
-    
-    const current = await currentResponse.json();
-    
+    // Fetch all in parallel for better performance
+    const currentPromise = authorizedFetch(currentUrl);
     const forecastPromise = authorizedFetch(forecastUrl);
     const historyPromise = includeHistory ? authorizedFetch(historyUrl).catch(() => null) : Promise.resolve(null);
     
-    const [forecastResponse, historyResponse] = await Promise.all([forecastPromise, historyPromise]);
+    const [currentResponse, forecastResponse, historyResponse] = await Promise.all([
+      currentPromise,
+      forecastPromise,
+      historyPromise
+    ]);
     
+    if (!currentResponse.ok) {
+      throw new Error(`Failed to fetch current weather: ${currentResponse.status}`);
+    }
     if (!forecastResponse.ok) {
       throw new Error(`Failed to fetch forecast: ${forecastResponse.status}`);
     }
     
+    const current = await currentResponse.json();
     const forecastData = await forecastResponse.json();
     const history = includeHistory && historyResponse?.ok ? await historyResponse.json() : [];
     
@@ -117,21 +120,27 @@ export function useWeatherAPI() {
     const historyDays = Math.max(1, Math.min(requestedHistoryDays, 30));
     const includeHistory = options.includeHistory ?? true;
 
-    const currentResponse = await authorizedFetch(`/api/weather/current?location=${encodeURIComponent(location)}`);
+    const currentUrl = `/api/weather/current?location=${encodeURIComponent(location)}`;
+    const forecastUrl = `/api/weather/forecast?location=${encodeURIComponent(location)}&days=${days}`;
+    const historyUrl = includeHistory ? `/api/weather/history?location=${encodeURIComponent(location)}&days=${historyDays}` : null;
+    
+    // Fetch all in parallel for better performance
+    const currentPromise = authorizedFetch(currentUrl);
+    const forecastPromise = authorizedFetch(forecastUrl);
+    const historyPromise = includeHistory ? authorizedFetch(historyUrl).catch(() => null) : Promise.resolve(null);
+    
+    const [currentResponse, forecastResponse, historyResponse] = await Promise.all([
+      currentPromise,
+      forecastPromise,
+      historyPromise
+    ]);
+    
     if (!currentResponse.ok) throw new Error('Failed to fetch current weather');
-    
-    const current = await currentResponse.json();
-    
-    const forecastResponse = await authorizedFetch(`/api/weather/forecast?location=${encodeURIComponent(location)}&days=${days}`);
     if (!forecastResponse.ok) throw new Error('Failed to fetch forecast');
     
+    const current = await currentResponse.json();
     const forecastData = await forecastResponse.json();
-    
-    let history = [];
-    if (includeHistory) {
-      const historyResponse = await authorizedFetch(`/api/weather/history?location=${encodeURIComponent(location)}&days=${historyDays}`).catch(() => null);
-      history = historyResponse?.ok ? await historyResponse.json() : [];
-    }
+    const history = includeHistory && historyResponse?.ok ? await historyResponse.json() : [];
     
     const result = { current, forecastData, history };
     
