@@ -136,6 +136,244 @@ The KLEMA system follows a three-tier architecture pattern:
 └───────────────┘         └──────────────────┘
 ```
 
+### System Architecture Diagrams
+
+**Figure 1. System Architecture Flow**
+
+```
+┌─────────────────────────────────────┐
+│   User Interface                    │
+│   (Browser / Frontend UI - Vue.js)  │
+└──────────────┬──────────────────────┘
+               │
+               │ HTTP Requests
+               ▼
+┌─────────────────────────────────────┐
+│   Laravel Controllers               │
+│   (Farm, Alert, Weather, Activity)  │
+└──────────────┬──────────────────────┘
+               │
+               │ Calls Models/Services
+               ▼
+┌─────────────────────────────────────┐
+│   Service Layer (Business Logic)    │
+│   - WeatherService                  │
+│   - ActivityAdvisor                 │
+│   - AlertAutomationService          │
+└──────────────┬──────────────────────┘
+               │              │
+               │              │ Calls External API
+               │              ▼
+               │    ┌──────────────────────────┐
+               │    │  External API            │
+               │    │  (OpenWeatherMap)        │
+               │    │  via WeatherService.php  │
+               │    └──────────────────────────┘
+               │
+               │ Calls Models
+               ▼
+┌─────────────────────────────────────┐
+│   Models (Eloquent ORM)             │
+│   (User, Farm, Activity, Alert, etc.)│
+└──────────────┬──────────────────────┘
+               │
+               │ SQL Queries
+               ▼
+┌─────────────────────────────────────┐
+│   Database (PostgreSQL)             │
+│   (Users, Farms, Weather, etc.)     │
+└─────────────────────────────────────┘
+```
+
+**Figure 2. Detailed System Flowchart**
+
+```
+┌─────────────────────────────────────┐
+│   Client (Browser / Mobile)         │
+└──────────────┬──────────────────────┘
+               │
+               │ HTTP Requests
+               ▼
+┌─────────────────────────────────────┐
+│   API / Web Route                   │
+│   (routes/api.php, routes/web.php)  │
+│   Receives and maps incoming        │
+│   HTTP requests                     │
+└──────────────┬──────────────────────┘
+               │
+               ▼
+┌─────────────────────────────────────┐
+│   Authentication & Middleware Check │
+│   (Sanctum, Verified, etc.)         │
+└──────┬──────────────┬───────────────┘
+       │              │              │
+       │              │              │
+       │ Unauthenticated    Authenticated   Role-based Policy
+       │              │              │
+       ▼              ▼              ▼
+┌──────────┐  ┌─────────────┐  ┌──────────────┐
+│   Auth   │  │   Main      │  │   Policy     │
+│Controllers│  │ Controllers │  │   Layer      │
+│          │  │             │  │              │
+│- Login   │  │- FarmApi    │  │- FarmPolicy  │
+│- Register│  │- WeatherApi │  │- ExportPolicy│
+│- Reset   │  │- AlertApi   │  │- Activity    │
+│          │  │- ActivityApi│  │  Policy      │
+│          │  │- ExportApi  │  │- UserPolicy  │
+│          │  │- Dashboard  │  │              │
+└──────────┘  └──────┬──────┘  └──────┬───────┘
+                     │                │
+                     └────────┬───────┘
+                              │
+                              ▼
+           ┌─────────────────────────────────────┐
+           │   Service Layer (Business Logic)    │
+           │                                     │
+           │   WeatherService.php                │
+           │   → connects to external APIs       │
+           │                                     │
+           │   ActivityAdvisor                   │
+           │   → handles activity recommendations│
+           │                                     │
+           │   AlertAutomationService            │
+           │   → handles automated alerts        │
+           │                                     │
+           │   Export Services                   │
+           │   → handles CSV/XLS/PDF generation  │
+           └──────────────┬──────────────────────┘
+                          │
+                          │ Calls Models
+                          ▼
+         ┌─────────────────────────────────────┐
+         │   Eloquent Models                   │
+         │                                     │
+         │   - User                            │
+         │   - Farm                            │
+         │   - FarmPoint                       │
+         │   - WeatherData                     │
+         │   - Forecast                        │
+         │   - Activity                        │
+         │   - Alert                           │
+         │   - Export                          │
+         │   - UserSettings                    │
+         └──────────────┬──────────────────────┘
+                        │
+                        │ SQL Queries
+                        ▼
+         ┌─────────────────────────────────────┐
+         │   Database (PostgreSQL)             │
+         │                                     │
+         │   Tables:                           │
+         │   - users                           │
+         │   - farms                           │
+         │   - farm_points                     │
+         │   - weather_data                    │
+         │   - forecasts                       │
+         │   - activities                      │
+         │   - alerts                          │
+         │   - exports                         │
+         │   - user_settings                   │
+         │                                     │
+         │   Managed through migrations        │
+         │   and accessed via Eloquent         │
+         └──────────────┬──────────────────────┘
+                        │
+                        ▼
+         ┌─────────────────────────────────────┐
+         │   External Systems & Integrations   │
+         │                                     │
+         │   Weather API (OpenWeatherMap)      │
+         │   → WeatherService                  │
+         │                                     │
+         │   File Storage                      │
+         │   → Export CSV/XLS/PDF              │
+         │   → ExportController                │
+         │                                     │
+         │   Provides external data,           │
+         │   reports, and backups              │
+         └─────────────────────────────────────┘
+```
+
+**Figure 3. Entity-Relationship Diagram (ERD)**
+
+```
+┌─────────────────────────────────────┐
+│           users                     │
+├─────────────────────────────────────┤
+│ PK  id                  INT         │
+│     name                VARCHAR     │
+│     email               VARCHAR(100)│
+│     password            VARCHAR(255)│
+│     role                ENUM        │
+│     email_verified_at   TIMESTAMP   │
+│     created_at          TIMESTAMP   │
+│     updated_at          TIMESTAMP   │
+└──────────────┬──────────────────────┘
+               │
+               │ 1
+               │
+               │ hasMany
+               │
+       ┌───────┴───────┬──────────────┬──────────────┬──────────────┐
+       │               │              │              │              │
+       │ N             │ N            │ N            │ N            │ 1
+       │               │              │              │              │
+       ▼               ▼              ▼              ▼              ▼
+┌──────────┐  ┌──────────────┐ ┌──────────┐          ┌──────────────┐
+│  farms   │  │ activities   │ │ exports  │          │user_settings │
+├──────────┤  ├──────────────┤ ├──────────┤          ├──────────────┤
+│PK farm_id│  │PK id         │ │PK export_│          │PK id         │
+│FK user_id│  │FK user_id    │ │    id    │          │FK user_id    │
+│farm_name │  │activity_type │ │file_name │          │...           │
+│latitude  │  │field         │ │file_path │          │              │
+│longitude │  │start_date    │ │created_at│          │              │
+│...       │  │end_date      │ │updated_at│          │              │
+│created_at│  │status        │ │          │          │              │
+│updated_at│  │...           │ │          │          │              │
+└────┬─────┘  └──────────────┘ └──────────┘          └──────────────┘
+     │
+     │ 1
+     │
+     │ hasMany
+     │
+     ├──────────┬──────────┬──────────┬──────────┐
+     │          │          │          │          │
+     │ N        │ N        │ N        │ N        │
+     │          │          │          │          │
+     ▼          ▼          ▼          ▼          ▼
+┌──────────┐┌──────────┐┌──────────┐┌──────────┐┌──────────┐
+│farm_     ││weather_  ││forecasts ││ alerts   ││          │
+│points    ││data      ││          ││          ││          │
+├──────────┤├──────────┤├──────────┤├──────────┤│          │
+│PK point_ ││PK weather││PK        ││PK alert_ ││          │
+│    id    ││    _id   ││forecast_ ││    id    ││          │
+│FK farm_id││FK farm_id││    id    ││FK farm_id││          │
+│label     ││temperature││FK farm_ ││alert_type││          │
+│latitude  ││humidity  ││    id    ││message   ││          │
+│longitude ││rainfall  ││location_ ││issued_at ││          │
+│point_type││wind_speed││  name    ││resolved  ││          │
+│created_at││condition ││latitude  ││...       ││          │
+│updated_at││recorded_ ││longitude ││          ││          │
+│          ││  at      ││forecast_ ││          ││          │
+│          ││          ││  date    ││          ││          │
+│          ││          ││temp_max  ││          ││          │
+│          ││          ││temp_min  ││          ││          │
+│          ││          ││condition ││          ││          │
+│          ││          ││expires_at││          ││          │
+│          ││          ││...       ││          ││          │
+└──────────┘└──────────┘└──────────┘└──────────┘└──────────┘
+
+Relationships:
+- users 1:N farms (one user can have many farms)
+- users 1:N activities (one user can have many activities)
+- users 1:N exports (one user can have many exports)
+- users 1:1 user_settings (one user has one settings record)
+- farms 1:N farm_points (one farm can have many points)
+- farms 1:N weather_data (one farm can have many weather records)
+- farms 1:N forecasts (one farm can have many forecasts)
+- farms 1:N alerts (one farm can have many alerts)
+```
+
 **User Interface (Browser / Frontend UI)**
 
 The frontend layer is built with Vue.js and provides a responsive, interactive user interface accessible via web browsers, desktop applications (Electron), and mobile applications (Capacitor). The UI components include:
