@@ -4,111 +4,100 @@
 
 KLEMA is a comprehensive climate-smart agriculture platform designed to help farmers, cooperatives, and agricultural agencies adapt to the challenges of climate change. By combining real-time weather monitoring, interactive farm mapping, intelligent activity recommendations, and automated alert systems, KLEMA empowers users to make informed farming decisions and reduce risks from extreme weather events.
 
-## 🌍 Introduction
+## CHAPTER III TECHNICAL BACKGROUND
 
-Climate change impacts agriculture by altering weather patterns, reducing yields, and increasing risks from droughts, floods, and pests. KLEMA provides reliable weather insights, farm visualization, historical data analysis, and automated recommendations to strengthen decision-making and food security.
+### Technology Stack
 
-## 🎯 Objectives
+#### i. Frontend Layer
 
-- Integrate real-time weather API data with historical climate analysis
-- Provide interactive farm mapping with OpenStreetMap integration
-- Support secure user authentication with role-based access control
-- Deliver responsive dashboards accessible on desktop, tablet, and mobile devices
-- Enable automated weather-based activity recommendations and alerts
-- Facilitate data export and reporting for analysis
+**Vue.js Framework**
 
-## ⚙️ Core Features
+KLEMA utilizes Vue.js 3.5+ with the Composition API as its primary frontend framework. The application is built using a component-based architecture that enables reactive data binding and efficient state management. Vue.js provides a flexible and performant foundation for building interactive user interfaces.
 
-### 1. Weather Monitoring
-- **Real-time Weather Data**: Temperature, humidity, rainfall, wind speed, and atmospheric pressure
-- **Weather Forecasts**: Multi-day forecasts (up to 16 days) for planning
-- **Historical Weather Data**: Store and analyze historical weather patterns (up to 30 days)
-- **Location-based Weather**: Support for both coordinate-based and location name queries
-- **Weather History API**: Access historical weather data by date
-- **Database-First Caching**: Intelligent caching system that checks database before making API calls, reducing external API usage
-- **Client-Side Caching**: In-memory caching on frontend for instant data retrieval on subsequent requests
-- **Optimized Loading**: Multi-layer caching ensures fast view loading with minimal API calls
+**Mapping Libraries**
 
-### 2. Farm Management
-- **Interactive Farm Mapping**: Visualize farm plots and boundaries using Leaflet maps with OpenStreetMap tiles
-- **Farm Points of Interest**: Mark, save, and manage specific points within farms
-- **Farm Boundaries**: Define and store farm boundary coordinates
-- **Farm Details**: Store comprehensive farm information including location, size, and metadata
-- **Multi-farm Support**: Users can manage multiple farms
+The system integrates Leaflet 1.9+ for interactive map rendering and visualization. Leaflet is a lightweight, open-source JavaScript library that provides seamless integration with OpenStreetMap tiles for displaying farm locations, boundaries, and weather data overlays. The mapping functionality enables users to visualize farm plots, mark points of interest, and draw farm boundaries directly on the map interface.
 
-### 3. Activity Management & Recommendations
-- **Activity Scheduling**: Plan and track farming activities with date-based scheduling
-- **Weather-based Recommendations**: Intelligent activity advisor that suggests optimal timing based on weather forecasts
-- **Activity Types**: Support for various farming activities (planting, harvesting, irrigation, etc.)
-- **Suitability Checking**: Pre-activity weather suitability validation
-- **Activity Calendar**: Visual calendar interface for managing activities
-- **Status Tracking**: Track activity status (pending, in_progress, completed, cancelled)
+Additional frontend technologies include:
+- **Vite 7.0+**: Modern build tool for fast development and optimized production builds
+- **Bootstrap 5.2+ with Tailwind CSS 4.0**: UI framework for responsive design and styling
+- **Axios 1.12+**: HTTP client for API communication
+- **SASS/SCSS**: Preprocessor for advanced styling capabilities
 
-### 4. Alert System
-- **Automated Weather Alerts**: System automatically generates alerts based on forecast conditions
-- **Severe Weather Warnings**: Alerts for extreme weather conditions (heavy rain, drought, high winds, etc.)
-- **Farm-specific Alerts**: Alerts tied to specific farm locations
-- **Alert Resolution**: Mark alerts as resolved when addressed
-- **Forecast Warnings**: Proactive warnings based on upcoming weather conditions
-- **Alert Automation**: Background service scans farms and creates alerts automatically
+#### ii. Backend and Application Logic
 
-### 5. Data Export & Reporting
-- **Weather Data Export**: Export weather data to CSV/PDF formats
-- **Farm Data Export**: Export farm information and associated data
-- **Activity Data Export**: Export activity records with timestamps
-- **Export History**: Track and download previous exports
-- **Multiple Export Formats**: Support for CSV and PDF exports
+**Railway**
 
-### 6. User Management & Authentication
-- **Secure Authentication**: Laravel Sanctum-based API authentication with Bearer tokens
+The KLEMA backend is deployed on Railway, a cloud platform that provides automated deployment, scaling, and infrastructure management. Railway handles the hosting of the Laravel application, database connections, and queue workers, ensuring reliable and scalable service delivery.
+
+**Laravel Framework**
+
+The backend is built on Laravel 12.0+ (PHP 8.2+), a modern PHP framework that provides a robust foundation for RESTful API development. Laravel's architecture includes:
+
+- **RESTful API Architecture**: Clean, standardized API endpoints for all system operations
+- **Eloquent ORM**: Object-relational mapping for database interactions
+- **Queue System**: Laravel Queue for background job processing (email sending, weather data storage)
+- **PDF Generation**: DomPDF 3.1+ for generating export documents
+- **Service Layer**: Business logic encapsulated in service classes for maintainability
+
+#### iii. Database Management and Storage
+
+**PostgreSQL Database**
+
+KLEMA uses PostgreSQL as its primary database management system. PostgreSQL provides robust data integrity, advanced indexing capabilities, and excellent performance for complex queries. The database stores:
+
+- **User Data**: User accounts, authentication tokens, and session information
+- **Farm Data**: Farm information, boundaries, coordinates, and points of interest
+- **Activity Records**: Farming activities with scheduling and status tracking
+- **Alert Data**: Weather alerts and system notifications
+- **Weather Data**: Historical weather data and cached current weather information
+- **Forecast Data**: Weather forecast information with expiration tracking
+- **Export Records**: Export job tracking and file management
+
+The system implements a database-first caching strategy where weather data is stored in PostgreSQL before making external API calls, significantly reducing API usage and improving response times.
+
+#### iv. Weather API
+
+**OpenWeatherMap**
+
+KLEMA integrates with the OpenWeatherMap API to retrieve real-time weather data, forecasts, and historical weather information. The WeatherService class manages all interactions with the OpenWeatherMap API, including:
+
+- **Current Weather**: Real-time temperature, humidity, rainfall, wind speed, and atmospheric pressure
+- **Weather Forecasts**: Multi-day forecasts (up to 16 days) for planning agricultural activities
+- **Historical Weather Data**: Access to past weather conditions for analysis and trend identification
+- **Location-based Queries**: Support for both coordinate-based and location name queries
+
+The system implements intelligent caching mechanisms that check the database before making API calls, reducing external API usage by approximately 90% while maintaining data freshness.
+
+#### v. Mapping
+
+**OpenStreetMap (OSM)**
+
+KLEMA utilizes OpenStreetMap tiles for map rendering and visualization. OpenStreetMap provides free, open-source map data that enables the system to display geographic information without licensing restrictions. The integration includes:
+
+- **Base Map Layers**: Standard OSM tiles for geographic context
+- **Weather Overlay Layers**: Integration with OpenWeatherMap tile services for weather visualization (clouds, precipitation, temperature, wind, pressure)
+- **Interactive Features**: Map click events, boundary drawing, and point marking capabilities
+- **Coordinate System**: Support for latitude/longitude coordinate-based operations
+
+#### vi. Authentication
+
+**Sanctum Authentication**
+
+KLEMA implements Laravel Sanctum 4.2+ for secure API authentication. Sanctum provides a lightweight authentication system that supports:
+
+- **Bearer Token Authentication**: API requests authenticated using Bearer tokens in the Authorization header
+- **Session Authentication**: Web-based session authentication for dashboard access
+- **Token Management**: Personal access tokens with configurable expiration (default: 120 minutes)
 - **Email Verification**: Required email verification for account activation
-- **Password Reset**: Secure password reset functionality
-- **Role-based Access**: Support for different user roles (farmer, admin)
-- **Session Management**: Web-based session authentication for dashboard access
-- **Token Management**: Personal access tokens for API authentication
+- **Password Reset**: Secure password reset functionality with token-based verification
+- **Role-based Access Control**: Support for different user roles (farmer, admin) with policy-based authorization
 
-### 7. Dashboard & Analytics
-- **Responsive Dashboard**: Mobile-first design accessible on all devices
-- **Weather Dashboard**: Real-time weather display with charts and visualizations
-- **Calendar View**: Interactive calendar for activity and weather planning
-- **Settings Management**: User preferences and system configuration
-- **User Management Interface**: Admin interface for managing users (accessible to all farmers)
+## CHAPTER IV SYSTEM DESIGN AND IMPLEMENTATION
 
-## 🛠 Tech Stack
+### System Architecture
 
-### Frontend
-- **Framework**: Vue.js 3.5+ (Composition API)
-- **Build Tool**: Vite 7.0+
-- **UI Framework**: Bootstrap 5.2+ with Tailwind CSS 4.0
-- **Mapping**: Leaflet 1.9+ with OpenStreetMap tiles
-- **3D Visualization**: Cesium 1.135+ (optional)
-- **HTTP Client**: Axios 1.12+
-- **Styling**: SASS/SCSS
-
-### Backend
-- **Framework**: Laravel 12.0+ (PHP 8.2+)
-- **API**: RESTful API architecture
-- **Authentication**: Laravel Sanctum 4.2+ (Bearer token authentication)
-- **Database**: PostgreSQL (primary), MySQL support available
-- **PDF Generation**: DomPDF 3.1+
-- **Queue System**: Laravel Queue for background jobs
-
-### Mobile & Desktop
-- **Mobile Framework**: Capacitor 6.0+ (Android & iOS support)
-- **Desktop Framework**: Electron 31.0+ (Windows, macOS, Linux)
-- **Build Tools**: Electron Builder for desktop packaging
-
-### External Services
-- **Weather API**: OpenWeatherMap API (real-time, forecast, and historical data)
-- **Mapping**: OpenStreetMap tiles for map rendering
-
-### Development Tools
-- **Package Manager**: Composer (PHP), npm (Node.js)
-- **Code Quality**: Laravel Pint
-- **Testing**: PHPUnit 11.5+
-- **Logging**: Laravel Pail
-
-## 🏗 System Architecture
+The KLEMA system follows a three-tier architecture pattern:
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
@@ -147,671 +136,250 @@ Climate change impacts agriculture by altering weather patterns, reducing yields
 └───────────────┘         └──────────────────┘
 ```
 
-### Request Flow
+**User Interface (Browser / Frontend UI)**
 
-1. **Frontend** (Vue.js/Electron/Capacitor) checks client-side cache first (instant if cached)
-2. If not cached, makes API request with Bearer token
-3. **Backend** (Laravel) validates authentication via Sanctum middleware
-4. **Weather Service** checks database cache before external API:
-   - Current weather: Uses database if data is < 30 minutes old
-   - Forecasts: Uses database if all requested days are available and not expired
-   - Historical data: Uses database storage
-5. Only fetches from OpenWeatherMap API if database cache is stale or missing
-6. Automatically stores fetched data to database for future requests
-7. **Response** returns JSON data to frontend, which caches it client-side
-8. Subsequent requests use cached data until expiration
+The frontend layer is built with Vue.js and provides a responsive, interactive user interface accessible via web browsers, desktop applications (Electron), and mobile applications (Capacitor). The UI components include:
 
-## 📁 Project Structure
+- **Weather Dashboard**: Real-time weather display with charts and visualizations
+- **Farm Management Interface**: Interactive maps for farm visualization and management
+- **Activity Calendar**: Visual calendar interface for managing farming activities
+- **Alert Management**: Interface for viewing and resolving weather alerts
+- **Settings Management**: User preferences and system configuration
+- **Export Interface**: Tools for exporting data in CSV and PDF formats
 
-```
-klema/
-├── app/
-│   ├── Console/Commands/        # Artisan commands
-│   ├── Http/
-│   │   ├── Controllers/         # Web controllers
-│   │   │   └── API/            # API controllers
-│   │   └── Middleware/         # Custom middleware
-│   ├── Models/                 # Eloquent models
-│   ├── Policies/               # Authorization policies
-│   ├── Providers/              # Service providers
-│   └── Services/               # Business logic services
-│       ├── ActivityAdvisor.php
-│       ├── AlertAutomationService.php
-│       └── WeatherService.php
-├── bootstrap/                  # Application bootstrap
-├── config/                     # Configuration files
-├── database/
-│   ├── migrations/             # Database migrations
-│   └── seeders/               # Database seeders
-├── public/                     # Public web root
-├── resources/
-│   ├── js/                     # Frontend JavaScript
-│   │   ├── components/         # Vue components
-│   │   │   └── Views/         # Main view components
-│   │   ├── composables/       # Vue composables
-│   │   └── services/          # Frontend services
-│   │       ├── auth.js        # Authentication service
-│   │       └── http.js        # HTTP client service
-│   ├── css/                    # Stylesheets
-│   └── views/                  # Blade templates
-├── routes/
-│   ├── api.php                # API routes
-│   └── web.php                  # Web routes
-├── storage/                    # Storage directory
-├── tests/                      # Test files
-├── android/                    # Capacitor Android project
-├── electron/                   # Electron main process files
-├── capacitor.config.ts         # Capacitor configuration
-├── vite.config.js             # Vite configuration
-├── composer.json               # PHP dependencies
-└── package.json                # Node.js dependencies
-```
+**Laravel Controllers (Farm, Alert, Weather)**
 
-## 🚀 Getting Started
+The backend implements a controller-based architecture with dedicated API controllers:
 
-### Prerequisites
+- **FarmApiController**: Handles farm CRUD operations, farm point management, and map data retrieval
+- **WeatherApiController**: Manages weather data retrieval (current, forecast, historical)
+- **AlertApiController**: Processes alert creation, retrieval, and resolution
+- **ActivityApiController**: Manages farming activity operations and recommendations
+- **AuthApiController**: Handles user authentication, registration, and password management
+- **ExportApiController**: Manages data export operations
+- **SettingsApiController**: Handles user settings management
 
-- **PHP**: 8.2 or higher
-- **Node.js**: 20.x or higher
-- **Composer**: Latest version
-- **PostgreSQL**: 12+ (or MySQL 8+)
-- **OpenWeatherMap API Key**: Get one from [openweathermap.org](https://openweathermap.org/api)
+**Models (Eloquent ORM for DB Operations)**
 
-### Installation
+The system uses Eloquent ORM models for database interactions:
 
-1. **Clone the repository**
-   ```bash
-   git clone <repository-url>
-   cd sia-project-1/klema
-   ```
+- **User**: User accounts with relationships to farms, activities, and exports
+- **Farm**: Farm information with boundaries, coordinates, and relationships to points and alerts
+- **FarmPoint**: Points of interest within farms
+- **Activity**: Farming activities with scheduling and status tracking
+- **Alert**: Weather and system alerts with resolution tracking
+- **WeatherData**: Historical weather data storage
+- **Forecast**: Forecast data with expiration tracking
+- **Export**: Export job tracking and file management
+- **UserSettings**: User preferences and configuration
 
-2. **Install PHP dependencies**
-   ```bash
-   composer install
-   ```
+**Database (PostgreSQL)**
 
-3. **Install Node.js dependencies**
-   ```bash
-   npm install
-   ```
+The PostgreSQL database serves as the primary data storage layer, implementing:
 
-4. **Configure environment**
-   ```bash
-   cp .env.example .env
-   php artisan key:generate
-   ```
+- **Relational Data Structure**: Normalized database schema with foreign key relationships
+- **Indexing Strategy**: Optimized indexes on frequently queried columns (location, coordinates, dates)
+- **Caching Layer**: Database-first caching for weather data to reduce external API calls
+- **Transaction Management**: ACID compliance for data integrity
 
-5. **Update `.env` file** with your configuration:
-   ```env
-   DB_CONNECTION=pgsql
-   DB_HOST=127.0.0.1
-   DB_PORT=5432
-   DB_DATABASE=klema
-   DB_USERNAME=your_username
-   DB_PASSWORD=your_password
-   
-   WEATHER_API_KEY=your_openweathermap_api_key
-   APP_URL=http://localhost:8000
-   ```
+**External APIs (Weather API via WeatherService.php)**
 
-6. **Run database migrations**
-   ```bash
-   php artisan migrate
-   ```
+The WeatherService class manages all external API interactions:
 
-7. **Build frontend assets**
-   ```bash
-   npm run build
-   ```
+- **API Request Management**: Handles HTTP requests to OpenWeatherMap API
+- **Error Handling**: Robust error handling and fallback mechanisms
+- **Data Transformation**: Converts API responses to standardized internal formats
+- **Caching Logic**: Implements database-first caching before making API calls
+- **Background Jobs**: Queues weather data storage jobs for non-blocking operations
 
-### Development
+### Backend Module
 
-**Start development servers:**
-```bash
-composer dev
-```
+**Controllers (Logic and Request Handlers)**
 
-This command runs:
-- Laravel development server (port 8000)
-- Queue worker
-- Laravel Pail (log viewer)
-- Vite dev server (hot module replacement)
+The backend module implements RESTful API controllers that handle HTTP requests and responses:
 
-**Or run individually:**
-```bash
-# Backend
-php artisan serve
+- **Request Validation**: Input validation using Laravel's validation rules
+- **Authorization**: Policy-based authorization checks for resource access
+- **Response Formatting**: Standardized JSON response format
+- **Error Handling**: Consistent error response structure
 
-# Frontend (in separate terminal)
-npm run dev
+**Models (Database Interaction Layer)**
 
-# Queue worker (in separate terminal)
-php artisan queue:listen
-```
+Eloquent models provide an object-oriented interface to the database:
 
-### Building for Production
+- **Relationships**: Defines relationships between entities (User hasMany Farms, Farm hasMany Activities, etc.)
+- **Query Scopes**: Reusable query constraints for common operations
+- **Accessors/Mutators**: Data transformation on model attributes
+- **Events**: Model events for automatic actions (e.g., creating related records)
 
-**Web:**
-```bash
-npm run build
-```
+**Services (External Integration Layer)**
 
-**Desktop (Electron):**
-```bash
-# Linux
-npm run electron:build:linux
+Service classes encapsulate business logic and external integrations:
 
-# Windows
-npm run electron:build:win
+- **WeatherService**: Manages OpenWeatherMap API interactions, caching, and data storage
+- **ActivityAdvisor**: Provides intelligent recommendations for farming activities based on weather forecasts
+- **AlertAutomationService**: Automatically scans farms and creates alerts based on weather conditions
 
-# macOS
-npm run electron:build:mac
-```
+**Policies and Middleware (Security and Access Control)**
 
-**Mobile (Capacitor):**
-```bash
-# Build web assets
-npm run build
+The system implements security through policies and middleware:
 
-# Sync with Capacitor
-npm run cap:sync
+- **Policies**: 
+  - ActivityPolicy: Controls access to activity resources
+  - ExportPolicy: Manages export permissions
+  - FarmPolicy: Enforces farm ownership and access rules
+  - UserPolicy: Handles user management permissions
 
-# Open Android Studio
-npm run cap:open:android
+- **Middleware**:
+  - EnsureUserHasRole: Validates user roles for admin operations
+  - Sanctum Authentication: Validates Bearer tokens for API requests
+  - Email Verification: Ensures users have verified their email addresses
 
-# Open Xcode (macOS only)
-npm run cap:open:ios
-```
+### Database Layer
 
-## 📡 API Endpoints
+The database layer implements a comprehensive schema for storing all system data:
 
-### Authentication
-- `POST /api/auth/register` - Register new user
-- `POST /api/auth/login` - Login and get Bearer token
+**Application Tables:**
+- `users`: User accounts with email verification and role-based access
+- `farms`: Farm information with boundaries, coordinates, and metadata
+- `farm_points`: Points of interest within farms
+- `activities`: Farming activities with scheduling and status tracking
+- `alerts`: Weather and system alerts with automation support
+- `weather_data`: Historical weather data storage (current weather cached for 30 minutes)
+- `forecasts`: Forecast data storage with expiration tracking
+- `exports`: Export job tracking and file management
+- `user_settings`: User preferences and configuration
+
+**Laravel Framework Tables:**
+- `password_reset_tokens`: Password reset token storage
+- `sessions`: Web session data storage
+- `personal_access_tokens`: Laravel Sanctum API tokens for authentication
+- `cache` / `cache_locks`: Cache storage (when using database cache driver)
+- `jobs` / `job_batches` / `failed_jobs`: Queue system tables (when using database queue driver)
+- `migrations`: Migration tracking
+
+### Map And Weather Integration
+
+**FarmController.php and FarmPoint Model**
+
+The FarmApiController manages farm-related operations including map integration:
+
+- **Farm CRUD Operations**: Create, read, update, and delete farm records
+- **Boundary Management**: Store and retrieve farm boundary coordinates as GeoJSON
+- **Point Management**: Add, retrieve, and manage points of interest within farms via the FarmPoint model
+- **Map Data Endpoint**: Provides aggregated farm data for map visualization (`/api/map/farms`)
+- **Weather Integration**: Retrieves weather data for specific farm locations
+
+**Data Handling**
+
+The system implements efficient data handling mechanisms:
+
+- **GeoJSON Format**: Farm boundaries stored as GeoJSON for compatibility with mapping libraries
+- **Coordinate Validation**: Ensures latitude/longitude values are within valid ranges
+- **Spatial Queries**: Database queries optimized for geographic data retrieval
+- **Data Transformation**: Converts between database format and API response format
+
+**Weather Integration**
+
+Weather data integration is handled through multiple layers:
+
+- **WeatherService**: Central service for all weather-related operations
+- **Database Caching**: Stores weather data in PostgreSQL before making external API calls
+- **Client-Side Caching**: In-memory caching on frontend for instant data retrieval
+- **Multi-layer Caching**: Client cache → Database cache → External API (only if needed)
+- **Background Jobs**: Non-blocking storage of weather data to database
+- **Forecast Management**: Automatic expiration of forecast data after date passes
+
+### API Endpoints
+
+**Authentication & User Management**
+
+- `POST /api/auth/register` - Register new user account
+- `POST /api/auth/login` - Login and receive Bearer token
 - `POST /api/auth/logout` - Logout and revoke token
-- `GET /api/auth/me` - Get current user info
-- `POST /api/auth/password/forgot` - Request password reset
-- `POST /api/auth/password/reset` - Reset password
+- `GET /api/auth/me` - Get current authenticated user information
+- `POST /api/auth/password/forgot` - Request password reset link
+- `POST /api/auth/password/reset` - Reset password with token
 - `POST /api/auth/token` - Issue token for session-authenticated users
+- `POST /api/auth/email/resend` - Resend email verification
+- `POST /api/auth/email/verification-notification` - Send verification email
 
-### Weather
-- `GET /api/weather/current` - Get current weather
-- `GET /api/weather/forecast` - Get weather forecast
+**Farm Management**
+
+- `GET /api/farms` - List all farms for authenticated user
+- `POST /api/farms` - Create new farm
+- `GET /api/farms/{farm}` - Get farm details
+- `PUT /api/farms/{farm}` - Update farm information
+- `DELETE /api/farms/{farm}` - Delete farm
+- `POST /api/farms/{farm}/points` - Add point of interest to farm
+- `GET /api/farms/{farm}/weather` - Get weather data for farm location
+- `GET /api/map/farms` - Get map data for all user farms
+
+**Farm Map Integration**
+
+The farm map integration endpoints provide:
+
+- **Map Data Aggregation**: `/api/map/farms` returns all farms with coordinates and boundaries for map rendering
+- **Farm Weather**: `/api/farms/{farm}/weather` retrieves weather data specific to farm location
+- **Point Management**: Farm points can be added and managed through the farm endpoints
+
+**Weather Integration**
+
+- `GET /api/weather/current` - Get current weather data (by location or coordinates)
+- `GET /api/weather/forecast` - Get weather forecast (1-16 days)
 - `GET /api/weather/history` - Get historical weather data
 - `GET /api/weather/historical/{date}` - Get weather for specific date
 
-### Farms
-- `GET /api/farms` - List user's farms
-- `POST /api/farms` - Create new farm
-- `GET /api/farms/{farm}` - Get farm details
-- `PUT /api/farms/{farm}` - Update farm
-- `DELETE /api/farms/{farm}` - Delete farm
-- `POST /api/farms/{farm}/points` - Add point to farm
-- `GET /api/farms/{farm}/weather` - Get weather for farm
-- `GET /api/map/farms` - Get map data for all farms
+All weather endpoints support:
+- Location name queries (e.g., "Manila, Philippines")
+- Coordinate-based queries (latitude/longitude)
+- Database-first caching (checks database before API call)
+- Automatic data storage to database for future requests
 
-### Alerts
-- `GET /api/alerts` - List alerts
-- `POST /api/alerts` - Create alert
-- `GET /api/alerts/active` - Get active alerts
-- `GET /api/alerts/forecast-warnings` - Get forecast warnings
-- `PATCH /api/alerts/{alert}/resolve` - Resolve alert
+**Activity and Alert Management**
 
-### Activities
-- `GET /api/activities` - List activities
-- `POST /api/activities` - Create activity
-- `GET /api/activities/meta` - Get activity metadata
-- `GET /api/activities/recommendation` - Get activity recommendations
+**Activities:**
+- `GET /api/activities` - List all activities for authenticated user
+- `POST /api/activities` - Create new activity
 - `GET /api/activities/{activity}` - Get activity details
 - `PUT /api/activities/{activity}` - Update activity
 - `DELETE /api/activities/{activity}` - Delete activity
+- `GET /api/activities/meta` - Get activity metadata (types, statuses)
+- `GET /api/activities/recommendation` - Get weather-based activity recommendations
 
-### Exports
-- `GET /api/exports` - List exports
-- `POST /api/exports/weather` - Export weather data
-- `POST /api/exports/farms` - Export farm data
-- `POST /api/exports/activities` - Export activity data
+**Alerts:**
+- `GET /api/alerts` - List all alerts
+- `POST /api/alerts` - Create new alert
+- `GET /api/alerts/active` - Get active (unresolved) alerts
+- `GET /api/alerts/forecast-warnings` - Get forecast-based warnings
+- `PATCH /api/alerts/{alert}/resolve` - Mark alert as resolved
+
+**Data Export and Reports**
+
+- `GET /api/exports` - List export history
+- `POST /api/exports/weather` - Export weather data (CSV/PDF)
+- `POST /api/exports/farms` - Export farm data (CSV/PDF)
+- `POST /api/exports/activities` - Export activity data (CSV/PDF)
 - `GET /api/exports/{export}/download` - Download export file
 
-### Admin
-- `GET /api/admin/stats` - Get system statistics
-- `GET /api/admin/farmers` - Get farmers with farms
-- `POST /api/admin/weather/update` - Manually update weather data
-- `GET /api/admin/users` - List users
-- `POST /api/admin/users/{user}/reset-password` - Reset user password
-
-**Note:** All API endpoints (except auth endpoints) require `Authorization: Bearer {token}` header.
-
-## 🔐 Authentication
-
-KLEMA uses **Laravel Sanctum** for API authentication:
-
-1. **Web Authentication**: Session-based authentication for dashboard access
-2. **API Authentication**: Bearer token authentication for API requests
-3. **Token Issuance**: Tokens can be obtained via:
-   - Login endpoint (`/api/auth/login`)
-   - Token endpoint (`/api/auth/token`) for session-authenticated users
-
-**Token Format:**
-```
-Authorization: Bearer {sanctum_token}
-```
-
-**Token Expiration:** Configurable via `SANCTUM_EXPIRATION` in `.env` (default: 120 minutes)
-
-## 🗄️ Database Schema
-
-### Application Tables (KLEMA-specific)
-- `users` - User accounts with email verification and role-based access
-- `farms` - Farm information with boundaries, coordinates, and metadata
-- `farm_points` - Points of interest within farms
-- `activities` - Farming activities with scheduling and status tracking
-- `alerts` - Weather and system alerts with automation support
-- `weather_data` - Historical weather data storage (current weather cached for 30 minutes)
-- `forecasts` - Forecast data storage with expiration tracking (forecasts expire after date passes)
-- `exports` - Export job tracking and file management
-
-### Laravel Framework Tables
-
-#### Authentication & Sessions
-- `password_reset_tokens` - Password reset token storage (created by Laravel)
-- `sessions` - Web session data storage (when using database session driver)
-- `personal_access_tokens` - Laravel Sanctum API tokens for authentication
-
-#### Caching (Database Cache Driver)
-- `cache` - General cache storage (when `CACHE_STORE=database`)
-- `cache_locks` - Cache lock storage for preventing race conditions
-
-#### Queue System (Database Queue Driver)
-- `jobs` - Queued job storage (when `QUEUE_CONNECTION=database`)
-- `job_batches` - Batch job tracking for grouped queue operations
-- `failed_jobs` - Failed queue job storage with exception details
-
-#### System Tables
-- `migrations` - Laravel migration tracking (automatically managed)
-
-**Note:** Framework tables are automatically created by Laravel's default migrations. They're essential for core Laravel functionality:
-- Cache tables are used when `CACHE_STORE=database` in `.env`
-- Queue tables are used when `QUEUE_CONNECTION=database` in `.env`
-- Session table is used when `SESSION_DRIVER=database` in `.env`
-
-## 🔄 Background Services
-
-### Alert Automation Service
-Automatically scans farms and creates alerts based on weather forecasts:
-- Runs via scheduled command or queue job
-- Checks forecast conditions for each farm
-- Creates alerts for severe weather conditions
-- Prevents duplicate alerts within time window
-
-### Activity Advisor Service
-Provides intelligent recommendations for farming activities:
-- Analyzes weather forecasts for activity dates
-- Suggests optimal timing based on weather conditions
-- Provides warnings for unfavorable conditions
-
-## ⚡ Performance Optimizations
-
-### Weather Data Caching Strategy
-
-KLEMA implements a multi-layer caching system to optimize weather data loading and reduce API calls:
-
-#### 1. Database-First Caching (Backend)
-The `WeatherService` checks the database before making external API calls:
-
-- **Current Weather**: 
-  - Checks database for data less than 30 minutes old
-  - Falls back to API only if database cache is stale
-  - Automatically stores API responses to database
-
-- **Forecasts**:
-  - Checks database for all requested forecast days
-  - Uses database data if all days are available and not expired
-  - Forecasts expire 2 hours after the forecast date ends
-  - Automatically stores forecast data to `forecasts` table
-
-- **Historical Data**:
-  - Primarily sourced from database storage
-  - Fetches from external API only for missing dates
-  - Historical data stored permanently for analysis
-
-**Benefits:**
-- Significant reduction in external API calls
-- Faster response times (database queries are much faster than API calls)
-- Lower API usage costs
-- Improved reliability (works even if external API is temporarily unavailable)
-
-#### 2. Client-Side Caching (Frontend)
-The `useWeatherAPI` composable implements in-memory caching:
-
-- **Cache Durations**:
-  - Current weather: 30 minutes
-  - Forecasts: 1 hour
-  - Historical data: 2 hours
-
-- **Cache Management**:
-  - Automatic expiration based on data age
-  - Cache size limited to 50 entries (LRU-style eviction)
-  - Transparent to components (no code changes needed)
-
-**Benefits:**
-- Instant loading when switching between views
-- Reduced server load
-- Better user experience with faster interactions
-- Works across all views (Dashboard, Calendar, Weather Map, etc.)
-
-#### 3. Cache Layers Flow
-
-```
-User Request
-    ↓
-┌─────────────────┐
-│ Client Cache    │ ← Check first (instant if hit)
-│ (In-Memory)     │
-└────────┬────────┘
-         │ (miss)
-         ↓
-┌─────────────────┐
-│  API Request    │
-└────────┬────────┘
-         ↓
-┌─────────────────┐
-│ Database Cache  │ ← Check before external API
-│ (PostgreSQL)    │
-└────────┬────────┘
-         │ (miss)
-         ↓
-┌─────────────────┐
-│ External API    │ ← Only if needed
-│ (OpenWeatherMap)│
-└─────────────────┘
-```
-
-#### 4. Database Schema for Caching
-
-**`weather_data` table:**
-- Stores current weather snapshots
-- Indexed by location, coordinates, and date
-- Used for current weather (30 min freshness) and historical queries
-
-**`forecasts` table:**
-- Stores forecast data with expiration dates
-- Indexed by location, coordinates, and forecast date
-- Each forecast expires 2 hours after its date passes
-- Supports queries by location name or coordinates
-
-#### 5. Optimization Impact
-
-**Before Optimization:**
-- Every view load → API call
-- Multiple views → Multiple redundant API calls
-- Slow loading times
-- High API usage
-
-**After Optimization:**
-- First load → API call (stored to database)
-- Subsequent loads → Database (fast)
-- View switches → Client cache (instant)
-- ~90% reduction in API calls for typical usage
-
-#### 6. Best Practices
-
-- **Automatic**: No manual cache management needed - system handles everything automatically
-- **Transparent**: All existing code continues to work without changes
-- **Reliable**: Falls back gracefully if cache is unavailable
-- **Fresh**: Data automatically refreshes when cache expires
-
-## 🧪 Testing
-
-Run tests:
-```bash
-composer test
-```
-
-Or with PHPUnit directly:
-```bash
-php artisan test
-```
-
-## 📦 Deployment
-
-### Docker Deployment
-The project includes a Dockerfile for containerized deployment:
-```bash
-docker build -t klema .
-docker run -p 8000:8000 klema
-```
-
-### Railway Deployment
-When deploying to Railway, ensure you configure the following:
-
-#### Database Migrations
-**Important:** After deploying to Railway, you must run database migrations to create all necessary tables (including the `forecasts` table).
-
-**Check Environment Variable First:**
-The entrypoint script (`render/entrypoint.sh`) automatically runs migrations unless `RUN_MIGRATIONS=0` is set. Check your Railway environment variables:
-
-1. Go to Railway Dashboard → Your Service → Variables
-2. Look for `RUN_MIGRATIONS`
-3. If it's set to `0`, either:
-   - **Delete it** (migrations will run by default), OR
-   - **Change it to `1`** to explicitly enable migrations
-
-**Option 1: Enable Auto-Migrations (Recommended)**
-Set the environment variable in Railway:
-```bash
-# In Railway Dashboard → Variables, set:
-RUN_MIGRATIONS=1
-```
-Migrations will run automatically on each deploy.
-
-**Option 2: Railway CLI (One-time)**
-```bash
-# Install Railway CLI if you haven't
-npm i -g @railway/cli
-
-# Login to Railway
-railway login
-
-# Link to your project
-railway link
-
-# Run migrations manually
-railway run php artisan migrate --force
-```
-
-**Option 3: Railway Web Dashboard Shell**
-1. Go to your Railway project dashboard
-2. Navigate to your service
-3. Click on "Deploy" → "Shell" or use the terminal feature
-4. Run: `php artisan migrate --force`
-
-**Note:** The `--force` flag is required when running migrations in production (when `APP_ENV=production`).
-
-#### Email Configuration
-**Important:** Railway blocks direct SMTP connections to external services like Gmail. You must use a cloud email service.
-
-**Note:** All mailer configurations coexist in `config/mail.php` - changing `MAIL_MAILER` only selects which one to use. Your settings remain in the config file.
-
-**Recommended Email Services:**
-1. **SendGrid** (Recommended - Uses Web API, no domain verification required for basic usage)
-   ```env
-   MAIL_MAILER=sendgrid
-   SENDGRID_API_KEY=SG.your_sendgrid_api_key  # Your SendGrid API key (starts with SG.)
-   MAIL_FROM_ADDRESS=noreply@yourdomain.com  # Any email address
-   MAIL_FROM_NAME="KLEMA"
-   ```
-   **Note:** This uses SendGrid's Web API (not SMTP). Get your API key from https://app.sendgrid.com/settings/api_keys
-
-2. **Resend** (Requires domain verification)
-   ```env
-   MAIL_MAILER=resend
-   RESEND_KEY=your_resend_api_key
-   MAIL_FROM_ADDRESS=noreply@yourdomain.com
-   MAIL_FROM_NAME="KLEMA"
-   ```
-
-3. **Postmark**
-   ```env
-   MAIL_MAILER=postmark
-   POSTMARK_TOKEN=your_postmark_token
-   MAIL_FROM_ADDRESS=noreply@yourdomain.com
-   MAIL_FROM_NAME="KLEMA"
-   ```
-
-4. **AWS SES**
-   ```env
-   MAIL_MAILER=ses
-   AWS_ACCESS_KEY_ID=your_access_key
-   AWS_SECRET_ACCESS_KEY=your_secret_key
-   AWS_DEFAULT_REGION=us-east-1
-   MAIL_FROM_ADDRESS=noreply@yourdomain.com
-   MAIL_FROM_NAME="KLEMA"
-   ```
-
-#### Queue Worker Configuration
-Email sending is queued to prevent blocking HTTP requests. Ensure you run a queue worker:
-
-1. **Add a Railway service** for the queue worker
-2. **Set the command** to: `php artisan queue:work --tries=3`
-3. **Or use Railway's built-in process manager** if available
-
-#### Required Environment Variables
-```env
-# Queue (required for email sending)
-QUEUE_CONNECTION=database
-
-# Email timeout (prevents long waits on failures)
-MAIL_TIMEOUT=5
-
-# Application
-APP_URL=https://your-app.railway.app
-APP_ENV=production
-APP_DEBUG=false
-```
-
-### Production Checklist
-- [ ] Set `APP_ENV=production` in `.env`
-- [ ] Set `APP_DEBUG=false` in `.env`
-- [ ] Run `php artisan config:cache`
-- [ ] Run `php artisan route:cache`
-- [ ] Run `php artisan view:cache`
-- [ ] Build frontend assets: `npm run build`
-- [ ] Set up queue worker: `php artisan queue:work`
-- [ ] Configure scheduled tasks (cron)
-- [ ] Set up SSL/TLS certificates
-- [ ] Configure database backups
-
-### Scheduled Tasks
-Add to crontab for production:
-```bash
-* * * * * cd /path-to-project && php artisan schedule:run >> /dev/null 2>&1
-```
-
-## 🌐 Platform Support
-
-### Web
-- Modern browsers (Chrome, Firefox, Safari, Edge)
-- Responsive design for mobile, tablet, and desktop
-- Progressive Web App (PWA) capabilities
-
-### Desktop
-- **Windows**: NSIS installer and portable version
-- **macOS**: DMG and ZIP packages
-- **Linux**: AppImage and DEB packages
-
-### Mobile
-- **Android**: APK builds via Capacitor
-- **iOS**: Native app via Capacitor (requires macOS for building)
-
-## 📝 Configuration
-
-### Key Configuration Files
-- `.env` - Environment variables
-- `config/sanctum.php` - Sanctum authentication settings
-- `config/activities.php` - Activity type definitions
-- `config/farm.php` - Farm-related settings
-- `config/mail.php` - Mail configuration (SendGrid, SMTP, etc.)
-- `config/services.php` - Third-party service credentials (SendGrid, OpenWeather, etc.)
-- `capacitor.config.ts` - Capacitor mobile configuration
-- `vite.config.js` - Frontend build configuration
-
-### Weather Data Caching Configuration
-
-Caching behavior is built-in and optimized by default. Cache durations:
-
-**Backend (Database):**
-- Current weather: 30 minutes freshness
-- Forecasts: Until date passes + 2 hours
-- Historical: Permanent storage
-
-**Frontend (Client-side):**
-- Current weather: 30 minutes
-- Forecasts: 1 hour
-- Historical: 2 hours
-
-Cache durations are optimized for balance between freshness and performance. Adjust in code if needed:
-- Backend: `app/Services/WeatherService.php` (check `getStoredCurrentWeatherBy*` methods)
-- Frontend: `resources/js/composables/useWeatherAPI.js` (check `CACHE_DURATION` constant)
-
-### Environment Variables
-```env
-# Application
-APP_NAME=KLEMA
-APP_ENV=local
-APP_DEBUG=true
-APP_URL=http://localhost:8000
-
-# Database
-DB_CONNECTION=pgsql
-DB_HOST=127.0.0.1
-DB_PORT=5432
-DB_DATABASE=klema
-DB_USERNAME=your_username
-DB_PASSWORD=your_password
-
-# Weather API
-WEATHER_API_KEY=your_api_key_here
-
-# Sanctum
-SANCTUM_STATEFUL_DOMAINS=localhost,127.0.0.1
-SANCTUM_EXPIRATION=120
-SANCTUM_TOKEN_PREFIX=klema_
-
-# Queue (required for email queuing)
-QUEUE_CONNECTION=database
-
-# Email Configuration - SendGrid Web API (Recommended for Railway)
-MAIL_MAILER=sendgrid
-SENDGRID_API_KEY=SG.your_sendgrid_api_key  # Your SendGrid API key (starts with SG.)
-MAIL_FROM_ADDRESS=noreply@yourdomain.com
-MAIL_FROM_NAME="KLEMA"
-
-# Alternative: Resend (requires domain verification)
-# MAIL_MAILER=resend
-# RESEND_KEY=your_resend_api_key
-
-# Alternative: Postmark
-# MAIL_MAILER=postmark
-# POSTMARK_TOKEN=your_postmark_token
-```
-
-## 👥 Target Users
-
-- **Local farmers & smallholder growers** - Primary users for weather monitoring and activity planning
-- **Agricultural cooperatives** - Group management and coordination
-- **Extension officers** - Support and advisory services
-- **LGUs & agricultural agencies** - Regional monitoring and data collection
-- **NGOs & community organizations** - Community-based agricultural support
-
-## ✅ Expected Outcomes
-
-- Farmers gain reliable, map-based dashboards for decision-making
-- Centralized, secure storage of farm & weather data
-- Automated alerts & recommendations to improve resilience against climate risks
-- Accessible across desktop, tablet, and mobile devices
-- Data export capabilities for analysis and reporting
-- Intelligent activity recommendations based on weather conditions
+**Dashboard & Analytics**
+
+- `GET /api/admin/stats` - Get system statistics (admin/farmer dashboard)
+- `GET /api/admin/farmers` - Get farmers with farms (admin dashboard)
+- `POST /api/admin/weather/update` - Manually trigger weather data update
+- `GET /api/admin/users` - List all users (admin)
+- `POST /api/admin/users/{user}/reset-password` - Reset user password (admin)
+- `GET /api/admin/users/{user}/sessions` - Get user sessions (admin)
+- `DELETE /api/admin/users/{user}/sessions` - Revoke user sessions (admin)
+- `GET /api/settings` - Get user settings
+- `PUT /api/settings` - Update user settings
+- `POST /api/settings/reset` - Reset user settings to defaults
+
+**Note:** All API endpoints (except authentication endpoints) require `Authorization: Bearer {token}` header for authentication.
+
+---
+
+**Version 1.2.0** - Last updated: 2025
 
 ## 👩‍💻 Contributors
 
@@ -831,23 +399,3 @@ This project is licensed under the MIT License.
 
 - **Homepage**: https://klema.up.railway.app/app
 - **Author Email**: nahoynikulcallanta@gmail.com
-
----
-
-**Version 1.2.0** - Last updated: 2025
-
-### Changelog
-
-#### Version 1.2.0 (2025)
-- ✨ **Major Performance Improvement**: Implemented database-first weather data caching
-- ✨ Added `forecasts` table for efficient forecast data storage
-- ✨ Client-side caching for instant view loading
-- ✨ Multi-layer caching system (Client → Database → API)
-- ⚡ Significantly reduced external API calls (~90% reduction)
-- ⚡ Faster view loading times
-- 🔧 Automatic cache expiration and management
-- 📚 Comprehensive caching documentation
-
-#### Version 1.1.0 (2025)
-- Initial stable release
-- Core features implemented
