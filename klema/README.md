@@ -552,7 +552,6 @@ Weather data integration is handled through multiple layers:
 - `POST /api/farms/{farm}/points` - Add point of interest to farm
 - `GET /api/farms/{farm}/weather` - Get weather data for farm location
 - `GET /api/map/farms` - Get map data for all user farms
-
 **Farm Map Integration**
 
 The farm map integration endpoints provide:
