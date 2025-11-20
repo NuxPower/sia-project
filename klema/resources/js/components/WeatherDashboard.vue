@@ -559,7 +559,16 @@ const fetchUserInfo = async () => {
       fetchSystemStats();
     }
   } catch (error) {
-    console.warn('Could not fetch user info:', error);
+    // If token is invalid (401), clear auth state and show login
+    if (error.response?.status === 401) {
+      revokeApiToken();
+      currentUser.value = null;
+      isAuthenticated.value = false;
+      applyAuthBodyClass(false);
+      console.warn('Token expired or invalid, please log in again');
+    } else {
+      console.warn('Could not fetch user info:', error);
+    }
   }
 };
 
@@ -1538,7 +1547,36 @@ onMounted(async () => {
     return;
   }
 
-  await bootstrapApp();
+  // Validate token before bootstrapping app
+  // If token is invalid, fetchUserInfo will clear auth state
+  try {
+    await ensureApiToken(window.axios);
+    const response = await window.axios.get('/api/auth/me');
+    if (response.data?.user) {
+      currentUser.value = response.data.user;
+      await bootstrapApp();
+    } else {
+      // No user data, clear auth
+      revokeApiToken();
+      isAuthenticated.value = false;
+      applyAuthBodyClass(false);
+    }
+  } catch (error) {
+    // Token is invalid (401) or other error - clear auth and show login
+    // Note: The axios interceptor will also handle 401, but we handle it here
+    // to prevent unnecessary API calls during bootstrap
+    if (error.response?.status === 401 || !error.response) {
+      revokeApiToken();
+      currentUser.value = null;
+      isAuthenticated.value = false;
+      applyAuthBodyClass(false);
+      console.warn('Token expired or invalid, please log in again');
+    } else {
+      // Other error - still try to bootstrap but log the error
+      console.error('Error validating token:', error);
+      await bootstrapApp();
+    }
+  }
 });
 
 watch([farmFeatures, pointFeatures], () => {

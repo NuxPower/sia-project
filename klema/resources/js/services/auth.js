@@ -27,24 +27,9 @@ export async function ensureApiToken(axiosInstance) {
     return existingToken;
   }
 
-  try {
-    const axiosClient = axiosInstance ?? (await import('axios')).default;
-    await axiosClient.get('/sanctum/csrf-cookie', { withCredentials: true });
-    const { data } = await axiosClient.post('/api/auth/token', {}, {
-      withCredentials: true,
-      headers: {
-        'Accept': 'application/json'
-      }
-    });
-
-    if (data?.token) {
-      setApiToken(data.token);
-      return data.token;
-    }
-  } catch (error) {
-    console.warn('Unable to issue API token', error);
-  }
-
+  // Don't try to get token from /api/auth/token as it requires session auth
+  // This endpoint is only for session-authenticated users to get API tokens
+  // For SPA authentication, users should use /api/auth/login to get tokens directly
   return null;
 }
 
