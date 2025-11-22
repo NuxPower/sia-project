@@ -528,6 +528,120 @@ const emit = defineEmits([
 const farms = computed(() => props.farms ?? []);
 const activities = computed(() => props.activities ?? []);
 
+// Helper function to compute weather warning from forecast data
+const computeWeatherWarning = (weather) => {
+  if (!weather) {
+    return null;
+  }
+
+  const condition = (weather.description || weather.condition || weather.weather?.[0]?.main || '').toLowerCase();
+  const precip = Number(
+    weather.precipitation_sum ??
+    weather.precip_mm ??
+    weather.rain ??
+    weather.daily_precipitation ??
+    0
+  );
+  const wind = Number(weather.wind_max_kmh ?? weather.wind_speed ?? weather.wind ?? 0);
+  const tempMax = Number(weather.temp_max ?? weather.main?.temp_max ?? null);
+  const tempMin = Number(weather.temp_min ?? weather.main?.temp_min ?? null);
+
+  if (condition.includes('storm') || condition.includes('thunder')) {
+    return 'Severe storm conditions likely';
+  }
+
+  if (precip >= 25) {
+    return 'Heavy rainfall expected';
+  }
+
+  // Check for rain in condition (e.g., "slight rain", "light rain", "rain")
+  if (condition.includes('rain') || condition.includes('drizzle')) {
+    return 'Rain likely throughout the day';
+  }
+
+  if (precip >= 5) {
+    return 'Rain likely throughout the day';
+  }
+
+  if (wind >= 50) {
+    return 'Damaging wind gusts possible';
+  }
+
+  if (wind >= 30) {
+    return 'Strong winds could impact field work';
+  }
+
+  if (Number.isFinite(tempMax) && tempMax >= 35) {
+    return 'Extreme heat risk';
+  }
+
+  if (Number.isFinite(tempMin) && tempMin <= 5) {
+    return 'Low temperature / frost risk';
+  }
+
+  return null;
+};
+
+// Helper to format date key for matching
+const formatDateKey = (value) => {
+  if (!value) return '';
+  
+  let date;
+  if (value instanceof Date) {
+    date = value;
+  } else if (typeof value === 'string') {
+    const [datePart] = value.split('T');
+    const parts = datePart.split('-').map((segment) => parseInt(segment, 10));
+    if (parts.length >= 3 && parts.every((part) => !Number.isNaN(part))) {
+      date = new Date(parts[0], parts[1] - 1, parts[2]);
+    } else {
+      date = new Date(value);
+    }
+  } else {
+    return '';
+  }
+
+  if (Number.isNaN(date.getTime())) {
+    return '';
+  }
+
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
+// Enrich activities with current forecast-based weather warnings
+const enrichedActivities = computed(() => {
+  const forecastMap = new Map();
+  
+  // Build a map of forecast data by date
+  if (Array.isArray(props.forecast)) {
+    props.forecast.forEach((day) => {
+      if (day?.date) {
+        forecastMap.set(day.date, day);
+      }
+    });
+  }
+
+  // Enrich each activity with computed weather warning
+  return activities.value.map((activity) => {
+    const activityDateKey = formatDateKey(activity.start_date);
+    const forecastForDate = forecastMap.get(activityDateKey);
+    
+    // Compute warning from current forecast, fall back to stored warning
+    const computedWarning = computeWeatherWarning(forecastForDate);
+    const displayWarning = computedWarning || activity.weather_warning || null;
+
+    return {
+      ...activity,
+      weather_warning: displayWarning,
+      _computedWarning: computedWarning, // Track if warning came from forecast
+      _storedWarning: activity.weather_warning // Track original stored warning
+    };
+  });
+});
+
 // Filter forecast to show only 7 days starting from tomorrow
 const futureForecast = computed(() => {
   if (!Array.isArray(props.forecast) || props.forecast.length === 0) {
@@ -641,7 +755,7 @@ const formatActivityDate = (value) => {
 };
 
 const sortedActivities = computed(() => {
-  return [...activities.value].sort((a, b) => {
+  return [...enrichedActivities.value].sort((a, b) => {
     const aDate = toDateOnly(a?.start_date)?.getTime() ?? 0;
     const bDate = toDateOnly(b?.start_date)?.getTime() ?? 0;
     return aDate - bDate;
