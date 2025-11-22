@@ -10,7 +10,7 @@ const getNasaTrueColorDate = (daysAgo = 2) => {
   return date.toISOString().split('T')[0];
 };
 
-export function createMapLayers(L) {
+function createMapLayers(L) {
   if (!L) {
     throw new Error('Leaflet instance is required before creating map layers.');
   }
@@ -93,3 +93,5 @@ export function createMapLayers(L) {
   
   return { baseLayers, overlayLayers };
 }
+
+export { createMapLayers };

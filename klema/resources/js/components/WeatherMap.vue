@@ -1,11 +1,19 @@
 <template>
   <div class="weather-map-container">
-    <div ref="mapContainer" class="map"></div>
+    <div ref="mapContainer" class="map" :class="{ 'hidden': activeBaseLayer === 'windy' }"></div>
+    <iframe
+      v-if="activeBaseLayer === 'windy'"
+      ref="windyIframe"
+      class="windy-embed"
+      :src="windyEmbedUrl"
+      frameborder="0"
+      allowfullscreen
+    ></iframe>
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted, nextTick } from 'vue';
+import { ref, computed, onMounted, nextTick, watch } from 'vue';
 import { initLeafletIcons } from '../utils/leafletConfig';
 import { createMapLayers } from '../utils/mapLayers';
 import { applyMapStyles } from '../utils/mapStyles';
@@ -27,6 +35,8 @@ const boundaryDrawing = ref(null);
 const pointPlacement = ref(null);
 const activeBaseLayer = ref(null);
 const requestedBaseLayer = ref('street');
+const windyIframe = ref(null);
+const currentMapView = ref({ lat: 7.5, lon: 124.5, zoom: 7 });
 
 const { formatTemperature, formatWindSpeed } = useDisplaySettings();
 
@@ -55,8 +65,14 @@ const ensureLeaflet = async () => {
 const baseLayerMap = {
   street: '🗺️ Street Map',
   satellite: '🛰️ Satellite View',
-  nasa: '🌍 NASA True Color'
+  nasa: '🌍 NASA True Color',
+  windy: '🌬️ Windy.com'
 };
+
+const windyEmbedUrl = computed(() => {
+  const { lat, lon, zoom } = currentMapView.value;
+  return `https://embed.windy.com/embed2.html?lat=${lat}&lon=${lon}&zoom=${zoom}&level=surface&overlay=wind&menu=&message=&marker=&calendar=&pressure=&type=map&location=coordinates&detail=&detailLat=&detailLon=&metricWind=default&metricTemp=default&radarRange=-1`;
+});
 
 const clampLatitude = (value) => {
   if (!Number.isFinite(value)) {
@@ -74,11 +90,29 @@ const wrapLongitude = (value) => {
 };
 
 const applyBaseLayer = (layerId) => {
+  const targetKey = baseLayerMap[layerId] ? layerId : 'street';
+  
+  // Handle Windy.com embed separately
+  if (targetKey === 'windy') {
+    activeBaseLayer.value = 'windy';
+    // Update Windy iframe URL with current map view if map exists
+    if (map.value) {
+      const center = map.value.getCenter();
+      const zoom = map.value.getZoom();
+      currentMapView.value = {
+        lat: center.lat,
+        lon: center.lng,
+        zoom: zoom
+      };
+    }
+    return;
+  }
+
+  // For other base layers, use normal tile layer switching
   if (!map.value || !baseMapLayers.value) {
     return;
   }
 
-  const targetKey = baseLayerMap[layerId] ? layerId : 'street';
   const layerName = baseLayerMap[targetKey];
   const targetLayer = baseMapLayers.value[layerName];
 
@@ -124,6 +158,9 @@ const initMap = async () => {
     zoomControl: false,
     attributionControl: true
   }).setView([7.5, 124.5], 7);
+  
+  // Initialize current map view
+  currentMapView.value = { lat: 7.5, lon: 124.5, zoom: 7 };
 
   L.control.zoom({
     position: 'bottomright'
@@ -181,6 +218,10 @@ const toggleWeatherLayer = (layerId, active) => {
 const moveToLocation = (lat, lon, zoom = 10) => {
   if (map.value) {
     map.value.setView([lat, lon], zoom, { animate: false });
+    currentMapView.value = { lat, lon, zoom };
+  } else {
+    // Update view even if map isn't ready yet (for Windy iframe)
+    currentMapView.value = { lat, lon, zoom };
   }
 };
 
@@ -477,6 +518,21 @@ onMounted(async () => {
   await ensureLeaflet();
   await new Promise(resolve => setTimeout(resolve, 500));
   await initMap();
+  
+  // Watch for map view changes to sync with Windy iframe
+  if (map.value) {
+    map.value.on('moveend', () => {
+      if (activeBaseLayer.value === 'windy' && map.value) {
+        const center = map.value.getCenter();
+        const zoom = map.value.getZoom();
+        currentMapView.value = {
+          lat: center.lat,
+          lon: center.lng,
+          zoom: zoom
+        };
+      }
+    });
+  }
 });
 
 defineExpose({
@@ -512,6 +568,25 @@ defineExpose({
   top: 0;
   left: 0;
   z-index: 1;
+  background: #2c3e50;
+  transition: opacity 0.3s ease;
+}
+
+.map.hidden {
+  opacity: 0;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.windy-embed {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  min-height: 100vh;
+  z-index: 2;
+  border: none;
   background: #2c3e50;
 }
 </style>

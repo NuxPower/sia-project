@@ -98,7 +98,8 @@ const isMobileLayout = ref(false);
 const baseLayers = ref([
   { id: 'street', name: 'Street Map', icon: '🗺️', description: 'OpenStreetMap Standard' },
   { id: 'satellite', name: 'Satellite (ArcGIS)', icon: '🛰️', description: 'Esri World Imagery' },
-  { id: 'nasa', name: 'NASA True Color', icon: '🌍', description: 'Daily VIIRS composite' }
+  { id: 'nasa', name: 'NASA True Color', icon: '🌍', description: 'Daily VIIRS composite' },
+  { id: 'windy', name: 'Windy.com', icon: '🌬️', description: 'Windy.com Weather Map' }
 ]);
 
 const layers = ref([
