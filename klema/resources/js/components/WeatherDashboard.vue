@@ -246,7 +246,7 @@ const getDefaultLocation = () => {
   return Promise.resolve(DEFAULT_LOCATION_STRING);
 };
 const INITIAL_HISTORY_DAYS = 3; // 3 days before today
-const INITIAL_FORECAST_DAYS = 3; // 3 days after today (total: 7 days including today)
+const INITIAL_FORECAST_DAYS = 7; // 7 days after today (API max is 5 days, so we'll get 4-5 future days)
 const MAX_HISTORY_WINDOW = 90; // Increased from 30 to 90 days
 const MAX_FORECAST_WINDOW = 16;
 const searchLocation = ref(DEFAULT_LOCATION_STRING);
@@ -531,7 +531,8 @@ watch(
       // Use requestIdleCallback or setTimeout to defer non-critical operations
       const loadDashboardData = () => {
         ensureDashboardActivitiesLoaded();
-        // Fetch system stats only when dashboard is shown
+        // Fetch system stats when dashboard is shown - force refresh to get latest data
+        fetchSystemStats(true); // Force refresh to get updated stats
         if (!systemStats.value) {
           fetchUserInfo();
         }
@@ -573,18 +574,35 @@ const fetchUserInfo = async () => {
 };
 
 // Separate system stats fetch for better performance
-const fetchSystemStats = async () => {
-  if (systemStats.value) return; // Already loaded
+const fetchSystemStats = async (forceRefresh = false, temperatureDays = null) => {
+  // Always fetch if forcing refresh or temperature filter is specified
+  if (!forceRefresh && temperatureDays === null && systemStats.value) {
+    // Skip if already loaded and no filter/refresh requested
+    return;
+  }
   
   try {
     await ensureApiToken(axios);
-    const statsResponse = await axios.get('/api/admin/stats');
+    // Add timestamp to prevent caching and include temperature period
+    const params = {};
+    if (forceRefresh || temperatureDays !== null) {
+      params._t = Date.now(); // Force refresh when filter changes
+    }
+    if (temperatureDays !== null) {
+      params.temperature_days = temperatureDays;
+    }
+    const statsResponse = await axios.get('/api/admin/stats', { params });
     if (statsResponse.data?.success && statsResponse.data?.stats) {
       systemStats.value = statsResponse.data.stats;
     }
   } catch (err) {
     console.warn('Could not fetch system stats:', err);
   }
+};
+
+// Handler for refreshing system stats with temperature filter
+const handleRefreshSystemStats = (temperatureDays) => {
+  fetchSystemStats(true, temperatureDays);
 };
 
 const handleLoginSuccess = async (user) => {
@@ -657,7 +675,7 @@ const overlayViewConfig = computed(() => {
         component: DashboardView,
         props: {
           currentWeather: currentWeather.value,
-          forecast: forecast.value,
+          forecast: fullForecastTimeline.value,
           getDayLabel,
           getWeatherIcon,
           farms: rawFarms.value,
@@ -685,7 +703,9 @@ const overlayViewConfig = computed(() => {
           onChangeActivityStatus: handleActivityStatusChange,
           onDeleteActivity: handleActivityDelete
         },
-        listeners: {}
+        listeners: {
+          'refresh-system-stats': handleRefreshSystemStats
+        }
       };
     case 'calendar':
       return {

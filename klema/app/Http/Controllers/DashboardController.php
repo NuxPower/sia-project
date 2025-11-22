@@ -58,8 +58,9 @@ class DashboardController extends Controller
         // Weather statistics removed - now using API directly
         $weatherStats = null;
         
-        // Get system-wide statistics (without weather data)
-        $systemStats = $this->getSystemStatistics();
+        // Get system-wide statistics (without weather data) - filtered for current user's farms
+        $temperatureDays = $request->get('temperature_days', null); // Default to all time
+        $systemStats = $this->getSystemStatistics($user, $temperatureDays);
 
         return view('dashboard', compact(
             'currentWeather', 
@@ -129,18 +130,69 @@ class DashboardController extends Controller
 
     /**
      * Get system-wide statistics for admin dashboard.
+     * If user is provided, filters to only show data for that user's farms.
+     * 
+     * @param User|null $user The user to filter stats for
+     * @param int|null $temperatureDays Number of days to use for average temperature (null = all time)
      */
-    private function getSystemStatistics()
+    private function getSystemStatistics($user = null, $temperatureDays = null)
     {
-        $totalFarms = Farm::count();
-        $totalUsers = User::count();
-        $totalAlerts = Alert::where('resolved', false)->count();
-        $totalActivities = Activity::where('start_date', '>=', Carbon::now()->subDays(30))->count();
-        
-        // Weather data statistics
-        $weatherDataPoints = WeatherData::count();
-        $avgTemperature = WeatherData::whereNotNull('temperature')
-            ->avg('temperature');
+        if ($user) {
+            // Filter by user's farms only
+            $userFarmIds = Farm::where('user_id', $user->id)->pluck('farm_id');
+            
+            $totalFarms = Farm::where('user_id', $user->id)->count();
+            $totalUsers = User::count();
+            $totalAlerts = Alert::where('resolved', false)
+                ->whereHas('farm', function($query) use ($user) {
+                    $query->where('user_id', $user->id);
+                })
+                ->count();
+            $totalActivities = Activity::where('user_id', $user->id)
+                ->where('start_date', '>=', Carbon::now()->subDays(30))
+                ->count();
+            
+            // Weather data statistics - only count data for user's farms, exclude null farm_id
+            if ($userFarmIds->isEmpty()) {
+                // User has no farms, so no weather data points
+                $weatherDataPoints = 0;
+                $avgTemperature = null;
+            } else {
+                $weatherDataPoints = WeatherData::whereIn('farm_id', $userFarmIds->toArray())
+                    ->whereNotNull('farm_id')
+                    ->count();
+                
+                // Average temperature with optional time filter
+                $tempQuery = WeatherData::whereIn('farm_id', $userFarmIds->toArray())
+                    ->whereNotNull('farm_id')
+                    ->whereNotNull('temperature');
+                
+                if ($temperatureDays !== null && $temperatureDays > 0) {
+                    $tempQuery->where('recorded_at', '>=', Carbon::now()->subDays($temperatureDays));
+                }
+                
+                $avgTemperature = $tempQuery->avg('temperature');
+            }
+        } else {
+            // System-wide statistics (no user filter)
+            $totalFarms = Farm::count();
+            $totalUsers = User::count();
+            $totalAlerts = Alert::where('resolved', false)->count();
+            $totalActivities = Activity::where('start_date', '>=', Carbon::now()->subDays(30))->count();
+            
+            // Weather data statistics - exclude null farm_id
+            $weatherDataPoints = WeatherData::whereNotNull('farm_id')->count();
+            
+            // Average temperature with optional time filter
+            $tempQuery = WeatherData::whereNotNull('farm_id')
+                ->whereNotNull('temperature');
+            
+            if ($temperatureDays !== null && $temperatureDays > 0) {
+                $tempQuery->where('recorded_at', '>=', Carbon::now()->subDays($temperatureDays));
+            }
+            
+            $avgTemperature = $tempQuery->avg('temperature');
+        }
         
         return [
             'total_farms' => $totalFarms,
@@ -149,15 +201,26 @@ class DashboardController extends Controller
             'recent_activities' => $totalActivities,
             'weather_data_points' => $weatherDataPoints,
             'avg_temperature' => $avgTemperature ? round($avgTemperature, 2) : null,
+            'avg_temperature_days' => $temperatureDays, // Include the filter period used
         ];
     }
 
     /**
      * API endpoint to get system statistics.
+     * Filters by authenticated user's farms if user is logged in.
+     * 
+     * Query parameters:
+     * - temperature_days: Number of days to include in average temperature calculation (null = all time)
      */
     public function getSystemStats(Request $request)
     {
-        $stats = $this->getSystemStatistics();
+        $user = auth()->user();
+        $temperatureDays = $request->get('temperature_days', null); // Default to all time
+        // Validate and limit temperature_days to reasonable values
+        if ($temperatureDays !== null) {
+            $temperatureDays = max(1, min((int) $temperatureDays, 365)); // Between 1 and 365 days
+        }
+        $stats = $this->getSystemStatistics($user, $temperatureDays);
 
         return response()->json([
             'success' => true,

@@ -122,11 +122,43 @@ class WeatherService
         $cacheKey = "weather_forecast_{$location}_{$days}";
         
         return Cache::remember($cacheKey, 3600, function () use ($location, $locationName, $days) {
+            // First, get coordinates for the location (needed for One Call API)
+            $geoData = $this->geocodeLocation($location);
+            
+            if ($geoData && isset($geoData['lat'], $geoData['lon'])) {
+                $lat = $geoData['lat'];
+                $lon = $geoData['lon'];
+                
+                // Try One Call API 3.0 for 7+ days (supports up to 8 days)
+                if ($days > 5) {
+                    try {
+                        $oneCallData = $this->getForecastFromOneCall($lat, $lon, $days);
+                        if (!empty($oneCallData)) {
+                            // Store and return One Call data
+                            $farm = $this->findFarmByCoordinates($lat, $lon);
+                            if ($farm) {
+                                StoreForecastJob::dispatch($oneCallData, $locationName, $lat, $lon, $farm->farm_id);
+                            }
+                            return $oneCallData;
+                        }
+                    } catch (\Exception $e) {
+                        \Log::warning('One Call API failed, falling back to /forecast', [
+                            'location' => $location,
+                            'error' => $e->getMessage(),
+                        ]);
+                        // Fall through to regular /forecast endpoint
+                    }
+                }
+            }
+            
+            // Fallback to regular /forecast endpoint (supports up to 5 days)
+            $maxForecasts = min($days * 8, 40); // Cap at 40 (API limit)
+            
             $response = Http::weather()->get("{$this->baseUrl}/forecast", [
                 'q' => $location,
                 'appid' => $this->apiKey,
                 'units' => 'metric',
-                'cnt' => $days * 8 // 8 forecasts per day (3-hour intervals)
+                'cnt' => $maxForecasts // 8 forecasts per day (3-hour intervals)
             ]);
 
             if (!$response->successful()) {
@@ -194,12 +226,37 @@ class WeatherService
         $cacheKey = "weather_forecast_coords_{$lat}_{$lon}_{$days}";
         
         return Cache::remember($cacheKey, 3600, function () use ($lat, $lon, $days) {
+            // Try One Call API 3.0 for 7+ days (supports up to 8 days)
+            if ($days > 5) {
+                try {
+                    $oneCallData = $this->getForecastFromOneCall($lat, $lon, $days);
+                    if (!empty($oneCallData)) {
+                        // Store and return One Call data
+                        $farm = $this->findFarmByCoordinates($lat, $lon);
+                        if ($farm) {
+                            StoreForecastJob::dispatch($oneCallData, null, $lat, $lon, $farm->farm_id);
+                        }
+                        return $oneCallData;
+                    }
+                } catch (\Exception $e) {
+                    \Log::warning('One Call API failed, falling back to /forecast', [
+                        'lat' => $lat,
+                        'lon' => $lon,
+                        'error' => $e->getMessage(),
+                    ]);
+                    // Fall through to regular /forecast endpoint
+                }
+            }
+            
+            // Fallback to regular /forecast endpoint (supports up to 5 days)
+            $maxForecasts = min($days * 8, 40); // Cap at 40 (API limit)
+            
             $response = Http::weather()->get("{$this->baseUrl}/forecast", [
                 'lat' => $lat,
                 'lon' => $lon,
                 'appid' => $this->apiKey,
                 'units' => 'metric',
-                'cnt' => $days * 8 // 8 forecasts per day (3-hour intervals)
+                'cnt' => $maxForecasts // 8 forecasts per day (3-hour intervals)
             ]);
 
             if (!$response->successful()) {
@@ -865,6 +922,101 @@ class WeatherService
             'precip_probability' => $precipProbability,
             'hourly' => $hourlyData,
         ];
+    }
+
+    /**
+     * Fetch forecast from OpenWeather One Call API 3.0
+     * Supports up to 8 days of daily forecasts
+     */
+    private function getForecastFromOneCall(float $lat, float $lon, int $days = 7): array
+    {
+        $oneCallBaseUrl = 'https://api.openweathermap.org/data/3.0/onecall';
+        $requestDays = min($days, 8); // One Call API supports up to 8 days
+        
+        $response = Http::weather()->get($oneCallBaseUrl, [
+            'lat' => $lat,
+            'lon' => $lon,
+            'appid' => $this->apiKey,
+            'units' => 'metric',
+            'exclude' => 'minutely,hourly,alerts', // Only get daily forecast
+        ]);
+
+        if (!$response->successful()) {
+            $errorData = $response->json();
+            $errorMessage = data_get($errorData, 'message', 'HTTP ' . $response->status());
+            \Log::warning('One Call API request failed', [
+                'status' => $response->status(),
+                'lat' => $lat,
+                'lon' => $lon,
+                'error' => $errorData,
+            ]);
+            throw new \RuntimeException('One Call API failed: ' . $errorMessage);
+        }
+
+        $data = $response->json();
+        
+        // Validate response structure
+        if (!isset($data['daily']) || !is_array($data['daily'])) {
+            \Log::warning('One Call API invalid response structure', [
+                'lat' => $lat,
+                'lon' => $lon,
+                'response' => $data,
+            ]);
+            throw new \RuntimeException('One Call API invalid response structure');
+        }
+
+        $timezoneOffset = data_get($data, 'timezone_offset', 0);
+        $dailyData = $data['daily'];
+        
+        // Process daily forecast data
+        $processedData = [];
+        $limit = min(count($dailyData), $requestDays);
+        
+        for ($i = 0; $i < $limit; $i++) {
+            $dayData = $dailyData[$i];
+            if (!isset($dayData['dt'])) {
+                continue;
+            }
+            
+            $timestamp = $dayData['dt'];
+            $date = Carbon::createFromTimestamp($timestamp, 'UTC')
+                ->addSeconds($timezoneOffset)
+                ->format('Y-m-d');
+            
+            $temp = $dayData['temp'] ?? [];
+            $tempMax = isset($temp['max']) ? round((float) $temp['max'], 1) : null;
+            $tempMin = isset($temp['min']) ? round((float) $temp['min'], 1) : null;
+            
+            $weather = $dayData['weather'][0] ?? null;
+            $condition = $weather['main'] ?? null;
+            $icon = $weather['icon'] ?? null;
+            $description = $weather['description'] ?? null;
+            
+            $sunrise = isset($dayData['sunrise']) ? (int) $dayData['sunrise'] : null;
+            $sunset = isset($dayData['sunset']) ? (int) $dayData['sunset'] : null;
+            $precipProbability = isset($dayData['pop']) ? (float) $dayData['pop'] : null; // Already a decimal 0-1
+            
+            // Hourly data is excluded from One Call API request for performance
+            // Set to empty array - can be populated later if needed
+            $hourly = [];
+            
+            $processedData[] = [
+                'date' => $date,
+                'day' => Carbon::parse($date)->format('l'),
+                'temp_max' => $tempMax,
+                'temp_min' => $tempMin,
+                'condition' => $condition,
+                'icon' => $icon,
+                'description' => $description,
+                'precip_probability' => $precipProbability,
+                'sunrise' => $sunrise,
+                'sunset' => $sunset,
+                'hourly' => $hourly,
+                'timezone_offset' => $timezoneOffset,
+            ];
+        }
+        
+        return $processedData;
     }
 
     private function processForecastData($data, int $days = 7)
