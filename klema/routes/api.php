@@ -53,8 +53,10 @@ Route::middleware(['auth:sanctum', 'verified'])
     // Alert endpoints
     Route::get('/alerts/active', [AlertApiController::class, 'active']);
     Route::get('/alerts/forecast-warnings', [AlertApiController::class, 'forecastWarnings']);
-    Route::patch('/alerts/{alert}/resolve', [AlertApiController::class, 'resolve'])->whereNumber('alert');
-    Route::apiResource('alerts', AlertApiController::class)->whereNumber('alert');
+    Route::patch('/alerts/{alert:alert_id}/resolve', [AlertApiController::class, 'resolve']);
+    Route::apiResource('alerts', AlertApiController::class)->parameters([
+        'alerts' => 'alert:alert_id'
+    ]);
 
     // Activity endpoints
     Route::get('/activities/meta', [ActivityApiController::class, 'meta']);

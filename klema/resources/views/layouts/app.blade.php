@@ -46,6 +46,18 @@
             display: none;
         }
 
+        body.map-only-mode .navbar {
+            display: none;
+        }
+
+        body.map-only-mode .sidebar-toggle {
+            display: none;
+        }
+
+        body.map-only-mode .logout-button {
+            display: none;
+        }
+
         /* Sidebar Container */
         .navbar {
             position: fixed;

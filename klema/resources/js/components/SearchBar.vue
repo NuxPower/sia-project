@@ -1,5 +1,12 @@
 <template>
   <div class="search-bar">
+    <button 
+      class="toggle-map-view-button"
+      @click="toggleMapOnly"
+      :title="isMapOnly ? 'Show all components' : 'Hide components (map only)'"
+    >
+      <i :class="isMapOnly ? 'fas fa-eye' : 'fas fa-eye-slash'"></i>
+    </button>
     <div class="search-container">
       <i class="fas fa-search search-icon"></i>
       <input
@@ -19,15 +26,28 @@ import { computed } from 'vue';
 
 const props = defineProps({
   modelValue: String,
-  isLoading: Boolean
+  isLoading: Boolean,
+  mapOnly: {
+    type: Boolean,
+    default: false
+  }
 });
 
-const emit = defineEmits(['update:modelValue', 'search']);
+const emit = defineEmits(['update:modelValue', 'search', 'update:mapOnly']);
+
+const isMapOnly = computed({
+  get: () => props.mapOnly,
+  set: (value) => emit('update:mapOnly', value)
+});
 
 const localValue = computed({
   get: () => props.modelValue,
   set: (value) => emit('update:modelValue', value)
 });
+
+const toggleMapOnly = () => {
+  isMapOnly.value = !isMapOnly.value;
+};
 </script>
 
 <style scoped>
@@ -38,6 +58,39 @@ const localValue = computed({
   left: auto;
   z-index: 1000;
   max-width: 420px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.toggle-map-view-button {
+  background: rgba(0, 0, 0, 0.7);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 12px;
+  padding: 12px 14px;
+  color: white;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.3s ease;
+  min-width: 44px;
+  height: 44px;
+  backdrop-filter: blur(10px);
+}
+
+.toggle-map-view-button:hover {
+  background: rgba(0, 0, 0, 0.85);
+  border-color: rgba(59, 130, 246, 0.5);
+  transform: translateY(-1px);
+}
+
+.toggle-map-view-button:active {
+  transform: translateY(0);
+}
+
+.toggle-map-view-button i {
+  font-size: 16px;
 }
 
 .search-container {
@@ -49,6 +102,7 @@ const localValue = computed({
   color: white;
   min-width: 300px;
   width: 100%;
+  backdrop-filter: blur(10px);
 }
 
 .search-icon {
@@ -80,11 +134,19 @@ const localValue = computed({
     left: 16px;
     right: 16px;
     max-width: none;
+    flex-wrap: wrap;
+  }
+
+  .toggle-map-view-button {
+    min-width: 40px;
+    height: 40px;
+    padding: 10px 12px;
   }
 
   .search-container {
     padding: 12px 14px;
     min-width: 0;
+    flex: 1;
   }
 }
 </style>

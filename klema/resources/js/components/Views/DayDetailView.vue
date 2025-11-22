@@ -880,22 +880,47 @@ const precipitationTooltip = (hour) => {
 
 .precip-chart {
   display: grid;
-  grid-template-columns: repeat(var(--precip-columns, 1), minmax(clamp(18px, calc(100% / var(--precip-columns, 1)), 60px), 1fr));
+  grid-template-columns: repeat(var(--precip-columns, 1), minmax(clamp(55px, calc(100% / var(--precip-columns, 1)), 60px), 1fr));
   align-items: end;
-  gap: clamp(4px, 0.8vw, 10px);
-  padding: 12px 4px 0;
+  gap: clamp(8px, 1.5vw, 12px);
+  padding: 12px 8px 4px;
   min-height: 160px;
   width: 100%;
   overflow-x: auto;
   scroll-snap-type: x proximity;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(59, 130, 246, 0.4) rgba(15, 23, 42, 0.6);
+}
+
+.precip-chart::-webkit-scrollbar {
+  height: 10px;
+}
+
+.precip-chart::-webkit-scrollbar-track {
+  background: rgba(15, 23, 42, 0.6);
+  border-radius: 6px;
+  margin: 8px 4px;
+}
+
+.precip-chart::-webkit-scrollbar-thumb {
+  background: linear-gradient(90deg, rgba(59, 130, 246, 0.5), rgba(96, 165, 250, 0.4));
+  border-radius: 6px;
+  border: 1px solid rgba(59, 130, 246, 0.3);
+  transition: background 0.3s ease;
+}
+
+.precip-chart::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(90deg, rgba(59, 130, 246, 0.7), rgba(96, 165, 250, 0.6));
+  border-color: rgba(59, 130, 246, 0.5);
 }
 
 .precip-hour {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 6px;
-  min-width: 0;
+  gap: 8px;
+  min-width: 55px;
   scroll-snap-align: start;
 }
 
@@ -919,13 +944,15 @@ const precipitationTooltip = (hour) => {
 }
 
 .precip-label {
-  font-size: 9px;
+  font-size: 10px;
   color: #d1d5db;
   white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  overflow: visible;
+  text-overflow: clip;
   width: 100%;
   text-align: center;
+  line-height: 1.3;
+  min-height: 14px;
 }
 
 .temperature-table-wrapper {
@@ -1066,6 +1093,28 @@ const precipitationTooltip = (hour) => {
     flex-direction: column;
   }
 
+  .precip-chart {
+    grid-template-columns: repeat(var(--precip-columns, 1), minmax(70px, 1fr));
+    gap: 12px;
+    padding: 12px 8px 8px;
+  }
+
+  .precip-hour {
+    min-width: 70px;
+    gap: 10px;
+  }
+
+  .precip-label {
+    font-size: 11px;
+    min-height: 16px;
+    padding: 2px 0;
+  }
+
+  .bar-wrapper {
+    max-width: 28px;
+    height: 100px;
+  }
+
   .temperature-table-wrapper {
     margin: 0 -1rem;
     padding: 0 1rem;
@@ -1102,6 +1151,23 @@ const precipitationTooltip = (hour) => {
     flex-direction: column;
   }
 
+  .precip-chart {
+    grid-template-columns: repeat(var(--precip-columns, 1), minmax(65px, 1fr));
+    gap: 10px;
+  }
+
+  .precip-hour {
+    min-width: 65px;
+  }
+
+  .precip-label {
+    font-size: 10.5px;
+  }
+
+  .bar-wrapper {
+    max-width: 24px;
+  }
+
   .summary-card {
     padding: 0.875rem;
     flex: 0 0 230px;
@@ -1134,6 +1200,14 @@ const precipitationTooltip = (hour) => {
 
   .detail-content {
     padding: 1.5rem;
+  }
+
+  .precip-chart {
+    gap: 10px;
+  }
+
+  .precip-label {
+    font-size: 10px;
   }
 }
 

@@ -3,14 +3,15 @@
     <SearchBar 
       v-if="activeView === 'map' && !selectedDayDetail && !isDrawingBoundary"
       v-model="searchLocation"
+      v-model:mapOnly="isMapOnly"
       @search="searchWeather"
       :is-loading="isLoadingWeather"
     />
     
-    <ClickInstruction v-if="activeView === 'map' && !selectedDayDetail && !isDrawingBoundary" />
+    <ClickInstruction v-if="activeView === 'map' && !selectedDayDetail && !isDrawingBoundary && !isMapOnly" />
     
     <WeatherLayerControls 
-      v-if="activeView === 'map' && !selectedDayDetail && !isDrawingBoundary"
+      v-if="activeView === 'map' && !selectedDayDetail && !isDrawingBoundary && !isMapOnly"
       @toggle-layer="handleLayerToggle"
       @change-base-layer="handleBaseLayerChange" 
     />
@@ -80,14 +81,14 @@
     </div>
     
     <WeatherTimeline
-      v-if="activeView === 'map' && !selectedDayDetail && !isDrawingBoundary"
+      v-if="activeView === 'map' && !selectedDayDetail && !isDrawingBoundary && !isMapOnly"
       :forecast="forecastTimeline"
       :get-day-label="getDayLabel"
       :get-weather-icon="getWeatherIcon"
       @day-selected="handleTimelineSelection"
     />
     
-    <TimelineLegend v-if="activeView === 'map' && !selectedDayDetail && !isDrawingBoundary" />
+    <TimelineLegend v-if="activeView === 'map' && !selectedDayDetail && !isDrawingBoundary && !isMapOnly" />
 
     <transition name="overlay-fade" v-if="!isMobileLayout">
       <div
@@ -217,6 +218,13 @@ const toggleDrawingModeClass = (isActive) => {
   document.body.classList.toggle('drawing-boundary-mode', !!isActive);
 };
 
+const toggleMapOnlyClass = (isActive) => {
+  if (typeof document === 'undefined') {
+    return;
+  }
+  document.body.classList.toggle('map-only-mode', !!isActive);
+};
+
 const applyAuthBodyClass = (authState) => {
   if (typeof document === 'undefined') {
     return;
@@ -256,6 +264,7 @@ const currentWeather = ref(null);
 const mapLoading = ref(true);
 const isLoadingWeather = ref(false);
 const activeView = ref('map');
+const isMapOnly = ref(false);
 const boundarySession = ref(null);
 const pointSession = ref(null);
 const isDrawingBoundary = computed(() => !!boundarySession.value);
@@ -1077,6 +1086,14 @@ watch(
   { immediate: true }
 );
 
+watch(
+  isMapOnly,
+  (isActive) => {
+    toggleMapOnlyClass(isActive);
+  },
+  { immediate: true }
+);
+
 watch(activeView, (view) => {
   if (view !== 'calendar') {
     calendarDetail.value = null;
@@ -1536,6 +1553,7 @@ onBeforeUnmount(() => {
   }
   applyAuthBodyClass(true);
   toggleDrawingModeClass(false);
+  toggleMapOnlyClass(false);
 });
 
 const getMobilePanelTitle = () => {

@@ -458,6 +458,98 @@ Service classes encapsulate business logic and external integrations:
 - **ActivityAdvisor**: Provides intelligent recommendations for farming activities based on weather forecasts
 - **AlertAutomationService**: Automatically scans farms and creates alerts based on weather conditions
 
+### Alert System
+
+**Automatic Alert Generation**
+
+The system implements an automated alert generation service (`AlertAutomationService`) that runs hourly via Laravel's task scheduler. The service:
+
+- **Scans all farms** with valid coordinates
+- **Fetches weather forecasts** for each farm location (7-day forecast)
+- **Analyzes forecast data** to detect weather scenarios
+- **Creates alerts automatically** when conditions meet thresholds
+- **Prevents duplicates** using automation keys (18-hour window)
+
+**Alert Scenarios and Thresholds**
+
+The automation service detects the following scenarios:
+
+1. **Weather Alerts**:
+   - **High Heat**: Temperature ≥34°C
+   - **Cold Snap**: Temperature ≤8°C
+
+2. **Irrigation Alerts**:
+   - **Dry Spell**: 3+ consecutive days with <1.5mm precipitation and no rain conditions
+
+3. **Harvest Alerts**:
+   - **Harvest Window**: 2+ consecutive days with:
+     - Precipitation <2mm
+     - Wind speed ≤30 km/h
+     - No rain conditions
+     - Temperature between 18°C and 32°C
+
+4. **Maintenance Alerts**:
+   - **Severe Wind**: Wind speed ≥45 km/h
+   - **Heavy Rain**: Precipitation ≥30mm
+   - **Storms**: Thunderstorm activity forecast
+
+**Manual Alert Creation**
+
+Users can manually create alerts through the Alerts view interface:
+
+- Click "New Alert" button
+- Select farm from dropdown
+- Choose alert type (weather, irrigation, harvest, maintenance)
+- Enter alert message (max 500 characters)
+- Alert is immediately saved and displayed
+
+**Alert Management**
+
+The alert system provides full CRUD functionality:
+
+- **View Active Alerts**: Shows all unresolved alerts for user's farms
+- **Resolve Alerts**: Mark alerts as resolved (checkmark button)
+- **Delete Alerts**: Remove alerts permanently (trash button)
+- **Automatic Refresh**: Alert list refreshes after create/resolve/delete operations
+- **Forecast Warnings**: Displays weather-based warnings based on forecast data and user preferences
+
+**Command-Line Interface**
+
+The alert automation service can be run manually via Artisan command:
+
+```bash
+php artisan alerts:auto-generate
+```
+
+This command will:
+- Scan all farms with coordinates
+- Generate alerts based on current forecast conditions
+- Display summary of farms scanned and alerts created
+- Show helpful feedback if no alerts were created (explaining why)
+
+**Alert Data Structure**
+
+Alerts are stored in the `alerts` table with the following key fields:
+
+- `alert_id`: Primary key
+- `farm_id`: Foreign key to farms table
+- `alert_type`: Type of alert (weather, irrigation, harvest, maintenance)
+- `message`: Alert description
+- `issued_at`: Timestamp when alert was created
+- `resolved`: Boolean flag for alert status
+- `is_system_generated`: Boolean flag indicating automated vs manual creation
+- `automation_key`: Unique signature for duplicate detection
+
+**Frontend Integration**
+
+The alert system is fully integrated into the Vue.js frontend:
+
+- **AlertsView Component**: Main view for displaying and managing alerts
+- **CreateAlertModal Component**: Modal dialog for creating new alerts
+- **Reactive Updates**: Alert list updates automatically after operations
+- **Notification Preferences**: User-configurable settings for forecast warnings
+- **Forecast Warnings**: Real-time weather warnings filtered by user preferences
+
 **Policies and Middleware (Security and Access Control)**
 
 The system implements security through policies and middleware:
@@ -585,10 +677,13 @@ All weather endpoints support:
 - `GET /api/activities/recommendation` - Get weather-based activity recommendations
 
 **Alerts:**
-- `GET /api/alerts` - List all alerts
-- `POST /api/alerts` - Create new alert
-- `GET /api/alerts/active` - Get active (unresolved) alerts
-- `GET /api/alerts/forecast-warnings` - Get forecast-based warnings
+- `GET /api/alerts` - List all alerts for authenticated user
+- `POST /api/alerts` - Create new alert (requires: farm_id, alert_type, message)
+- `GET /api/alerts/{alert}` - Get alert details
+- `PUT /api/alerts/{alert}` - Update alert
+- `DELETE /api/alerts/{alert}` - Delete alert
+- `GET /api/alerts/active` - Get active (unresolved) alerts for authenticated user
+- `GET /api/alerts/forecast-warnings` - Get forecast-based warnings (returns mock data - frontend generates warnings from forecast)
 - `PATCH /api/alerts/{alert}/resolve` - Mark alert as resolved
 
 **Data Export and Reports**
@@ -613,6 +708,70 @@ All weather endpoints support:
 - `POST /api/settings/reset` - Reset user settings to defaults
 
 **Note:** All API endpoints (except authentication endpoints) require `Authorization: Bearer {token}` header for authentication.
+
+### Scheduled Tasks
+
+The system uses Laravel's task scheduler for automated operations:
+
+**Alert Automation** (runs hourly):
+```bash
+php artisan alerts:auto-generate
+```
+
+This scheduled task:
+- Scans all farms with valid coordinates
+- Fetches 7-day weather forecasts for each farm
+- Detects weather scenarios based on configured thresholds
+- Creates alerts automatically when conditions are met
+- Prevents duplicate alerts within 18-hour window using automation keys
+- Logs failures for farms that cannot be processed
+
+To run manually for testing:
+```bash
+php artisan alerts:auto-generate
+```
+
+The command provides detailed output including:
+- Number of farms scanned
+- Number of alerts created
+- List of farms skipped with reasons (missing coordinates, forecast unavailable, etc.)
+- Helpful feedback if no alerts were created explaining the thresholds
+
+**Why No Alerts Are Created**
+
+It is normal and expected for the automation service to create 0 alerts when current weather conditions do not meet any of the alert thresholds. This means the system is working correctly - it only creates alerts when actionable weather conditions are detected.
+
+Common reasons for no alerts being generated:
+
+1. **Normal Weather Conditions**: Current forecast shows moderate temperatures, normal precipitation, and calm winds that don't exceed any thresholds
+2. **Recently Created Alerts**: Alerts for detected conditions may have already been created within the 18-hour duplicate prevention window
+3. **Farm Configuration Issues**:
+   - Farms without coordinates cannot be processed (farms must have valid latitude/longitude)
+   - Forecast data unavailable for farm location
+   - Invalid or unusable forecast data format
+
+**Example Output When No Alerts Are Created**:
+```
+Scanned 2 farms, created 0 alerts.
+No alerts were created because current weather conditions do not meet alert thresholds:
+  - High heat: ≥34°C
+  - Cold snap: ≤8°C
+  - Dry spell: 3+ consecutive days with <1.5mm precipitation
+  - Harvest window: 2+ consecutive favorable days
+  - Maintenance: severe wind (≥45 km/h), heavy rain (≥30mm), or storms
+
+This is normal - alerts will be created automatically when conditions are met.
+```
+
+**When Alerts Will Be Created**:
+
+Alerts are automatically generated when weather conditions meet any of these thresholds:
+- **High temperatures** (≥34°C) or **cold snaps** (≤8°C) are forecast
+- **3+ consecutive dry days** (<1.5mm precipitation) indicating need for irrigation
+- **2+ consecutive favorable days** for harvest operations
+- **Severe weather** conditions (wind ≥45 km/h, rain ≥30mm, or storms) requiring maintenance
+
+The system will create alerts as soon as these conditions are detected in the forecast, ensuring farmers are notified proactively before conditions occur.
 
 ---
 
