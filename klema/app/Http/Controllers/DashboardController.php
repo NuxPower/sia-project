@@ -38,7 +38,8 @@ class DashboardController extends Controller
 
         // Get current weather data from API
         $currentWeather = $this->weatherService->getCurrentWeather($location);
-        $forecast = $this->weatherService->getForecast($location);
+        // Request 7 days of forecast data
+        $forecast = $this->weatherService->getForecast($location, 7);
         
         // Get farming tips based on weather
         $farmingTips = $this->generateFarmingTips($currentWeather);

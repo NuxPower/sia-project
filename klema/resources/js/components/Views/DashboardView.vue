@@ -499,9 +499,12 @@ const futureForecast = computed(() => {
   today.setHours(0, 0, 0, 0);
   
   // Filter out today and history days, only keep future days
+  // Be more lenient with the filtering to ensure we get all available days
   const futureDays = props.forecast.filter((day) => {
     if (!day?.date) return false;
+    // Explicitly exclude history
     if (day.isHistory) return false;
+    // Exclude today if explicitly marked
     if (day.isToday) return false;
     
     // Parse the date string (format: "YYYY-MM-DD")
@@ -515,8 +518,8 @@ const futureForecast = computed(() => {
     );
     dayDate.setHours(0, 0, 0, 0);
     
-    // Only include days after today
-    return dayDate > today;
+    // Include all days that are today or later (we'll filter out today above if marked)
+    return dayDate >= today;
   });
   
   // Sort by date and take first 7 days
@@ -524,9 +527,23 @@ const futureForecast = computed(() => {
     .sort((a, b) => {
       const aParts = a.date.split('-');
       const bParts = b.date.split('-');
+      if (aParts.length !== 3 || bParts.length !== 3) return 0;
       const aDate = new Date(parseInt(aParts[0], 10), parseInt(aParts[1], 10) - 1, parseInt(aParts[2], 10));
       const bDate = new Date(parseInt(bParts[0], 10), parseInt(bParts[1], 10) - 1, parseInt(bParts[2], 10));
       return aDate - bDate;
+    })
+    // Filter out today one more time to be safe, then take first 7
+    .filter(day => {
+      if (day.isToday) return false;
+      const parts = day.date?.split('-');
+      if (parts?.length !== 3) return true;
+      const dayDate = new Date(
+        parseInt(parts[0], 10),
+        parseInt(parts[1], 10) - 1,
+        parseInt(parts[2], 10)
+      );
+      dayDate.setHours(0, 0, 0, 0);
+      return dayDate > today;
     })
     .slice(0, 7);
 });
