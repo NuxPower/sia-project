@@ -102,9 +102,9 @@ The KLEMA system follows a three-tier architecture pattern:
 ```
 ┌─────────────────────────────────────────────────────────────┐
 │                    Client Applications                      │
-├──────────────┬──────────────┬──────────────┬───────────────┤
-│   Web App    │  Desktop App │  Android App │   iOS App     │
-│  (Vue.js)    │  (Electron)  │ (Capacitor)  │ (Capacitor)   │
+├──────────────┬──────────────┬──────────────┬────────────────┤
+│   Web App    │  Desktop App │  Android App │   iOS App      │
+│  (Vue.js)    │  (Electron)  │ (Capacitor)  │ (Capacitor)    │
 └──────┬───────┴──────┬───────┴──────┬───────┴───────┬────────┘
        │              │              │              │
        └──────────────┴──────────────┴──────────────┘
@@ -113,10 +113,10 @@ The KLEMA system follows a three-tier architecture pattern:
        ┌──────────────────────────────────────┐
        │      Laravel REST API (Backend)      │
        │  - Authentication (Sanctum)          │
-       │  - Weather API Integration            │
-       │  - Farm Management                    │
-       │  - Activity Advisor                   │
-       │  - Alert Automation                   │
+       │  - Weather API Integration           │
+       │  - Farm Management                   │
+       │  - Activity Advisor                  │
+       │  - Alert Automation                  │
        └──────────────┬───────────────────────┘
                       │
         ┌─────────────┴─────────────┐
@@ -174,7 +174,7 @@ The KLEMA system follows a three-tier architecture pattern:
                ▼
 ┌─────────────────────────────────────┐
 │   Models (Eloquent ORM)             │
-│   (User, Farm, Activity, Alert, etc.)│
+│  (User, Farm, Activity, Alert, etc.)│
 └──────────────┬──────────────────────┘
                │
                │ SQL Queries
@@ -300,12 +300,13 @@ The KLEMA system follows a three-tier architecture pattern:
 ┌─────────────────────────────────────┐
 │           users                     │
 ├─────────────────────────────────────┤
-│ PK  id                  INT         │
-│     name                VARCHAR     │
-│     email               VARCHAR(100)│
+│ PK  id                  BIGINT      │
+│     name                VARCHAR(255)│
+│     email               VARCHAR(255)│
 │     password            VARCHAR(255)│
-│     role                ENUM        │
+│     role                VARCHAR(255)│
 │     email_verified_at   TIMESTAMP   │
+│     remember_token      VARCHAR(100)│
 │     created_at          TIMESTAMP   │
 │     updated_at          TIMESTAMP   │
 └──────────────┬──────────────────────┘
@@ -324,12 +325,19 @@ The KLEMA system follows a three-tier architecture pattern:
 ├──────────┤  ├──────────────┤ ├──────────┤          ├──────────────┤
 │PK farm_id│  │PK id         │ │PK export_│          │PK id         │
 │FK user_id│  │FK user_id    │ │    id    │          │FK user_id    │
-│farm_name │  │activity_type │ │file_name │          │...           │
-│latitude  │  │field         │ │file_path │          │              │
-│longitude │  │start_date    │ │created_at│          │              │
-│...       │  │end_date      │ │updated_at│          │              │
-│created_at│  │status        │ │          │          │              │
-│updated_at│  │...           │ │          │          │              │
+│farm_name │  │activity_type │ │file_name │          │settings      │
+│latitude  │  │field         │ │file_path │          │(JSON)        │
+│longitude │  │start_date    │ │disk      │          │created_at    │
+│size_hect │  │end_date      │ │created_at│          │updated_at    │
+│ares      │  │weather_warn  │ │updated_at│          │              │
+│soil_type │  │ing           │ │          │          │              │
+│descript  │  │status        │ │          │          │              │
+│ion       │  │notes         │ │          │          │              │
+│boundary_ │  │created_at    │ │          │          │              │
+│geojson   │  │updated_at    │ │          │          │              │
+│(JSON)    │  │              │ │          │          │              │
+│created_at│  │              │ │          │          │              │
+│updated_at│  │              │ │          │          │              │
 └────┬─────┘  └──────────────┘ └──────────┘          └──────────────┘
      │
      │ 1
@@ -341,27 +349,39 @@ The KLEMA system follows a three-tier architecture pattern:
      │ N        │ N        │ N        │ N        │
      │          │          │          │          │
      ▼          ▼          ▼          ▼          ▼
-┌──────────┐┌──────────┐┌──────────┐┌──────────┐┌──────────┐
-│farm_     ││weather_  ││forecasts ││ alerts   ││          │
-│points    ││data      ││          ││          ││          │
-├──────────┤├──────────┤├──────────┤├──────────┤│          │
-│PK point_ ││PK weather││PK        ││PK alert_ ││          │
-│    id    ││    _id   ││forecast_ ││    id    ││          │
-│FK farm_id││FK farm_id││    id    ││FK farm_id││          │
-│label     ││temperature││FK farm_ ││alert_type││          │
-│latitude  ││humidity  ││    id    ││message   ││          │
-│longitude ││rainfall  ││location_ ││issued_at ││          │
-│point_type││wind_speed││  name    ││resolved  ││          │
-│created_at││condition ││latitude  ││...       ││          │
-│updated_at││recorded_ ││longitude ││          ││          │
-│          ││  at      ││forecast_ ││          ││          │
-│          ││          ││  date    ││          ││          │
-│          ││          ││temp_max  ││          ││          │
-│          ││          ││temp_min  ││          ││          │
-│          ││          ││condition ││          ││          │
-│          ││          ││expires_at││          ││          │
-│          ││          ││...       ││          ││          │
-└──────────┘└──────────┘└──────────┘└──────────┘└──────────┘
+┌──────────┐┌──────────┐┌──────────┐┌──────────┐
+│farm_     ││weather_  ││forecasts ││ alerts   │
+│points    ││data      ││          ││          │
+├──────────┤├──────────┤├──────────┤├──────────┤
+│PK point_ ││PK weather││PK        ││PK alert_ │
+│    id    ││    _id   ││forecast_ ││    id    │
+│FK farm_id││FK farm_id││    id    ││FK farm_id│
+│label     ││temperature││FK farm_ ││alert_type│
+│latitude  ││humidity  ││    id    ││message   │
+│longitude ││rainfall  ││location_ ││issued_at │
+│point_type││wind_speed││  name    ││resolved  │
+│created_at││condition ││latitude  ││is_system │
+│updated_at││recorded_ ││longitude ││_generated│
+│          ││  at      ││forecast_ ││automation│
+│          ││location_ ││  date    ││_key      │
+│          ││  name    ││temp_max  ││          │
+│          ││latitude  ││temp_min  ││          │
+│          ││longitude ││condition ││          │
+│          ││condition ││condition ││          │
+│          ││_icon     ││_icon     ││          │
+│          ││          ││descript  ││          │
+│          ││          ││ion       ││          │
+│          ││          ││precip_   ││          │
+│          ││          ││prob      ││          │
+│          ││          ││sunrise   ││          │
+│          ││          ││sunset    ││          │
+│          ││          ││timezone_ ││          │
+│          ││          ││offset    ││          │
+│          ││          ││hourly_   ││          │
+│          ││          ││data(JSON)││          │
+│          ││          ││cached_at ││          │
+│          ││          ││expires_at││          │
+└──────────┘└──────────┘└──────────┘└──────────┘
 
 Relationships:
 - users 1:N farms (one user can have many farms)
