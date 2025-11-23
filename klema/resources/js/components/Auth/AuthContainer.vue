@@ -52,6 +52,10 @@ const detectInitialState = () => {
     const requestedView = url.searchParams.get('view');
     if (requestedView && viewRegistry[requestedView]) {
       currentView.value = requestedView;
+      // Extract token from query params if view is 'reset'
+      if (requestedView === 'reset' && url.searchParams.has('token')) {
+        resetToken.value = decodeURIComponent(url.searchParams.get('token') || '');
+      }
     }
     pendingEmail.value = url.searchParams.get('email') ?? '';
   }

@@ -38,8 +38,15 @@ class QueuedResetPassword extends BaseResetPassword implements ShouldQueue
         $token = $this->token;
         $email = $notifiable->getEmailForPasswordReset();
 
-        // Build the frontend reset URL
-        return rtrim($frontendUrl, '/') . '/reset-password?' . http_build_query([
+        // Build the frontend reset URL matching AuthContainer's expected format
+        // AuthContainer supports both /password/reset/{token} path and ?view=reset&token=... query params
+        // Using query param format for better SPA compatibility: /app?view=reset&token=...&email=...
+        $baseUrl = rtrim($frontendUrl, '/');
+        $encodedToken = urlencode($token);
+        $encodedEmail = urlencode($email);
+        
+        return "{$baseUrl}/app?" . http_build_query([
+            'view' => 'reset',
             'token' => $token,
             'email' => $email,
         ]);
