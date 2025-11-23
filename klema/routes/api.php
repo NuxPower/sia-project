@@ -42,6 +42,7 @@ Route::middleware(['auth:sanctum', 'verified'])
         Route::get('/forecast', [WeatherApiController::class, 'getForecast']);
         Route::get('/history', [WeatherApiController::class, 'getWeatherHistory']);
         Route::get('/historical/{date}', [WeatherApiController::class, 'getHistoricalWeather']);
+        Route::get('/suggestions', [WeatherApiController::class, 'getLocationSuggestions']);
     });
 
     // Farm endpoints

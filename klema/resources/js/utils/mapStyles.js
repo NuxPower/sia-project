@@ -1,34 +1,43 @@
 export function applyMapStyles() {
   const style = document.createElement('style');
   style.textContent = `
+    .enhanced-clouds-layer,
+    .enhanced-precipitation-layer,
+    .enhanced-temperature-layer,
+    .enhanced-wind-layer,
+    .enhanced-pressure-layer {
+      z-index: 400 !important;
+      pointer-events: none;
+    }
+    
     .enhanced-clouds-layer {
-      filter: contrast(1.8) brightness(1.3) saturate(1.6) hue-rotate(200deg) sepia(0.3);
+      filter: contrast(2.2) brightness(1.5) saturate(1.8) hue-rotate(200deg) sepia(0.4);
       mix-blend-mode: screen;
-      opacity: 0.9 !important;
+      opacity: 1.0 !important;
     }
     
     .enhanced-precipitation-layer {
-      filter: contrast(2.0) brightness(1.2) saturate(1.8) hue-rotate(240deg) sepia(0.4);
+      filter: contrast(2.4) brightness(1.4) saturate(2.0) hue-rotate(240deg) sepia(0.5);
       mix-blend-mode: multiply;
-      opacity: 0.95 !important;
+      opacity: 1.0 !important;
     }
     
     .enhanced-temperature-layer {
-      filter: contrast(1.7) brightness(1.4) saturate(1.8) hue-rotate(-30deg) sepia(0.5);
+      filter: contrast(2.1) brightness(1.6) saturate(2.0) hue-rotate(-30deg) sepia(0.6);
       mix-blend-mode: overlay;
-      opacity: 0.9 !important;
+      opacity: 1.0 !important;
     }
     
     .enhanced-wind-layer {
-      filter: contrast(1.9) brightness(1.5) saturate(1.7) hue-rotate(150deg) sepia(0.3);
+      filter: contrast(2.3) brightness(1.7) saturate(1.9) hue-rotate(150deg) sepia(0.4);
       mix-blend-mode: soft-light;
-      opacity: 0.9 !important;
+      opacity: 1.0 !important;
     }
     
     .enhanced-pressure-layer {
-      filter: contrast(1.6) brightness(1.3) saturate(1.5) hue-rotate(120deg) sepia(0.4);
+      filter: contrast(2.0) brightness(1.5) saturate(1.7) hue-rotate(120deg) sepia(0.5);
       mix-blend-mode: overlay;
-      opacity: 0.9 !important;
+      opacity: 1.0 !important;
     }
     
     .leaflet-control-layers {

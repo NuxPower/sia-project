@@ -555,6 +555,78 @@ class WeatherService
     }
 
     /**
+     * Get multiple geocoding suggestions for autocomplete.
+     * Returns up to 5 location suggestions.
+     */
+    public function geocodeSuggestions(string $query, int $limit = 5): array
+    {
+        $normalized = Str::of($query ?? '')->trim();
+        if ($normalized->isEmpty() || $normalized->length() < 2) {
+            return [];
+        }
+
+        $limit = max(1, min($limit, 10)); // Limit between 1 and 10
+        $cacheKey = 'geocode_suggestions_' . Str::lower($normalized) . '_' . $limit;
+
+        return Cache::remember($cacheKey, 3600, function () use ($normalized, $limit) {
+            try {
+                $response = Http::weather()->get('https://api.openweathermap.org/geo/1.0/direct', [
+                    'q' => $normalized,
+                    'limit' => $limit,
+                    'appid' => $this->apiKey,
+                ]);
+
+                if (!$response->successful()) {
+                    Log::warning('Geocoding suggestions request failed', [
+                        'query' => $normalized,
+                        'status' => $response->status(),
+                        'body' => $response->body(),
+                    ]);
+                    return [];
+                }
+
+                $results = $response->json();
+                
+                if (!is_array($results)) {
+                    return [];
+                }
+
+                return array_map(function ($result) {
+                    $name = $result['name'] ?? '';
+                    $state = $result['state'] ?? null;
+                    $country = $result['country'] ?? null;
+                    
+                    // Build full location name
+                    $fullName = $name;
+                    if ($state && $state !== $name) {
+                        $fullName .= ', ' . $state;
+                    }
+                    if ($country) {
+                        $fullName .= ', ' . $country;
+                    }
+
+                    return [
+                        'name' => $name,
+                        'fullName' => $fullName,
+                        'lat' => isset($result['lat']) ? (float) $result['lat'] : null,
+                        'lon' => isset($result['lon']) ? (float) $result['lon'] : null,
+                        'country' => $country,
+                        'state' => $state,
+                    ];
+                }, array_filter($results, function ($result) {
+                    return isset($result['lat'], $result['lon']);
+                }));
+            } catch (\Throwable $e) {
+                Log::error('Geocoding suggestions exception', [
+                    'query' => $normalized,
+                    'error' => $e->getMessage(),
+                ]);
+                return [];
+            }
+        });
+    }
+
+    /**
      * Reverse geocode coordinates to get location name.
      */
     public function reverseGeocodeCoordinates(float $lat, float $lon): ?array
