@@ -3,6 +3,7 @@
 // app/Models/User.php
 namespace App\Models;
 
+use App\Notifications\QueuedResetPassword;
 use App\Notifications\QueuedVerifyEmail;
 use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -78,6 +79,29 @@ class User extends Authenticatable implements MustVerifyEmail
                 'email' => $this->email,
                 'error' => $e->getMessage(),
             ]);
+        }
+    }
+
+    /**
+     * Send the password reset notification.
+     * Override to use custom notification that generates frontend URL instead of Laravel route.
+     *
+     * @param  string  $token
+     * @return void
+     */
+    public function sendPasswordResetNotification($token)
+    {
+        try {
+            $this->notify(new QueuedResetPassword($token));
+        } catch (\Exception $e) {
+            // Log the error for debugging
+            Log::error('Failed to queue password reset notification', [
+                'user_id' => $this->id,
+                'email' => $this->email,
+                'error' => $e->getMessage(),
+            ]);
+            // Re-throw to let the PasswordBroker handle it appropriately
+            throw $e;
         }
     }
 
