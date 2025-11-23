@@ -18,7 +18,11 @@ if (envPath) {
   dotenv.config({ path: envPath });
 }
 
-const defaultServerUrl = 'http://192.168.1.18:8000/app';
+// Use Railway URL from env if available, otherwise fallback to local
+const railwayUrl = process.env.APP_URL || process.env.RAILWAY_PUBLIC_DOMAIN || process.env.RAILWAY_STATIC_URL;
+const defaultServerUrl = railwayUrl 
+  ? `${railwayUrl}/app`
+  : 'http://192.168.1.18:8000/app';
 const serverUrl = process.env.CAPACITOR_SERVER_URL || defaultServerUrl;
 const isHttps = serverUrl.startsWith('https://');
 

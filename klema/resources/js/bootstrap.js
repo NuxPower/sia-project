@@ -16,6 +16,15 @@ const isMobileContainer = () => {
     return window.location?.protocol === 'capacitor:' || window.location?.protocol === 'ionic:';
 };
 
+const isElectron = () => {
+    if (typeof window === 'undefined' || typeof process === 'undefined') {
+        return false;
+    }
+    // Check for Electron environment
+    return window.navigator?.userAgent?.includes('Electron') || 
+           (typeof process !== 'undefined' && process.versions?.electron);
+};
+
 const hasSpaRoot = () => {
     if (typeof document === 'undefined') {
         return false;
@@ -23,6 +32,29 @@ const hasSpaRoot = () => {
     return Boolean(document.getElementById('app'));
 };
 window.axios = axios;
+
+// Set API base URL for Electron - MUST be set before any axios calls
+// Check for Electron environment
+const isElectronEnv = isElectron() || window.__ELECTRON_API_BASE_URL__ || 
+                      (typeof window !== 'undefined' && window.location?.protocol === 'file:');
+
+if (isElectronEnv) {
+    // Use the production API URL for Electron (from env vars or fallback)
+    const apiBaseUrl = window.__ELECTRON_API_BASE_URL__ || 
+                      import.meta.env.VITE_APP_URL?.replace(/\/app$/, '') ||
+                      import.meta.env.VITE_RAILWAY_PUBLIC_DOMAIN ||
+                      'https://klema.up.railway.app';
+    console.log('Setting API base URL for Electron:', apiBaseUrl);
+    
+    // Set on both window.axios and the axios module itself (since modules import axios directly)
+    window.axios.defaults.baseURL = apiBaseUrl;
+    axios.defaults.baseURL = apiBaseUrl;
+    
+    // Also set for any future axios imports
+    if (typeof window !== 'undefined') {
+        window.__AXIOS_BASE_URL__ = apiBaseUrl;
+    }
+}
 
 window.axios.defaults.headers.common['X-Requested-With'] = 'XMLHttpRequest';
 window.axios.defaults.withCredentials = true;
