@@ -46,7 +46,11 @@ Install frontend dependencies using npm:
 npm install
 ```
 
-This will install Vue.js, Vite, Capacitor, and all other frontend dependencies.
+This will install Vue.js, Vite, Capacitor, and all other frontend dependencies including:
+- **Three.js**: 3D graphics library for weather visualizations
+- **Vanta.js**: Animated background effects (clouds, fog, waves) for dashboard
+- **Leaflet**: Interactive mapping library
+- **Capacitor**: Mobile app framework
 
 ### Step 4: Environment Configuration
 
@@ -238,7 +242,35 @@ This script will:
 - Build the Android APK
 - Install on connected device (requires USB debugging enabled)
 
-### Step 8: Production Build
+### Step 8: Docker Deployment (Optional)
+
+For containerized deployment or USB-based setup:
+
+1. **Build the Docker image:**
+   ```bash
+   docker build -t klema:latest .
+   ```
+
+2. **Run the container:**
+   ```bash
+   docker run -d \
+     -p 8000:8000 \
+     -e DB_HOST=your_db_host \
+     -e DB_DATABASE=klema \
+     -e DB_USERNAME=your_db_user \
+     -e DB_PASSWORD=your_db_password \
+     -e OPENWEATHER_API_KEY=your_api_key \
+     --name klema-app \
+     klema:latest
+   ```
+
+3. **Access the application:**
+   - Web: `http://localhost:8000/app`
+   - API: `http://localhost:8000/api`
+
+**Note:** The Dockerfile includes setup instructions and installs all dependencies including Three.js and Vanta.js for weather visualizations.
+
+### Step 9: Production Build
 
 #### Web Production Build
 
@@ -320,6 +352,8 @@ Additional frontend technologies include:
 - **Bootstrap 5.2+ with Tailwind CSS 4.0**: UI framework for responsive design and styling
 - **Axios 1.12+**: HTTP client for API communication
 - **SASS/SCSS**: Preprocessor for advanced styling capabilities
+- **Three.js 0.181+**: 3D graphics library used for interactive weather visualizations and effects
+- **Vanta.js 0.5+**: Animated background effects library that integrates with Three.js to create dynamic weather-themed visualizations (clouds, fog, waves) in the dashboard
 
 #### ii. Backend and Application Logic
 
@@ -377,7 +411,22 @@ KLEMA utilizes OpenStreetMap tiles for map rendering and visualization. OpenStre
 - **Interactive Features**: Map click events, boundary drawing, and point marking capabilities
 - **Coordinate System**: Support for latitude/longitude coordinate-based operations
 
-#### vi. Authentication
+#### vi. Visual Effects and 3D Graphics
+
+**Three.js and Vanta.js**
+
+KLEMA integrates advanced 3D graphics and animated visual effects to enhance the user experience in the dashboard:
+
+- **Three.js 0.181+**: A powerful 3D graphics library that provides WebGL-based rendering capabilities. Used as the foundation for creating interactive weather visualizations and animated backgrounds.
+
+- **Vanta.js 0.5+**: A library that creates animated, interactive backgrounds using Three.js. The dashboard dynamically selects different Vanta effects based on current weather conditions:
+  - **Clouds Effect**: Displayed during cloudy, misty, foggy, or hazy conditions
+  - **Fog Effect**: Activated during rainy or thunderstorm conditions
+  - **Waves Effect**: Shown during clear weather conditions
+
+The visual effects system automatically adapts to weather conditions, providing users with an immersive and contextually relevant visual experience. The effects are optimized for performance with viewport-based scaling and deferred initialization to avoid blocking the initial page load.
+
+#### vii. Authentication
 
 **Sanctum Authentication**
 
