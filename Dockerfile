@@ -55,12 +55,14 @@ COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 
 WORKDIR /var/www/html
 
-# Install PHP dependencies (Laravel, Sanctum, DomPDF, etc.)
+# Install PHP dependencies
+# Includes: Laravel Framework 12.0+, Sanctum 4.2+, DomPDF 3.1+, Doctrine DBAL 4.3+, etc.
 COPY klema/composer.json klema/composer.lock ./
 RUN composer install --no-dev --optimize-autoloader --prefer-dist --no-interaction --no-scripts
 
 # Install Node.js dependencies
-# Includes: Vue.js, Vite, Capacitor, Leaflet, Three.js, Vanta.js, and other frontend libraries
+# Includes: Vue.js 3.5+, Vite 7.0+, Capacitor 6.0+, Leaflet 1.9+, Three.js 0.181+, 
+# Vanta.js 0.5+, Cesium 1.135+, Axios 1.12+, Bootstrap 5.2+, Tailwind CSS 4.0+, SASS 1.56+
 COPY klema/package.json klema/package-lock.json ./
 RUN npm ci --omit=dev=false --legacy-peer-deps=false
 

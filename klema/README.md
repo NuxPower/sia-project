@@ -36,7 +36,13 @@ Install PHP dependencies using Composer:
 composer install
 ```
 
-This will install all Laravel framework dependencies and required packages.
+This will install all Laravel framework dependencies and required packages including:
+- **Laravel Framework 12.0+**: Core PHP framework
+- **Laravel Sanctum 4.2+**: API authentication
+- **Laravel UI 4.6+**: User interface scaffolding
+- **DomPDF 3.1+**: PDF generation for exports
+- **Doctrine DBAL 4.3+**: Database abstraction layer
+- **Laravel Tinker 2.10+**: Interactive REPL
 
 ### Step 3: Install Node.js Dependencies
 
@@ -47,10 +53,17 @@ npm install
 ```
 
 This will install Vue.js, Vite, Capacitor, and all other frontend dependencies including:
-- **Three.js**: 3D graphics library for weather visualizations
-- **Vanta.js**: Animated background effects (clouds, fog, waves) for dashboard
-- **Leaflet**: Interactive mapping library
-- **Capacitor**: Mobile app framework
+- **Vue.js 3.5+**: Progressive JavaScript framework
+- **Vite 7.0+**: Build tool and dev server
+- **Three.js 0.181+**: 3D graphics library for weather visualizations
+- **Vanta.js 0.5+**: Animated background effects (clouds, fog, waves) for dashboard
+- **Leaflet 1.9+**: Interactive mapping library
+- **Capacitor 6.0+**: Mobile app framework (Android & iOS)
+- **Cesium 1.135+**: 3D globe and map library
+- **Axios 1.12+**: HTTP client for API requests
+- **Bootstrap 5.2+**: CSS framework
+- **Tailwind CSS 4.0+**: Utility-first CSS framework
+- **SASS 1.56+**: CSS preprocessor
 
 ### Step 4: Environment Configuration
 
@@ -86,6 +99,8 @@ This will install Vue.js, Vite, Capacitor, and all other frontend dependencies i
 
    # OpenWeatherMap API (Backend)
    OPENWEATHER_API_KEY=your_openweather_api_key
+   # Optional: Custom OpenWeatherMap base URL (default: https://api.openweathermap.org/data/2.5)
+   OPENWEATHER_BASE_URL=https://api.openweathermap.org/data/2.5
 
    # Vite Frontend Configuration
    # OpenWeatherMap API key for frontend (if needed)
@@ -321,9 +336,14 @@ For containerized deployment or USB-based setup:
      -e DB_USERNAME=your_db_user \
      -e DB_PASSWORD=your_db_password \
      -e OPENWEATHER_API_KEY=your_api_key \
+     -e SENDGRID_API_KEY=your_sendgrid_key \
+     -e MAIL_FROM_ADDRESS=your_email@gmail.com \
+     -e APP_URL=http://localhost:8000 \
      --name klema-app \
      klema:latest
    ```
+   
+   **Note:** You can pass any environment variable from your `.env` file using `-e` flag. The Dockerfile automatically installs all Composer and npm dependencies including Three.js, Vanta.js, and all other required packages.
 
 3. **Access the application:**
    - Web: `http://localhost:8000/app`
