@@ -3,10 +3,15 @@
 namespace App\Services;
 
 use App\Models\WeatherData;
+use App\Models\Forecast;
 use App\Models\Farm;
+use App\Jobs\StoreCurrentWeatherJob;
+use App\Jobs\StoreForecastJob;
+use App\Jobs\StoreHistoricalWeatherJob;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Schema;
 use Carbon\Carbon;
 use Illuminate\Support\Str;
 use Illuminate\Support\Collection;
@@ -27,9 +32,21 @@ class WeatherService
 
     public function getCurrentWeather($location)
     {
+        $locationName = Str::of($location ?? '')->trim()->lower();
+        if ($locationName->isEmpty()) {
+            throw new \RuntimeException('Location is required');
+        }
+
+        // Check database first (data from last 30 minutes is considered fresh)
+        $storedWeather = $this->getStoredCurrentWeatherByLocation($locationName);
+        if ($storedWeather !== null) {
+            return $storedWeather;
+        }
+
+        // Fallback to API
         $cacheKey = "weather_current_{$location}";
         
-        return Cache::remember($cacheKey, 600, function () use ($location) {
+        return Cache::remember($cacheKey, 600, function () use ($location, $locationName) {
             $response = Http::weather()->get("{$this->baseUrl}/weather", [
                 'q' => $location,
                 'appid' => $this->apiKey,
@@ -40,12 +57,24 @@ class WeatherService
                 throw new \RuntimeException('Failed to fetch current weather: '.$response->status());
             }
 
-            return $response->json();
+            $weather = $response->json();
+            
+            // Only store weather data for farm locations, not generic locations
+            // For location-based queries, we skip storage to optimize performance
+
+            return $weather;
         });
     }
 
     public function getCurrentWeatherByCoordinates($lat, $lon)
     {
+        // Check database first (data from last 30 minutes is considered fresh)
+        $storedWeather = $this->getStoredCurrentWeatherByCoordinates($lat, $lon);
+        if ($storedWeather !== null) {
+            return $storedWeather;
+        }
+
+        // Fallback to API
         $cacheKey = "weather_current_coords_{$lat}_{$lon}";
         
         return Cache::remember($cacheKey, 600, function () use ($lat, $lon) {
@@ -60,50 +89,223 @@ class WeatherService
                 throw new \RuntimeException('Failed to fetch current weather by coordinates: '.$response->status());
             }
 
-            return $response->json();
+            $weather = $response->json();
+            
+            // Only store weather data for farm locations
+            $farm = $this->findFarmByCoordinates($lat, $lon);
+            if ($farm) {
+                // Store to database in background (non-blocking) only if farm is found
+                StoreCurrentWeatherJob::dispatch($weather, [
+                    'lat' => $lat,
+                    'lon' => $lon,
+                    'location' => $weather['name'] ?? null,
+                    'farm_id' => $farm->farm_id,
+                ]);
+            }
+
+            return $weather;
         });
     }
 
     public function getForecast($location, $days = 7)
     {
+        $days = max(1, min($days, 16));
+        $locationName = Str::of($location ?? '')->trim()->lower();
+        
+        // Check database first
+        $storedForecast = $this->getStoredForecastByLocation($locationName, $days);
+        if ($storedForecast !== null) {
+            return $storedForecast;
+        }
+
+        // Fallback to API
         $cacheKey = "weather_forecast_{$location}_{$days}";
         
-        return Cache::remember($cacheKey, 3600, function () use ($location, $days) {
+        return Cache::remember($cacheKey, 3600, function () use ($location, $locationName, $days) {
+            // First, get coordinates for the location (needed for One Call API)
+            $geoData = $this->geocodeLocation($location);
+            
+            if ($geoData && isset($geoData['lat'], $geoData['lon'])) {
+                $lat = $geoData['lat'];
+                $lon = $geoData['lon'];
+                
+                // Try One Call API 3.0 for 7+ days (supports up to 8 days)
+                if ($days > 5) {
+                    try {
+                        $oneCallData = $this->getForecastFromOneCall($lat, $lon, $days);
+                        if (!empty($oneCallData)) {
+                            // Store and return One Call data
+                            $farm = $this->findFarmByCoordinates($lat, $lon);
+                            if ($farm) {
+                                StoreForecastJob::dispatch($oneCallData, $locationName, $lat, $lon, $farm->farm_id);
+                            }
+                            return $oneCallData;
+                        }
+                    } catch (\Exception $e) {
+                        \Log::warning('One Call API failed, falling back to /forecast', [
+                            'location' => $location,
+                            'error' => $e->getMessage(),
+                        ]);
+                        // Fall through to regular /forecast endpoint
+                    }
+                }
+            }
+            
+            // Fallback to regular /forecast endpoint (supports up to 5 days)
+            $maxForecasts = min($days * 8, 40); // Cap at 40 (API limit)
+            
             $response = Http::weather()->get("{$this->baseUrl}/forecast", [
                 'q' => $location,
                 'appid' => $this->apiKey,
                 'units' => 'metric',
-                'cnt' => $days * 8 // 8 forecasts per day (3-hour intervals)
+                'cnt' => $maxForecasts // 8 forecasts per day (3-hour intervals)
             ]);
 
             if (!$response->successful()) {
-                throw new \RuntimeException('Failed to fetch forecast: '.$response->status());
+                $errorData = $response->json();
+                $errorMessage = data_get($errorData, 'message', 'HTTP ' . $response->status());
+                \Log::error('Weather forecast API error', [
+                    'status' => $response->status(),
+                    'location' => $location,
+                    'error' => $errorData,
+                ]);
+                throw new \RuntimeException('Failed to fetch forecast: ' . $errorMessage);
             }
 
             $data = $response->json();
-            return $this->processForecastData($data, $days);
+            
+            // Check for API error response (even if HTTP status is 200)
+            if (isset($data['cod']) && $data['cod'] != 200) {
+                $errorMessage = data_get($data, 'message', 'API returned error code: ' . ($data['cod'] ?? 'unknown'));
+                \Log::error('Weather forecast API returned error code', [
+                    'code' => $data['cod'],
+                    'location' => $location,
+                    'error' => $data,
+                ]);
+                throw new \RuntimeException('Failed to fetch forecast: ' . $errorMessage);
+            }
+            
+            // Validate API response structure
+            if (!isset($data['list']) || !is_array($data['list'])) {
+                $errorMessage = data_get($data, 'message', 'Invalid forecast data structure');
+                \Log::error('Invalid forecast API response structure', [
+                    'location' => $location,
+                    'response' => $data,
+                ]);
+                throw new \RuntimeException('Failed to fetch forecast: ' . $errorMessage);
+            }
+            
+            $processedData = $this->processForecastData($data, $days);
+            
+            // Only store forecast data for farm locations
+            $lat = data_get($data, 'city.coord.lat');
+            $lon = data_get($data, 'city.coord.lon');
+            if ($lat !== null && $lon !== null) {
+                $farm = $this->findFarmByCoordinates($lat, $lon);
+                if ($farm) {
+                    // Store to database in background (non-blocking) only if farm is found
+                    StoreForecastJob::dispatch($processedData, $locationName, $lat, $lon, $farm->farm_id);
+                }
+            }
+
+            return $processedData;
         });
     }
 
     public function getForecastByCoordinates($lat, $lon, $days = 7)
     {
+        $days = max(1, min($days, 16));
+        
+        // Check database first
+        $storedForecast = $this->getStoredForecastByCoordinates($lat, $lon, $days);
+        if ($storedForecast !== null) {
+            return $storedForecast;
+        }
+
+        // Fallback to API
         $cacheKey = "weather_forecast_coords_{$lat}_{$lon}_{$days}";
         
         return Cache::remember($cacheKey, 3600, function () use ($lat, $lon, $days) {
+            // Try One Call API 3.0 for 7+ days (supports up to 8 days)
+            if ($days > 5) {
+                try {
+                    $oneCallData = $this->getForecastFromOneCall($lat, $lon, $days);
+                    if (!empty($oneCallData)) {
+                        // Store and return One Call data
+                        $farm = $this->findFarmByCoordinates($lat, $lon);
+                        if ($farm) {
+                            StoreForecastJob::dispatch($oneCallData, null, $lat, $lon, $farm->farm_id);
+                        }
+                        return $oneCallData;
+                    }
+                } catch (\Exception $e) {
+                    \Log::warning('One Call API failed, falling back to /forecast', [
+                        'lat' => $lat,
+                        'lon' => $lon,
+                        'error' => $e->getMessage(),
+                    ]);
+                    // Fall through to regular /forecast endpoint
+                }
+            }
+            
+            // Fallback to regular /forecast endpoint (supports up to 5 days)
+            $maxForecasts = min($days * 8, 40); // Cap at 40 (API limit)
+            
             $response = Http::weather()->get("{$this->baseUrl}/forecast", [
                 'lat' => $lat,
                 'lon' => $lon,
                 'appid' => $this->apiKey,
                 'units' => 'metric',
-                'cnt' => $days * 8 // 8 forecasts per day (3-hour intervals)
+                'cnt' => $maxForecasts // 8 forecasts per day (3-hour intervals)
             ]);
 
             if (!$response->successful()) {
-                throw new \RuntimeException('Failed to fetch forecast by coordinates: '.$response->status());
+                $errorData = $response->json();
+                $errorMessage = data_get($errorData, 'message', 'HTTP ' . $response->status());
+                \Log::error('Weather forecast API error (coordinates)', [
+                    'status' => $response->status(),
+                    'lat' => $lat,
+                    'lon' => $lon,
+                    'error' => $errorData,
+                ]);
+                throw new \RuntimeException('Failed to fetch forecast by coordinates: ' . $errorMessage);
             }
 
             $data = $response->json();
-            return $this->processForecastData($data, $days);
+            
+            // Check for API error response (even if HTTP status is 200)
+            if (isset($data['cod']) && $data['cod'] != 200) {
+                $errorMessage = data_get($data, 'message', 'API returned error code: ' . ($data['cod'] ?? 'unknown'));
+                \Log::error('Weather forecast API returned error code (coordinates)', [
+                    'code' => $data['cod'],
+                    'lat' => $lat,
+                    'lon' => $lon,
+                    'error' => $data,
+                ]);
+                throw new \RuntimeException('Failed to fetch forecast by coordinates: ' . $errorMessage);
+            }
+            
+            // Validate API response structure
+            if (!isset($data['list']) || !is_array($data['list'])) {
+                $errorMessage = data_get($data, 'message', 'Invalid forecast data structure');
+                \Log::error('Invalid forecast API response structure (coordinates)', [
+                    'lat' => $lat,
+                    'lon' => $lon,
+                    'response' => $data,
+                ]);
+                throw new \RuntimeException('Failed to fetch forecast by coordinates: ' . $errorMessage);
+            }
+            
+            $processedData = $this->processForecastData($data, $days);
+            
+            // Only store forecast data for farm locations
+            $farm = $this->findFarmByCoordinates($lat, $lon);
+            if ($farm) {
+                // Store to database in background (non-blocking) only if farm is found
+                StoreForecastJob::dispatch($processedData, null, $lat, $lon, $farm->farm_id);
+            }
+
+            return $processedData;
         });
     }
 
@@ -235,7 +437,7 @@ class WeatherService
         $lonKey = round($lon, 3);
         $cacheKey = "historical_weather_{$latKey}_{$lonKey}_{$start}_{$end}";
 
-        return Cache::remember($cacheKey, 86400, function () use ($lat, $lon, $start, $end) {
+        $series = Cache::remember($cacheKey, 86400, function () use ($lat, $lon, $start, $end) {
             try {
                 $response = Http::withOptions([
                     'timeout' => 10,
@@ -297,6 +499,18 @@ class WeatherService
                 return [];
             }
         });
+        
+        // Only store historical data for farm locations
+        // Only dispatch if we got data from API (not empty series) and farm is found
+        if (!empty($series)) {
+            $farm = $this->findFarmByCoordinates($lat, $lon);
+            if ($farm) {
+                // Store historical data in background (non-blocking) only if farm is found
+                StoreHistoricalWeatherJob::dispatch($series, $lat, $lon, null, $farm->farm_id);
+            }
+        }
+        
+        return $series;
     }
 
     public function geocodeLocation(string $location): ?array
@@ -337,6 +551,78 @@ class WeatherService
                 'name' => $first['name'] ?? (string) $normalized,
                 'country' => $first['country'] ?? null,
             ];
+        });
+    }
+
+    /**
+     * Get multiple geocoding suggestions for autocomplete.
+     * Returns up to 5 location suggestions.
+     */
+    public function geocodeSuggestions(string $query, int $limit = 5): array
+    {
+        $normalized = Str::of($query ?? '')->trim();
+        if ($normalized->isEmpty() || $normalized->length() < 2) {
+            return [];
+        }
+
+        $limit = max(1, min($limit, 10)); // Limit between 1 and 10
+        $cacheKey = 'geocode_suggestions_' . Str::lower($normalized) . '_' . $limit;
+
+        return Cache::remember($cacheKey, 3600, function () use ($normalized, $limit) {
+            try {
+                $response = Http::weather()->get('https://api.openweathermap.org/geo/1.0/direct', [
+                    'q' => $normalized,
+                    'limit' => $limit,
+                    'appid' => $this->apiKey,
+                ]);
+
+                if (!$response->successful()) {
+                    Log::warning('Geocoding suggestions request failed', [
+                        'query' => $normalized,
+                        'status' => $response->status(),
+                        'body' => $response->body(),
+                    ]);
+                    return [];
+                }
+
+                $results = $response->json();
+                
+                if (!is_array($results)) {
+                    return [];
+                }
+
+                return array_map(function ($result) {
+                    $name = $result['name'] ?? '';
+                    $state = $result['state'] ?? null;
+                    $country = $result['country'] ?? null;
+                    
+                    // Build full location name
+                    $fullName = $name;
+                    if ($state && $state !== $name) {
+                        $fullName .= ', ' . $state;
+                    }
+                    if ($country) {
+                        $fullName .= ', ' . $country;
+                    }
+
+                    return [
+                        'name' => $name,
+                        'fullName' => $fullName,
+                        'lat' => isset($result['lat']) ? (float) $result['lat'] : null,
+                        'lon' => isset($result['lon']) ? (float) $result['lon'] : null,
+                        'country' => $country,
+                        'state' => $state,
+                    ];
+                }, array_filter($results, function ($result) {
+                    return isset($result['lat'], $result['lon']);
+                }));
+            } catch (\Throwable $e) {
+                Log::error('Geocoding suggestions exception', [
+                    'query' => $normalized,
+                    'error' => $e->getMessage(),
+                ]);
+                return [];
+            }
         });
     }
 
@@ -400,7 +686,7 @@ class WeatherService
      * Find a farm by coordinates (within 0.005 degree tolerance, ~500m).
      * Only matches farms that are very close to the weather data coordinates.
      */
-    private function findFarmByCoordinates(float $lat, float $lon): ?Farm
+    public function findFarmByCoordinates(float $lat, float $lon): ?Farm
     {
         // Don't round coordinates here - use them as-is for precise matching
         // Use a small tolerance (0.005 degrees ≈ 500m) to match nearby farms
@@ -472,8 +758,9 @@ class WeatherService
             }
         }
 
-        if (!$farmId && $locationName === null && ($lat === null || $lon === null)) {
-            // Without a farm or identifiable location, skip persistence
+        // Only store weather data for farm locations (optimization)
+        // Skip storage for generic locations that don't belong to farms
+        if (!$farmId) {
             return null;
         }
 
@@ -709,8 +996,108 @@ class WeatherService
         ];
     }
 
+    /**
+     * Fetch forecast from OpenWeather One Call API 3.0
+     * Supports up to 8 days of daily forecasts
+     */
+    private function getForecastFromOneCall(float $lat, float $lon, int $days = 7): array
+    {
+        $oneCallBaseUrl = 'https://api.openweathermap.org/data/3.0/onecall';
+        $requestDays = min($days, 8); // One Call API supports up to 8 days
+        
+        $response = Http::weather()->get($oneCallBaseUrl, [
+            'lat' => $lat,
+            'lon' => $lon,
+            'appid' => $this->apiKey,
+            'units' => 'metric',
+            'exclude' => 'minutely,hourly,alerts', // Only get daily forecast
+        ]);
+
+        if (!$response->successful()) {
+            $errorData = $response->json();
+            $errorMessage = data_get($errorData, 'message', 'HTTP ' . $response->status());
+            \Log::warning('One Call API request failed', [
+                'status' => $response->status(),
+                'lat' => $lat,
+                'lon' => $lon,
+                'error' => $errorData,
+            ]);
+            throw new \RuntimeException('One Call API failed: ' . $errorMessage);
+        }
+
+        $data = $response->json();
+        
+        // Validate response structure
+        if (!isset($data['daily']) || !is_array($data['daily'])) {
+            \Log::warning('One Call API invalid response structure', [
+                'lat' => $lat,
+                'lon' => $lon,
+                'response' => $data,
+            ]);
+            throw new \RuntimeException('One Call API invalid response structure');
+        }
+
+        $timezoneOffset = data_get($data, 'timezone_offset', 0);
+        $dailyData = $data['daily'];
+        
+        // Process daily forecast data
+        $processedData = [];
+        $limit = min(count($dailyData), $requestDays);
+        
+        for ($i = 0; $i < $limit; $i++) {
+            $dayData = $dailyData[$i];
+            if (!isset($dayData['dt'])) {
+                continue;
+            }
+            
+            $timestamp = $dayData['dt'];
+            $date = Carbon::createFromTimestamp($timestamp, 'UTC')
+                ->addSeconds($timezoneOffset)
+                ->format('Y-m-d');
+            
+            $temp = $dayData['temp'] ?? [];
+            $tempMax = isset($temp['max']) ? round((float) $temp['max'], 1) : null;
+            $tempMin = isset($temp['min']) ? round((float) $temp['min'], 1) : null;
+            
+            $weather = $dayData['weather'][0] ?? null;
+            $condition = $weather['main'] ?? null;
+            $icon = $weather['icon'] ?? null;
+            $description = $weather['description'] ?? null;
+            
+            $sunrise = isset($dayData['sunrise']) ? (int) $dayData['sunrise'] : null;
+            $sunset = isset($dayData['sunset']) ? (int) $dayData['sunset'] : null;
+            $precipProbability = isset($dayData['pop']) ? (float) $dayData['pop'] : null; // Already a decimal 0-1
+            
+            // Hourly data is excluded from One Call API request for performance
+            // Set to empty array - can be populated later if needed
+            $hourly = [];
+            
+            $processedData[] = [
+                'date' => $date,
+                'day' => Carbon::parse($date)->format('l'),
+                'temp_max' => $tempMax,
+                'temp_min' => $tempMin,
+                'condition' => $condition,
+                'icon' => $icon,
+                'description' => $description,
+                'precip_probability' => $precipProbability,
+                'sunrise' => $sunrise,
+                'sunset' => $sunset,
+                'hourly' => $hourly,
+                'timezone_offset' => $timezoneOffset,
+            ];
+        }
+        
+        return $processedData;
+    }
+
     private function processForecastData($data, int $days = 7)
     {
+        // Validate input data
+        if (!is_array($data) || !isset($data['list']) || !is_array($data['list'])) {
+            throw new \InvalidArgumentException('Invalid forecast data: missing or invalid list');
+        }
+
         $dailyForecasts = [];
         $currentDate = null;
         $dayData = [];
@@ -1008,5 +1395,242 @@ class WeatherService
             'description' => $entry[1],
             'icon' => $entry[2],
         ];
+    }
+
+    /**
+     * Get stored current weather from database by location name.
+     * Returns data if it's less than 30 minutes old.
+     */
+    private function getStoredCurrentWeatherByLocation(string $locationName): ?array
+    {
+        $thirtyMinutesAgo = Carbon::now()->subMinutes(30);
+        
+        $record = WeatherData::query()
+            ->whereNotNull('location_name')
+            ->where('location_name', $locationName)
+            ->where('recorded_at', '>=', $thirtyMinutesAgo)
+            ->orderByDesc('recorded_at')
+            ->first();
+
+        if ($record) {
+            return $this->createSnapshotFromRecord($record);
+        }
+
+        return null;
+    }
+
+    /**
+     * Get stored current weather from database by coordinates.
+     * Returns data if it's less than 30 minutes old.
+     */
+    private function getStoredCurrentWeatherByCoordinates(float $lat, float $lon): ?array
+    {
+        $lat = round($lat, 3);
+        $lon = round($lon, 3);
+        $thirtyMinutesAgo = Carbon::now()->subMinutes(30);
+        $tolerance = 0.01;
+
+        $record = WeatherData::query()
+            ->whereNotNull('latitude')
+            ->whereNotNull('longitude')
+            ->whereBetween('latitude', [$lat - $tolerance, $lat + $tolerance])
+            ->whereBetween('longitude', [$lon - $tolerance, $lon + $tolerance])
+            ->where('recorded_at', '>=', $thirtyMinutesAgo)
+            ->orderByDesc('recorded_at')
+            ->first();
+
+        if ($record) {
+            return $this->createSnapshotFromRecord($record);
+        }
+
+        return null;
+    }
+
+    /**
+     * Get stored forecast from database by location name.
+     * Returns forecast if all requested days are available and not expired.
+     */
+    private function getStoredForecastByLocation(string $locationName, int $days): ?array
+    {
+        try {
+            // Check if forecasts table exists
+            if (!Schema::hasTable('forecasts')) {
+                \Log::warning('Forecasts table does not exist - migrations may need to be run');
+                return null;
+            }
+
+            $today = Carbon::today('UTC');
+            $endDate = $today->copy()->addDays($days - 1);
+
+            $forecasts = Forecast::query()
+                ->notExpired()
+                ->forLocation($locationName)
+                ->forDateRange($today, $endDate)
+                ->orderBy('forecast_date')
+                ->get();
+
+            // Check if we have all requested days
+            if ($forecasts->count() >= $days) {
+                return $this->formatForecastCollection($forecasts);
+            }
+
+            return null;
+        } catch (\Exception $e) {
+            // Gracefully handle if table doesn't exist
+            \Log::warning('Error querying forecasts table', [
+                'error' => $e->getMessage(),
+                'location' => $locationName,
+            ]);
+            return null;
+        }
+    }
+
+    /**
+     * Get stored forecast from database by coordinates.
+     * Returns forecast if all requested days are available and not expired.
+     */
+    private function getStoredForecastByCoordinates(float $lat, float $lon, int $days): ?array
+    {
+        try {
+            // Check if forecasts table exists
+            if (!Schema::hasTable('forecasts')) {
+                \Log::warning('Forecasts table does not exist - migrations may need to be run');
+                return null;
+            }
+
+            $lat = round($lat, 3);
+            $lon = round($lon, 3);
+            $today = Carbon::today('UTC');
+            $endDate = $today->copy()->addDays($days - 1);
+
+            $forecasts = Forecast::query()
+                ->notExpired()
+                ->forCoordinates($lat, $lon)
+                ->forDateRange($today, $endDate)
+                ->orderBy('forecast_date')
+                ->get();
+
+            // Check if we have all requested days
+            if ($forecasts->count() >= $days) {
+                return $this->formatForecastCollection($forecasts);
+            }
+
+            return null;
+        } catch (\Exception $e) {
+            // Gracefully handle if table doesn't exist
+            \Log::warning('Error querying forecasts table', [
+                'error' => $e->getMessage(),
+                'lat' => $lat,
+                'lon' => $lon,
+            ]);
+            return null;
+        }
+    }
+
+    /**
+     * Store forecast data to database.
+     */
+    public function storeForecastData(array $forecastData, ?string $locationName, ?float $lat, ?float $lon, ?int $farmId = null): void
+
+    {
+        if (empty($forecastData) || !is_array($forecastData)) {
+            return;
+        }
+        
+        // Check if forecasts table exists before trying to store
+        if (!Schema::hasTable('forecasts')) {
+            \Log::warning('Cannot store forecast data - forecasts table does not exist. Run migrations.');
+            return;
+        }
+
+        $lat = $lat !== null ? round($lat, 6) : null;
+        $lon = $lon !== null ? round($lon, 6) : null;
+        $locationName = $locationName ? Str::lower(trim($locationName)) : null;
+
+        // Use provided farm_id, or try to find associated farm if not provided
+        if ($farmId === null && $lat !== null && $lon !== null) {
+            $farm = $this->findFarmByCoordinates($lat, $lon);
+            if ($farm) {
+                $farmId = $farm->farm_id;
+            }
+        }
+
+        // Only store forecast data for farm locations (optimization)
+        if ($farmId === null) {
+            return;
+        }
+
+        // Calculate expiration: forecasts expire at the end of the forecast date
+        $now = Carbon::now('UTC');
+        $maxForecastDate = null;
+
+        foreach ($forecastData as $dayForecast) {
+            $forecastDateStr = $dayForecast['date'] ?? null;
+            if (!$forecastDateStr) {
+                continue;
+            }
+
+            try {
+                $forecastDate = Carbon::parse($forecastDateStr, 'UTC')->startOfDay();
+                $expiresAt = $forecastDate->copy()->endOfDay()->addHours(2); // Expire 2 hours after the day ends
+                
+                if ($maxForecastDate === null || $expiresAt->gt($maxForecastDate)) {
+                    $maxForecastDate = $expiresAt;
+                }
+
+                // Store or update forecast record
+                Forecast::updateOrCreate(
+                    [
+                        'farm_id' => $farmId,
+                        'location_name' => $locationName,
+                        'latitude' => $lat,
+                        'longitude' => $lon,
+                        'forecast_date' => $forecastDate,
+                    ],
+                    [
+                        'temp_max' => $dayForecast['temp_max'] ?? null,
+                        'temp_min' => $dayForecast['temp_min'] ?? null,
+                        'condition' => $dayForecast['condition'] ?? null,
+                        'condition_icon' => $dayForecast['icon'] ?? null,
+                        'description' => $dayForecast['description'] ?? null,
+                        'precip_probability' => $dayForecast['precip_probability'] ?? null,
+                        'sunrise' => $dayForecast['sunrise'] ?? null,
+                        'sunset' => $dayForecast['sunset'] ?? null,
+                        'timezone_offset' => $dayForecast['timezone_offset'] ?? 0,
+                        'hourly_data' => $dayForecast['hourly'] ?? null,
+                        'cached_at' => $now,
+                        'expires_at' => $expiresAt,
+                    ]
+                );
+            } catch (\Exception $e) {
+                Log::warning('Failed to store forecast day', [
+                    'date' => $forecastDateStr,
+                    'error' => $e->getMessage(),
+                ]);
+            }
+        }
+    }
+
+    /**
+     * Format forecast collection to match API response format.
+     */
+    private function formatForecastCollection(Collection $forecasts): array
+    {
+        return $forecasts->map(function (Forecast $forecast) {
+            return [
+                'date' => $forecast->forecast_date->format('Y-m-d'),
+                'day' => $forecast->forecast_date->format('l'),
+                'temp_max' => $forecast->temp_max,
+                'temp_min' => $forecast->temp_min,
+                'condition' => $forecast->condition,
+                'icon' => $forecast->condition_icon,
+                'description' => $forecast->description,
+                'precip_probability' => $forecast->precip_probability,
+                'sunrise' => $forecast->sunrise,
+                'sunset' => $forecast->sunset,
+                'hourly' => $forecast->hourly_data ?? [],
+                'timezone_offset' => $forecast->timezone_offset ?? 0,
+            ];
+        })->toArray();
     }
 }

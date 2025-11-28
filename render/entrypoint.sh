@@ -46,15 +46,24 @@ php artisan config:cache
 php artisan route:cache
 php artisan view:cache
 
+# Run migrations by default unless RUN_MIGRATIONS=0 is explicitly set
+# Default behavior: migrations run automatically on deploy
 if [ "${RUN_MIGRATIONS:-1}" != "0" ]; then
-  log "Running database migrations (RUN_MIGRATIONS=${RUN_MIGRATIONS})"
+  log "Running database migrations (RUN_MIGRATIONS=${RUN_MIGRATIONS:-1})"
   until php artisan migrate --force --no-interaction; do
     log "Migration failed (likely DB not ready). Retrying in 5 seconds..."
     sleep 5
   done
+  log "Database migrations completed successfully"
 else
   log "RUN_MIGRATIONS=0, skipping php artisan migrate"
+  log "WARNING: If this is first deploy or after adding new migrations, you must run migrations manually!"
 fi
+
+log "Starting queue worker in background (processing 'weather' and 'default' queues)"
+# Process weather queue first (higher priority), then default queue
+# Increased timeout to 300s for historical weather jobs that process 30 days of data
+php artisan queue:work --queue=weather,default --tries=3 --timeout=300 --sleep=3 > /proc/1/fd/1 2>&1 &
 
 log "Starting Laravel HTTP server on port ${PORT:-8000}"
 exec php artisan serve --host 0.0.0.0 --port "${PORT:-8000}"

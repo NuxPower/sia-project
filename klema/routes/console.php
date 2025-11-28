@@ -23,4 +23,15 @@ Artisan::command('alerts:auto-generate', function (AlertAutomationService $autom
             $this->line(sprintf('- Farm %s: %s', $failure['farm_id'], $failure['reason']));
         });
     }
+
+    if ($summary['alerts_created'] === 0 && empty($summary['failures'])) {
+        $this->comment('No alerts were created because current weather conditions do not meet alert thresholds:');
+        $this->line('  - High heat: ≥34°C');
+        $this->line('  - Cold snap: ≤8°C');
+        $this->line('  - Dry spell: 3+ consecutive days with <1.5mm precipitation');
+        $this->line('  - Harvest window: 2+ consecutive favorable days');
+        $this->line('  - Maintenance: severe wind (≥45 km/h), heavy rain (≥30mm), or storms');
+        $this->newLine();
+        $this->info('This is normal - alerts will be created automatically when conditions are met.');
+    }
 })->purpose('Generate system alerts based on current forecast data');

@@ -313,6 +313,8 @@ onMounted(async () => {
 const dismissAlert = async (alertId) => {
   try {
     await props.resolveAlert(alertId);
+    // Refresh alerts after resolving
+    await props.fetchActiveAlerts();
   } catch (err) {
     console.error('Failed to dismiss alert:', err);
   }
@@ -322,6 +324,8 @@ const deleteAlertHandler = async (alertId) => {
   if (confirm('Are you sure you want to delete this alert?')) {
     try {
       await props.deleteAlert(alertId);
+      // Refresh alerts after deleting
+      await props.fetchActiveAlerts();
     } catch (err) {
       console.error('Failed to delete alert:', err);
     }

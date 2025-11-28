@@ -9,6 +9,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Password as PasswordBroker;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rules\Password;
@@ -46,7 +47,17 @@ class AuthApiController extends Controller
             'role' => $validated['role'] ?? 'farmer',
         ]);
 
-        event(new Registered($user));
+        // Try to send verification email, but don't fail registration if it fails
+        try {
+            event(new Registered($user));
+        } catch (\Exception $e) {
+            // Log the error but don't fail the registration
+            Log::warning('Failed to send verification email during registration', [
+                'user_id' => $user->id,
+                'email' => $user->email,
+                'error' => $e->getMessage(),
+            ]);
+        }
 
         return response()->json([
             'success' => true,
@@ -171,12 +182,24 @@ class AuthApiController extends Controller
             ]);
         }
 
-        $request->user()->sendEmailVerificationNotification();
-
-        return response()->json([
-            'success' => true,
-            'message' => 'Verification link sent successfully.',
-        ]);
+        try {
+            $request->user()->sendEmailVerificationNotification();
+            
+            return response()->json([
+                'success' => true,
+                'message' => 'Verification link sent successfully.',
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Failed to send verification email', [
+                'user_id' => $request->user()->id,
+                'error' => $e->getMessage(),
+            ]);
+            
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to send verification email. Please try again later or contact support.',
+            ], 500);
+        }
     }
 
     public function resendVerificationForEmail(Request $request): JsonResponse
@@ -201,12 +224,25 @@ class AuthApiController extends Controller
             ]);
         }
 
-        $user->sendEmailVerificationNotification();
-
-        return response()->json([
-            'success' => true,
-            'message' => 'Verification email sent successfully.',
-        ]);
+        try {
+            $user->sendEmailVerificationNotification();
+            
+            return response()->json([
+                'success' => true,
+                'message' => 'Verification email sent successfully.',
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Failed to resend verification email', [
+                'user_id' => $user->id,
+                'email' => $user->email,
+                'error' => $e->getMessage(),
+            ]);
+            
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to send verification email. Please try again later or contact support.',
+            ], 500);
+        }
     }
 
     public function sendPasswordResetLink(Request $request): JsonResponse

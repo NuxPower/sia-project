@@ -33,18 +33,12 @@ class WeatherApiController extends Controller
         
         try {
             if ($lat && $lon) {
-                // Use coordinates
+                // Use coordinates - WeatherService automatically stores to database
                 $weather = $this->weatherService->getCurrentWeatherByCoordinates($lat, $lon);
             } else {
-                // Use location name
+                // Use location name - WeatherService automatically stores to database
                 $weather = $this->weatherService->getCurrentWeather($location);
             }
-
-            $this->weatherService->storeWeatherSnapshot($weather, [
-                'location' => $weather['name'] ?? $location,
-                'lat' => $lat,
-                'lon' => $lon,
-            ]);
 
             return response()->json($weather);
         } catch (\Throwable $e) {
@@ -344,6 +338,29 @@ class WeatherApiController extends Controller
     }
 
     // Database query methods removed - now using API directly with caching
+
+    /**
+     * Get location suggestions for autocomplete.
+     */
+    public function getLocationSuggestions(Request $request): JsonResponse
+    {
+        $query = $request->get('q', '');
+        $limit = (int) $request->get('limit', 5);
+        
+        if (empty(trim($query))) {
+            return response()->json([]);
+        }
+
+        try {
+            $suggestions = $this->weatherService->geocodeSuggestions($query, $limit);
+            return response()->json($suggestions);
+        } catch (\Throwable $e) {
+            \Log::error('Location suggestions API error: ' . $e->getMessage());
+            return response()->json([
+                'message' => 'Failed to fetch location suggestions: ' . $e->getMessage()
+            ], 500);
+        }
+    }
 
     /**
      * Manually trigger weather update from external API (Admin only).

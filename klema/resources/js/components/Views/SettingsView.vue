@@ -7,56 +7,64 @@
       </h2>
     </div>
 
-    <!-- Location Settings -->
-    <div class="settings-section">
-      <h3>
-        <i class="fas fa-map-marker-alt"></i>
-        Location Settings
-      </h3>
-      <div class="setting-item">
-        <label>Location Type</label>
-        <div class="radio-group">
-          <label class="radio-label">
-            <input type="radio" name="locationType" value="custom" v-model="settings.locationType">
-            <span>Custom Location</span>
-          </label>
-          <label class="radio-label">
-            <input type="radio" name="locationType" value="farm" v-model="settings.locationType">
-            <span>Farm Location</span>
-          </label>
-        </div>
-      </div>
-      
-      <!-- Custom Location Input -->
-      <div class="setting-item" v-if="settings.locationType === 'custom'">
-        <label>Default Location</label>
-        <input type="text" v-model="settings.defaultLocation" class="setting-input" placeholder="Enter location (e.g., Butuan, Caraga, PH)">
-        <button class="action-button" @click="getCurrentLocation" style="margin-top: 10px;">
-          <i class="fas fa-crosshairs"></i>
-          Detect Location
-        </button>
-      </div>
-      
-      <!-- Farm Location Dropdown -->
-      <div class="setting-item" v-if="settings.locationType === 'farm'">
-        <label>Select Farm</label>
-        <select v-model="settings.selectedFarmId" class="setting-select" :disabled="farmsLoading">
-          <option value="">-- Select a Farm --</option>
-          <option v-for="farm in farms" :key="farm.farm_id" :value="farm.farm_id">
-            {{ farm.farm_name }}
-          </option>
-        </select>
-        <small v-if="farmsLoading" style="color: #9ca3af; margin-top: 8px; display: block;">
-          Loading farms...
-        </small>
-        <small v-else-if="farms.length === 0" style="color: #9ca3af; margin-top: 8px; display: block;">
-          No farms available. Create a farm first.
-        </small>
-      </div>
+    <!-- Loading State -->
+    <div v-if="isLoadingSettings" class="loading-state">
+      <i class="fas fa-spinner fa-spin"></i>
+      <p>Loading settings...</p>
     </div>
 
-    <!-- Display Settings -->
-    <div class="settings-section">
+    <!-- Settings Content -->
+    <template v-else>
+      <!-- Location Settings -->
+      <div class="settings-section">
+        <h3>
+          <i class="fas fa-map-marker-alt"></i>
+          Location Settings
+        </h3>
+        <div class="setting-item">
+          <label>Location Type</label>
+          <div class="radio-group">
+            <label class="radio-label">
+              <input type="radio" name="locationType" value="custom" v-model="settings.locationType">
+              <span>Custom Location</span>
+            </label>
+            <label class="radio-label">
+              <input type="radio" name="locationType" value="farm" v-model="settings.locationType">
+              <span>Farm Location</span>
+            </label>
+          </div>
+        </div>
+        
+        <!-- Custom Location Input -->
+        <div class="setting-item" v-if="settings.locationType === 'custom'">
+          <label>Default Location</label>
+          <input type="text" v-model="settings.defaultLocation" class="setting-input" placeholder="Enter location">
+          <button class="action-button" @click="getCurrentLocation" style="margin-top: 10px;">
+            <i class="fas fa-crosshairs"></i>
+            Detect Location
+          </button>
+        </div>
+        
+        <!-- Farm Location Dropdown -->
+        <div class="setting-item" v-if="settings.locationType === 'farm'">
+          <label>Select Farm</label>
+          <select v-model="settings.selectedFarmId" class="setting-select" :disabled="farmsLoading">
+            <option value="">-- Select a Farm --</option>
+            <option v-for="farm in farms" :key="farm.farm_id" :value="farm.farm_id">
+              {{ farm.farm_name }}
+            </option>
+          </select>
+          <small v-if="farmsLoading" style="color: #9ca3af; margin-top: 8px; display: block;">
+            Loading farms...
+          </small>
+          <small v-else-if="farms.length === 0" style="color: #9ca3af; margin-top: 8px; display: block;">
+            No farms available. Create a farm first.
+          </small>
+        </div>
+      </div>
+
+      <!-- Display Settings -->
+      <div class="settings-section">
       <h3>
         <i class="fas fa-desktop"></i>
         Display Settings
@@ -95,10 +103,10 @@
           </label>
         </div>
       </div>
-    </div>
+      </div>
 
-    <!-- Data & Privacy -->
-    <div class="settings-section">
+      <!-- Data & Privacy -->
+      <div class="settings-section">
       <h3>
         <i class="fas fa-shield-alt"></i>
         Data & Privacy
@@ -123,10 +131,10 @@
           <span class="slider"></span>
         </label>
       </div>
-    </div>
+      </div>
 
-    <!-- About -->
-    <div class="settings-section">
+      <!-- About -->
+      <div class="settings-section">
       <h3>
         <i class="fas fa-info-circle"></i>
         About
@@ -134,7 +142,7 @@
       <div class="about-info">
         <div class="info-row">
           <span class="info-label">Version:</span>
-          <span class="info-value">1.1.0</span>
+          <span class="info-value">1.1.1</span>
         </div>
         <div class="info-row">
           <span class="info-label">Weather Data:</span>
@@ -145,25 +153,26 @@
           <span class="info-value">October 2025</span>
         </div>
       </div>
-    </div>
+      </div>
 
-    <!-- Actions -->
-    <div class="settings-actions">
-      <button class="action-button primary" @click="saveSettings" :disabled="isSaving">
+      <!-- Actions -->
+      <div class="settings-actions">
+      <button class="action-button primary" @click="saveSettings" :disabled="isSaving || isLoadingSettings">
         <i class="fas fa-save"></i>
         <span v-if="!isSaving">Save Changes</span>
         <span v-else>Saving...</span>
       </button>
-      <button class="action-button danger" @click="clearAllData" :disabled="isClearing">
+      <button class="action-button danger" @click="clearAllData" :disabled="isClearing || isLoadingSettings">
         <i class="fas fa-trash"></i>
         <span v-if="!isClearing">Clear All Data</span>
         <span v-else>Clearing...</span>
       </button>
-      <button class="action-button logout" @click="logout">
+      <button class="action-button logout" @click="logout" :disabled="isLoadingSettings">
         <i class="fas fa-sign-out-alt"></i>
         Logout
       </button>
-    </div>
+      </div>
+    </template>
   </div>
 </template>
 
@@ -176,12 +185,11 @@ import { useFarms } from '../../composables/useFarms';
 import { ensureApiToken } from '../../services/auth';
 import axios from 'axios';
 
-const STORAGE_KEY = 'appSettings';
 const NOTIFICATION_SETTINGS_KEY = 'notificationSettings';
 
 const defaultSettings = Object.freeze({
   locationType: 'custom', // 'custom' or 'farm'
-  defaultLocation: 'Butuan, Caraga, PH',
+  defaultLocation: '',
   selectedFarmId: '',
   temperatureUnit: 'celsius',
   windSpeedUnit: 'ms',
@@ -193,31 +201,59 @@ const defaultSettings = Object.freeze({
 const settings = reactive({ ...defaultSettings });
 const isSaving = ref(false);
 const isClearing = ref(false);
+const isLoadingSettings = ref(false);
 
 const { showSuccess, showError } = useGlobalAlerts();
 const { farms, loading: farmsLoading, fetchFarms } = useFarms();
 
-const loadSettings = () => {
-  if (typeof window === 'undefined') {
-    return;
-  }
-
+const loadSettings = async () => {
   try {
-    const stored = window.localStorage?.getItem(STORAGE_KEY);
-    if (stored) {
-      const parsed = JSON.parse(stored);
-      Object.assign(settings, { ...defaultSettings, ...parsed });
+    isLoadingSettings.value = true;
+    await ensureApiToken(axios);
+    
+    const response = await axios.get('/api/settings');
+    
+    if (response.data?.success && response.data?.settings) {
+      Object.assign(settings, { ...defaultSettings, ...response.data.settings });
     }
   } catch (error) {
     console.error('Failed to load settings:', error);
-    showError('Load Failed', 'Unable to load your saved settings.');
+    
+    // Fallback to localStorage if API fails (for backward compatibility during migration)
+    if (typeof window !== 'undefined') {
+      try {
+        const stored = window.localStorage?.getItem('appSettings');
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          Object.assign(settings, { ...defaultSettings, ...parsed });
+          // Try to sync to database (defer to avoid circular dependency)
+          setTimeout(async () => {
+            try {
+              await ensureApiToken(axios);
+              await axios.put('/api/settings', settings);
+            } catch (syncError) {
+              console.warn('Failed to sync localStorage settings to database:', syncError);
+            }
+          }, 1000);
+        }
+      } catch (localError) {
+        console.error('Failed to load from localStorage:', localError);
+      }
+    }
+    
+    // Don't show error if we successfully loaded from localStorage
+    if (!error.response || error.response.status !== 404) {
+      showError('Load Failed', 'Unable to load your saved settings.');
+    }
+  } finally {
+    isLoadingSettings.value = false;
   }
 };
 
 onMounted(async () => {
   await ensureApiToken(axios);
   await fetchFarms();
-  loadSettings();
+  await loadSettings();
   
   // If location type is farm but no farm is selected, and farms are available, select first farm
   if (settings.locationType === 'farm' && !settings.selectedFarmId && farms.value.length > 0) {
@@ -233,64 +269,100 @@ watch(() => settings.locationType, (newType) => {
   }
 });
 
-const saveSettings = async () => {
+const saveSettingsToAPI = async () => {
   if (isSaving.value) return;
 
   try {
     isSaving.value = true;
+    await ensureApiToken(axios);
 
-    if (typeof window !== 'undefined') {
-      // Create a copy to avoid mutating the reactive object
-      const settingsToSave = { ...settings };
-      window.localStorage?.setItem(STORAGE_KEY, JSON.stringify(settingsToSave));
-      
-      // Trigger a custom event for immediate updates in the same window (before page reload)
-      // This ensures components can react to changes without waiting for reload
-      window.dispatchEvent(new CustomEvent('appSettingsUpdated', { 
-        detail: settingsToSave 
-      }));
-      
-      // Also trigger storage event so other tabs/components can update
-      // Note: storage event only fires for other tabs, not the current one
-      window.dispatchEvent(new StorageEvent('storage', {
-        key: STORAGE_KEY,
-        newValue: JSON.stringify(settingsToSave),
-        storageArea: window.localStorage
-      }));
-    }
-
-    showSuccess('Settings Saved', 'Your preferences have been updated. Reloading...');
+    // Create a copy to avoid mutating the reactive object
+    const settingsToSave = { ...settings };
     
-    // Reload the page after a short delay to ensure settings are applied
-    setTimeout(() => {
-      window.location.reload();
-    }, 1000);
+    // Remove undefined/null values
+    Object.keys(settingsToSave).forEach(key => {
+      if (settingsToSave[key] === undefined || settingsToSave[key] === null || settingsToSave[key] === '') {
+        delete settingsToSave[key];
+      }
+    });
+
+    const response = await axios.put('/api/settings', settingsToSave);
+
+    if (response.data?.success) {
+      // Update local settings with server response (to ensure consistency)
+      if (response.data?.settings) {
+        Object.assign(settings, { ...defaultSettings, ...response.data.settings });
+      }
+
+      // Trigger a custom event for immediate updates in the same window (before page reload)
+      window.dispatchEvent(new CustomEvent('appSettingsUpdated', { 
+        detail: settings 
+      }));
+
+      // Also keep localStorage in sync (as backup/fallback)
+      if (typeof window !== 'undefined') {
+        window.localStorage?.setItem('appSettings', JSON.stringify(settings));
+      }
+
+      showSuccess('Settings Saved', 'Your preferences have been updated. Reloading...');
+      
+      // Reload the page after a short delay to ensure settings are applied
+      setTimeout(() => {
+        window.location.reload();
+      }, 1000);
+    } else {
+      throw new Error(response.data?.message || 'Failed to save settings');
+    }
   } catch (error) {
     console.error('Save settings error:', error);
-    showError('Save Failed', 'Unable to save your settings. Please try again.');
+    showError('Save Failed', error.response?.data?.message || 'Unable to save your settings. Please try again.');
     isSaving.value = false;
   }
 };
 
+const saveSettings = () => {
+  saveSettingsToAPI();
+};
+
 const clearAllData = async () => {
   if (isClearing.value) return;
-  if (typeof window === 'undefined') return;
 
-  const confirmed = window.confirm('This will reset your local settings. Continue?');
+  const confirmed = window.confirm('This will reset your settings to defaults. Continue?');
   if (!confirmed) return;
 
   try {
     isClearing.value = true;
+    await ensureApiToken(axios);
 
-    window.localStorage?.removeItem(STORAGE_KEY);
-    window.localStorage?.removeItem(NOTIFICATION_SETTINGS_KEY);
+    // Reset settings on server
+    const response = await axios.post('/api/settings/reset');
 
-    Object.assign(settings, { ...defaultSettings });
+    if (response.data?.success) {
+      // Update local settings with server response
+      if (response.data?.settings) {
+        Object.assign(settings, { ...defaultSettings, ...response.data.settings });
+      } else {
+        Object.assign(settings, { ...defaultSettings });
+      }
 
-    showSuccess('Data Cleared', 'All settings have been reset to defaults.');
+      // Clear localStorage as well
+      if (typeof window !== 'undefined') {
+        window.localStorage?.removeItem('appSettings');
+        window.localStorage?.removeItem(NOTIFICATION_SETTINGS_KEY);
+      }
+
+      // Trigger event for components
+      window.dispatchEvent(new CustomEvent('appSettingsUpdated', { 
+        detail: settings 
+      }));
+
+      showSuccess('Data Cleared', 'All settings have been reset to defaults.');
+    } else {
+      throw new Error(response.data?.message || 'Failed to reset settings');
+    }
   } catch (error) {
     console.error('Clear data error:', error);
-    showError('Reset Failed', 'Unable to clear settings. Please try again.');
+    showError('Reset Failed', error.response?.data?.message || 'Unable to clear settings. Please try again.');
   } finally {
     isClearing.value = false;
   }
@@ -384,6 +456,27 @@ const logout = async () => {
 
 .settings-section h3 i {
   color: #3b82f6;
+}
+
+.loading-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 60px 20px;
+  color: #9ca3af;
+  text-align: center;
+}
+
+.loading-state i {
+  font-size: 48px;
+  margin-bottom: 20px;
+  color: #3b82f6;
+}
+
+.loading-state p {
+  font-size: 16px;
+  margin: 0;
 }
 
 .setting-item {

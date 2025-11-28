@@ -19,6 +19,7 @@ yarn-error.log
 
 # Capacitor
 /android
+/android/app/build
 /ios
 .capacitor
 
@@ -27,5 +28,6 @@ yarn-error.log
 /dist-electron
 
 # Build outputs
+/dist
 *.log
 .vercel

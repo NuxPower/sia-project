@@ -27,6 +27,7 @@ const boundaryDrawing = ref(null);
 const pointPlacement = ref(null);
 const activeBaseLayer = ref(null);
 const requestedBaseLayer = ref('street');
+const activeOverlayLayers = ref(new Set());
 
 const { formatTemperature, formatWindSpeed } = useDisplaySettings();
 
@@ -90,6 +91,12 @@ const applyBaseLayer = (layerId) => {
     return;
   }
 
+  // Store currently active overlay layers
+  const overlaysToRestore = Array.from(activeOverlayLayers.value).map(name => ({
+    name,
+    layer: weatherLayers.value[name]
+  })).filter(item => item.layer && map.value.hasLayer(item.layer));
+
   Object.values(baseMapLayers.value).forEach((layer) => {
     if (map.value.hasLayer(layer)) {
       map.value.removeLayer(layer);
@@ -98,6 +105,13 @@ const applyBaseLayer = (layerId) => {
 
   targetLayer.addTo(map.value);
   activeBaseLayer.value = targetKey;
+
+  // Re-add overlay layers to ensure they're on top
+  overlaysToRestore.forEach(({ layer }) => {
+    if (layer && !map.value.hasLayer(layer)) {
+      map.value.addLayer(layer);
+    }
+  });
 };
 
 const setBaseLayer = (layerId) => {
@@ -171,9 +185,15 @@ const toggleWeatherLayer = (layerId, active) => {
   
   if (layer) {
     if (active) {
+      // Remove and re-add to ensure it's on top of base layers
+      if (map.value.hasLayer(layer)) {
+        map.value.removeLayer(layer);
+      }
       map.value.addLayer(layer);
+      activeOverlayLayers.value.add(layerName);
     } else {
       map.value.removeLayer(layer);
+      activeOverlayLayers.value.delete(layerName);
     }
   }
 };

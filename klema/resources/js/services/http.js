@@ -35,14 +35,10 @@ export async function authorizedFetch(url, options = {}) {
     return response;
   }
 
+  // Token is invalid/expired - clear it
   setApiToken(null);
-  const refreshedToken = await ensureApiToken();
-
-  if (!refreshedToken) {
-    return response;
-  }
-
-  response = await performFetch(url, options, refreshedToken);
-
+  
+  // Don't try to refresh token automatically
+  // The app should handle 401 by showing login screen
   return response;
 }

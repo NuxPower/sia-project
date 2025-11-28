@@ -46,10 +46,10 @@
     </div>
 
     <div class="forecast-grid">
-      <h3>7-Day Forecast</h3>
+      <h3>5-Day Forecast</h3>
       <div class="forecast-cards">
         <div 
-          v-for="(day, index) in forecast" 
+          v-for="(day, index) in futureForecast" 
           :key="index"
           class="forecast-card"
           :class="{ 'today': day.isToday, 'history': day.isHistory }"
@@ -70,10 +70,25 @@
 
     <!-- System Statistics -->
     <div v-if="systemStats" class="system-stats-section">
-      <h3>
-        <i class="fas fa-chart-line"></i>
-        System Statistics
-      </h3>
+      <div class="stats-header">
+        <h3>
+          <i class="fas fa-chart-line"></i>
+          System Statistics
+        </h3>
+        <div class="temperature-filter">
+          <label class="filter-label">
+            <span>Avg Temp Period:</span>
+            <select v-model="temperaturePeriod" @change="updateTemperatureFilter" class="period-select">
+              <option :value="null">All Time</option>
+              <option :value="7">Last 7 Days</option>
+              <option :value="30">Last 30 Days</option>
+              <option :value="90">Last 90 Days</option>
+              <option :value="180">Last 6 Months</option>
+              <option :value="365">Last Year</option>
+            </select>
+          </label>
+        </div>
+      </div>
       <div class="stats-grid">
         <div class="stat-card">
           <div class="stat-icon">
@@ -117,7 +132,10 @@
           </div>
           <div class="stat-content">
             <div class="stat-value">{{ formatTemperature(systemStats.avg_temperature || 0) }}</div>
-            <div class="stat-label">Avg Temperature</div>
+            <div class="stat-label">
+              Avg Temperature
+              <span v-if="temperaturePeriod" class="period-badge">{{ getPeriodLabel(temperaturePeriod) }}</span>
+            </div>
           </div>
         </div>
       </div>
@@ -471,6 +489,26 @@ const props = defineProps({
 
 const { formatTemperature, formatWindSpeed } = useDisplaySettings();
 
+// Temperature period filter state
+const temperaturePeriod = ref(null); // null = all time
+
+// Period label helper
+const getPeriodLabel = (days) => {
+  const labels = {
+    7: '7d',
+    30: '30d',
+    90: '90d',
+    180: '6mo',
+    365: '1yr'
+  };
+  return labels[days] || `${days}d`;
+};
+
+// Update temperature filter when period changes
+const updateTemperatureFilter = () => {
+  emit('refresh-system-stats', temperaturePeriod.value);
+};
+
 const emit = defineEmits([
   'refresh-farms',
   'create-farm',
@@ -483,11 +521,181 @@ const emit = defineEmits([
   'cancel-point',
   'refresh-activities',
   'change-activity-status',
-  'delete-activity'
+  'delete-activity',
+  'refresh-system-stats'
 ]);
 
 const farms = computed(() => props.farms ?? []);
 const activities = computed(() => props.activities ?? []);
+
+// Helper function to compute weather warning from forecast data
+const computeWeatherWarning = (weather) => {
+  if (!weather) {
+    return null;
+  }
+
+  const condition = (weather.description || weather.condition || weather.weather?.[0]?.main || '').toLowerCase();
+  const precip = Number(
+    weather.precipitation_sum ??
+    weather.precip_mm ??
+    weather.rain ??
+    weather.daily_precipitation ??
+    0
+  );
+  const wind = Number(weather.wind_max_kmh ?? weather.wind_speed ?? weather.wind ?? 0);
+  const tempMax = Number(weather.temp_max ?? weather.main?.temp_max ?? null);
+  const tempMin = Number(weather.temp_min ?? weather.main?.temp_min ?? null);
+
+  if (condition.includes('storm') || condition.includes('thunder')) {
+    return 'Severe storm conditions likely';
+  }
+
+  if (precip >= 25) {
+    return 'Heavy rainfall expected';
+  }
+
+  // Check for rain in condition (e.g., "slight rain", "light rain", "rain")
+  if (condition.includes('rain') || condition.includes('drizzle')) {
+    return 'Rain likely throughout the day';
+  }
+
+  if (precip >= 5) {
+    return 'Rain likely throughout the day';
+  }
+
+  if (wind >= 50) {
+    return 'Damaging wind gusts possible';
+  }
+
+  if (wind >= 30) {
+    return 'Strong winds could impact field work';
+  }
+
+  if (Number.isFinite(tempMax) && tempMax >= 35) {
+    return 'Extreme heat risk';
+  }
+
+  if (Number.isFinite(tempMin) && tempMin <= 5) {
+    return 'Low temperature / frost risk';
+  }
+
+  return null;
+};
+
+// Helper to format date key for matching
+const formatDateKey = (value) => {
+  if (!value) return '';
+  
+  let date;
+  if (value instanceof Date) {
+    date = value;
+  } else if (typeof value === 'string') {
+    const [datePart] = value.split('T');
+    const parts = datePart.split('-').map((segment) => parseInt(segment, 10));
+    if (parts.length >= 3 && parts.every((part) => !Number.isNaN(part))) {
+      date = new Date(parts[0], parts[1] - 1, parts[2]);
+    } else {
+      date = new Date(value);
+    }
+  } else {
+    return '';
+  }
+
+  if (Number.isNaN(date.getTime())) {
+    return '';
+  }
+
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
+// Enrich activities with current forecast-based weather warnings
+const enrichedActivities = computed(() => {
+  const forecastMap = new Map();
+  
+  // Build a map of forecast data by date
+  if (Array.isArray(props.forecast)) {
+    props.forecast.forEach((day) => {
+      if (day?.date) {
+        forecastMap.set(day.date, day);
+      }
+    });
+  }
+
+  // Enrich each activity with computed weather warning
+  return activities.value.map((activity) => {
+    const activityDateKey = formatDateKey(activity.start_date);
+    const forecastForDate = forecastMap.get(activityDateKey);
+    
+    // Compute warning from current forecast, fall back to stored warning
+    const computedWarning = computeWeatherWarning(forecastForDate);
+    const displayWarning = computedWarning || activity.weather_warning || null;
+
+    return {
+      ...activity,
+      weather_warning: displayWarning,
+      _computedWarning: computedWarning, // Track if warning came from forecast
+      _storedWarning: activity.weather_warning // Track original stored warning
+    };
+  });
+});
+
+// Filter forecast to show only 7 days starting from tomorrow
+const futureForecast = computed(() => {
+  if (!Array.isArray(props.forecast) || props.forecast.length === 0) {
+    return [];
+  }
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  
+  // Filter out today and history days, only keep future days
+  const futureDays = props.forecast.filter((day) => {
+    // Basic validation
+    if (!day?.date) return false;
+    
+    // Explicitly exclude history and today
+    if (day.isHistory) return false;
+    if (day.isToday) return false;
+    
+    // Parse the date string (format: "YYYY-MM-DD")
+    const parts = day.date.split('-');
+    if (parts.length !== 3) return false;
+    
+    try {
+      const dayDate = new Date(
+        parseInt(parts[0], 10),
+        parseInt(parts[1], 10) - 1,
+        parseInt(parts[2], 10)
+      );
+      dayDate.setHours(0, 0, 0, 0);
+      
+      // Only include days strictly after today
+      return dayDate > today;
+    } catch (e) {
+      return false;
+    }
+  });
+  
+  // Sort by date and take first 7 days
+  return futureDays
+    .sort((a, b) => {
+      try {
+        const aParts = a.date.split('-');
+        const bParts = b.date.split('-');
+        if (aParts.length !== 3 || bParts.length !== 3) return 0;
+        const aDate = new Date(parseInt(aParts[0], 10), parseInt(aParts[1], 10) - 1, parseInt(aParts[2], 10));
+        const bDate = new Date(parseInt(bParts[0], 10), parseInt(bParts[1], 10) - 1, parseInt(bParts[2], 10));
+        return aDate - bDate;
+      } catch (e) {
+        return 0;
+      }
+    })
+    .slice(0, 7);
+});
+
 const activityStatusFilter = ref('active');
 const activityWindowFilter = ref('upcoming');
 const activitySearch = ref('');
@@ -547,7 +755,7 @@ const formatActivityDate = (value) => {
 };
 
 const sortedActivities = computed(() => {
-  return [...activities.value].sort((a, b) => {
+  return [...enrichedActivities.value].sort((a, b) => {
     const aDate = toDateOnly(a?.start_date)?.getTime() ?? 0;
     const bDate = toDateOnly(b?.start_date)?.getTime() ?? 0;
     return aDate - bDate;
@@ -730,7 +938,7 @@ const selectVantaEffect = (condition = '') => {
   return CLOUDS;
 };
 
-const initVanta = () => {
+const initVanta = async () => {
   if (typeof window === 'undefined' || !weatherCard.value) {
     return;
   }
@@ -761,7 +969,19 @@ const initVanta = () => {
   };
 
   try {
+    // Ensure THREE.js is available before initializing
+    if (!THREE) {
+      console.warn('THREE.js not available for Vanta effect');
+      return;
+    }
+
     const { minHeight, scale, scaleMobile } = getVantaViewportConfig();
+    
+    // Check if element still exists before initializing
+    if (!weatherCard.value) {
+      return;
+    }
+
     vantaEffect = effectType({
       el: weatherCard.value,
       THREE,
@@ -777,7 +997,8 @@ const initVanta = () => {
     });
 
     isVantaActive.value = true;
-  } catch {
+  } catch (error) {
+    console.warn('Failed to initialize Vanta effect:', error);
     destroyVanta();
   }
 };
@@ -787,23 +1008,48 @@ const scheduleVantaInit = () => {
     return;
   }
 
-  nextTick(() => {
-    initVanta();
-  });
+  // Optimized: Defer Vanta initialization to avoid blocking initial render
+  // Use requestIdleCallback for better performance, fallback to setTimeout
+  const deferredInit = () => {
+    nextTick(() => {
+      initVanta();
+    });
+  };
+
+  if (typeof requestIdleCallback !== 'undefined') {
+    // Use idle time to initialize Vanta (non-blocking)
+    requestIdleCallback(deferredInit, { timeout: 300 });
+  } else {
+    // Fallback: Defer to next animation frame
+    setTimeout(deferredInit, 100);
+  }
 };
 
+let vantaInitTimeout = null;
+
 onMounted(() => {
+  // Don't block mount - schedule Vanta for later
   scheduleVantaInit();
 });
 
 onBeforeUnmount(() => {
+  if (vantaInitTimeout) {
+    clearTimeout(vantaInitTimeout);
+    vantaInitTimeout = null;
+  }
   destroyVanta();
 });
 
 watch(
   () => props.currentWeather?.weather?.[0]?.main,
   () => {
-    scheduleVantaInit();
+    // Debounce Vanta re-initialization to avoid excessive recreations
+    if (vantaInitTimeout) {
+      clearTimeout(vantaInitTimeout);
+    }
+    vantaInitTimeout = setTimeout(() => {
+      scheduleVantaInit();
+    }, 150);
   }
 );
 
@@ -1167,10 +1413,19 @@ const weatherEffectClass = computed(() => {
   margin-bottom: 30px;
 }
 
+.stats-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+  gap: 15px;
+}
+
 .system-stats-section h3 {
   color: white;
   font-size: 20px;
-  margin-bottom: 20px;
+  margin: 0;
   display: flex;
   align-items: center;
   gap: 10px;
@@ -1178,6 +1433,65 @@ const weatherEffectClass = computed(() => {
 
 .system-stats-section h3 i {
   color: #3b82f6;
+}
+
+.temperature-filter {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.filter-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 14px;
+}
+
+.filter-label span {
+  white-space: nowrap;
+}
+
+.period-select {
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 8px;
+  padding: 6px 12px;
+  color: white;
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  min-width: 120px;
+}
+
+.period-select:hover {
+  background: rgba(255, 255, 255, 0.15);
+  border-color: rgba(59, 130, 246, 0.5);
+}
+
+.period-select:focus {
+  outline: none;
+  border-color: #3b82f6;
+  background: rgba(255, 255, 255, 0.15);
+}
+
+.period-select option {
+  background: #1e293b;
+  color: white;
+}
+
+.period-badge {
+  display: inline-block;
+  background: rgba(59, 130, 246, 0.2);
+  color: #60a5fa;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 10px;
+  margin-left: 6px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
 }
 
 .stats-grid {
@@ -1929,6 +2243,27 @@ const weatherEffectClass = computed(() => {
   .tips-section {
     padding: 1rem;
     margin-bottom: 1.25rem;
+  }
+
+  .stats-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+  }
+
+  .temperature-filter {
+    width: 100%;
+  }
+
+  .filter-label {
+    width: 100%;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 6px;
+  }
+
+  .period-select {
+    width: 100%;
   }
 
   .stats-grid {

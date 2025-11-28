@@ -3,14 +3,15 @@
     <SearchBar 
       v-if="activeView === 'map' && !selectedDayDetail && !isDrawingBoundary"
       v-model="searchLocation"
+      v-model:mapOnly="isMapOnly"
       @search="searchWeather"
       :is-loading="isLoadingWeather"
     />
     
-    <ClickInstruction v-if="activeView === 'map' && !selectedDayDetail && !isDrawingBoundary" />
+    <ClickInstruction v-if="activeView === 'map' && !selectedDayDetail && !isDrawingBoundary && !isMapOnly" />
     
     <WeatherLayerControls 
-      v-if="activeView === 'map' && !selectedDayDetail && !isDrawingBoundary"
+      v-if="activeView === 'map' && !selectedDayDetail && !isDrawingBoundary && !isMapOnly"
       @toggle-layer="handleLayerToggle"
       @change-base-layer="handleBaseLayerChange" 
     />
@@ -80,14 +81,14 @@
     </div>
     
     <WeatherTimeline
-      v-if="activeView === 'map' && !selectedDayDetail && !isDrawingBoundary"
+      v-if="activeView === 'map' && !selectedDayDetail && !isDrawingBoundary && !isMapOnly"
       :forecast="forecastTimeline"
       :get-day-label="getDayLabel"
       :get-weather-icon="getWeatherIcon"
       @day-selected="handleTimelineSelection"
     />
     
-    <TimelineLegend v-if="activeView === 'map' && !selectedDayDetail && !isDrawingBoundary" />
+    <TimelineLegend v-if="activeView === 'map' && !selectedDayDetail && !isDrawingBoundary && !isMapOnly" />
 
     <transition name="overlay-fade" v-if="!isMobileLayout">
       <div
@@ -217,6 +218,13 @@ const toggleDrawingModeClass = (isActive) => {
   document.body.classList.toggle('drawing-boundary-mode', !!isActive);
 };
 
+const toggleMapOnlyClass = (isActive) => {
+  if (typeof document === 'undefined') {
+    return;
+  }
+  document.body.classList.toggle('map-only-mode', !!isActive);
+};
+
 const applyAuthBodyClass = (authState) => {
   if (typeof document === 'undefined') {
     return;
@@ -246,7 +254,7 @@ const getDefaultLocation = () => {
   return Promise.resolve(DEFAULT_LOCATION_STRING);
 };
 const INITIAL_HISTORY_DAYS = 3; // 3 days before today
-const INITIAL_FORECAST_DAYS = 3; // 3 days after today (total: 7 days including today)
+const INITIAL_FORECAST_DAYS = 7; // 7 days after today (API max is 5 days, so we'll get 4-5 future days)
 const MAX_HISTORY_WINDOW = 90; // Increased from 30 to 90 days
 const MAX_FORECAST_WINDOW = 16;
 const searchLocation = ref(DEFAULT_LOCATION_STRING);
@@ -256,6 +264,7 @@ const currentWeather = ref(null);
 const mapLoading = ref(true);
 const isLoadingWeather = ref(false);
 const activeView = ref('map');
+const isMapOnly = ref(false);
 const boundarySession = ref(null);
 const pointSession = ref(null);
 const isDrawingBoundary = computed(() => !!boundarySession.value);
@@ -523,17 +532,32 @@ const handleActivityDelete = async (activityId) => {
   }
 };
 
+// Optimized: Only load dashboard data when view is actually active (lazy loading)
 watch(
   activeView,
   (view) => {
     if (view === 'dashboard') {
-      ensureDashboardActivitiesLoaded();
+      // Use requestIdleCallback or setTimeout to defer non-critical operations
+      const loadDashboardData = () => {
+        ensureDashboardActivitiesLoaded();
+        // Fetch system stats when dashboard is shown - force refresh to get latest data
+        fetchSystemStats(true); // Force refresh to get updated stats
+        if (!systemStats.value) {
+          fetchUserInfo();
+        }
+      };
+      
+      // Defer to avoid blocking view switch
+      if (typeof requestIdleCallback !== 'undefined') {
+        requestIdleCallback(loadDashboardData, { timeout: 100 });
+      } else {
+        setTimeout(loadDashboardData, 0);
+      }
     }
-  },
-  { immediate: true }
+  }
 );
 
-// Fetch user info and system stats
+// Fetch user info and system stats (only called when needed)
 const fetchUserInfo = async () => {
   try {
     await ensureApiToken(axios);
@@ -541,19 +565,53 @@ const fetchUserInfo = async () => {
     if (response.data?.user) {
       currentUser.value = response.data.user;
       
-      // Fetch system stats
-      try {
-        const statsResponse = await axios.get('/api/admin/stats');
-        if (statsResponse.data?.success && statsResponse.data?.stats) {
-          systemStats.value = statsResponse.data.stats;
-        }
-      } catch (err) {
-        console.warn('Could not fetch system stats:', err);
-      }
+      // Fetch system stats separately and asynchronously
+      fetchSystemStats();
     }
   } catch (error) {
-    console.warn('Could not fetch user info:', error);
+    // If token is invalid (401), clear auth state and show login
+    if (error.response?.status === 401) {
+      revokeApiToken();
+      currentUser.value = null;
+      isAuthenticated.value = false;
+      applyAuthBodyClass(false);
+      console.warn('Token expired or invalid, please log in again');
+    } else {
+      console.warn('Could not fetch user info:', error);
+    }
   }
+};
+
+// Separate system stats fetch for better performance
+const fetchSystemStats = async (forceRefresh = false, temperatureDays = null) => {
+  // Always fetch if forcing refresh or temperature filter is specified
+  if (!forceRefresh && temperatureDays === null && systemStats.value) {
+    // Skip if already loaded and no filter/refresh requested
+    return;
+  }
+  
+  try {
+    await ensureApiToken(axios);
+    // Add timestamp to prevent caching and include temperature period
+    const params = {};
+    if (forceRefresh || temperatureDays !== null) {
+      params._t = Date.now(); // Force refresh when filter changes
+    }
+    if (temperatureDays !== null) {
+      params.temperature_days = temperatureDays;
+    }
+    const statsResponse = await axios.get('/api/admin/stats', { params });
+    if (statsResponse.data?.success && statsResponse.data?.stats) {
+      systemStats.value = statsResponse.data.stats;
+    }
+  } catch (err) {
+    console.warn('Could not fetch system stats:', err);
+  }
+};
+
+// Handler for refreshing system stats with temperature filter
+const handleRefreshSystemStats = (temperatureDays) => {
+  fetchSystemStats(true, temperatureDays);
 };
 
 const handleLoginSuccess = async (user) => {
@@ -626,7 +684,7 @@ const overlayViewConfig = computed(() => {
         component: DashboardView,
         props: {
           currentWeather: currentWeather.value,
-          forecast: forecast.value,
+          forecast: fullForecastTimeline.value,
           getDayLabel,
           getWeatherIcon,
           farms: rawFarms.value,
@@ -654,7 +712,9 @@ const overlayViewConfig = computed(() => {
           onChangeActivityStatus: handleActivityStatusChange,
           onDeleteActivity: handleActivityDelete
         },
-        listeners: {}
+        listeners: {
+          'refresh-system-stats': handleRefreshSystemStats
+        }
       };
     case 'calendar':
       return {
@@ -1022,6 +1082,14 @@ watch(
   isDrawingBoundary,
   (next) => {
     toggleDrawingModeClass(next);
+  },
+  { immediate: true }
+);
+
+watch(
+  isMapOnly,
+  (isActive) => {
+    toggleMapOnlyClass(isActive);
   },
   { immediate: true }
 );
@@ -1429,20 +1497,35 @@ const bootstrapApp = async () => {
   bootstrapInProgress.value = true;
   try {
     await ensureApiToken(window.axios);
-    await fetchUserInfo();
+    
+    // Optimized: Only fetch user info if needed (not blocking)
+    // System stats will be fetched lazily when dashboard is shown
+    fetchUserInfo().catch(err => {
+      console.warn('Non-critical: Could not fetch user info:', err);
+    });
 
     // Load farms first so we can use saved farm selection
     await refreshFarmLayers({ reloadData: true });
 
+    // Initialize alerts panel in parallel with weather (doesn't depend on weather)
+    const alertsPromise = initializeAlertsPanel().catch(err => {
+      console.warn('Non-critical: Could not initialize alerts panel:', err);
+    });
+
     // Now initialize default location (which can use saved settings)
-    const prefilled = await initializeDefaultLocation();
-    if (!prefilled) {
-      await searchWeather();
-    }
+    const weatherPromise = (async () => {
+      const prefilled = await initializeDefaultLocation();
+      if (!prefilled) {
+        await searchWeather();
+      }
+    })().catch(err => {
+      console.error('Failed to initialize weather:', err);
+    });
 
     registerGlobalHandlers();
 
-    await initializeAlertsPanel();
+    // Wait for both to complete (in parallel)
+    await Promise.all([alertsPromise, weatherPromise]);
   } finally {
     bootstrapInProgress.value = false;
   }
@@ -1470,6 +1553,7 @@ onBeforeUnmount(() => {
   }
   applyAuthBodyClass(true);
   toggleDrawingModeClass(false);
+  toggleMapOnlyClass(false);
 });
 
 const getMobilePanelTitle = () => {
@@ -1501,7 +1585,36 @@ onMounted(async () => {
     return;
   }
 
-  await bootstrapApp();
+  // Validate token before bootstrapping app
+  // If token is invalid, fetchUserInfo will clear auth state
+  try {
+    await ensureApiToken(window.axios);
+    const response = await window.axios.get('/api/auth/me');
+    if (response.data?.user) {
+      currentUser.value = response.data.user;
+      await bootstrapApp();
+    } else {
+      // No user data, clear auth
+      revokeApiToken();
+      isAuthenticated.value = false;
+      applyAuthBodyClass(false);
+    }
+  } catch (error) {
+    // Token is invalid (401) or other error - clear auth and show login
+    // Note: The axios interceptor will also handle 401, but we handle it here
+    // to prevent unnecessary API calls during bootstrap
+    if (error.response?.status === 401 || !error.response) {
+      revokeApiToken();
+      currentUser.value = null;
+      isAuthenticated.value = false;
+      applyAuthBodyClass(false);
+      console.warn('Token expired or invalid, please log in again');
+    } else {
+      // Other error - still try to bootstrap but log the error
+      console.error('Error validating token:', error);
+      await bootstrapApp();
+    }
+  }
 });
 
 watch([farmFeatures, pointFeatures], () => {

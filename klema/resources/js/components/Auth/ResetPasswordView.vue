@@ -6,7 +6,7 @@
       </div>
       <div>
         <h1 class="auth-card__title">Reset your password</h1>
-        <p class="auth-card__subtitle">Enter the code we emailed you and choose a new password</p>
+        <p class="auth-card__subtitle">Choose a new password for your account</p>
       </div>
     </div>
 
@@ -21,34 +21,7 @@
     </div>
 
     <form class="auth-form" @submit.prevent="handleReset">
-      <div class="auth-form__group">
-        <label class="auth-form__label">Reset Token</label>
-        <div class="auth-input-wrapper">
-          <i class="fas fa-hashtag"></i>
-          <input
-            v-model="form.token"
-            class="auth-input"
-            type="text"
-            placeholder="Paste the token from your email"
-            required
-          >
-        </div>
-      </div>
-
-      <div class="auth-form__group">
-        <label class="auth-form__label">Email Address</label>
-        <div class="auth-input-wrapper">
-          <i class="fas fa-envelope"></i>
-          <input
-            v-model="form.email"
-            class="auth-input"
-            type="email"
-            placeholder="you@example.com"
-            required
-          >
-        </div>
-      </div>
-
+      <!-- Token and email are stored internally from URL params, not shown to user -->
       <div class="auth-form__group">
         <label class="auth-form__label">New Password</label>
         <div class="auth-input-wrapper">

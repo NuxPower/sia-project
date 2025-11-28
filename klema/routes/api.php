@@ -8,6 +8,7 @@ use App\Http\Controllers\API\AlertApiController;
 use App\Http\Controllers\API\AuthApiController;
 use App\Http\Controllers\API\ActivityApiController;
 use App\Http\Controllers\API\ExportApiController;
+use App\Http\Controllers\API\SettingsApiController;
 
 Route::prefix('auth')->group(function () {
     Route::middleware('throttle:login')->post('/login', [AuthApiController::class, 'login']);
@@ -41,6 +42,7 @@ Route::middleware(['auth:sanctum', 'verified'])
         Route::get('/forecast', [WeatherApiController::class, 'getForecast']);
         Route::get('/history', [WeatherApiController::class, 'getWeatherHistory']);
         Route::get('/historical/{date}', [WeatherApiController::class, 'getHistoricalWeather']);
+        Route::get('/suggestions', [WeatherApiController::class, 'getLocationSuggestions']);
     });
 
     // Farm endpoints
@@ -52,8 +54,10 @@ Route::middleware(['auth:sanctum', 'verified'])
     // Alert endpoints
     Route::get('/alerts/active', [AlertApiController::class, 'active']);
     Route::get('/alerts/forecast-warnings', [AlertApiController::class, 'forecastWarnings']);
-    Route::patch('/alerts/{alert}/resolve', [AlertApiController::class, 'resolve'])->whereNumber('alert');
-    Route::apiResource('alerts', AlertApiController::class)->whereNumber('alert');
+    Route::patch('/alerts/{alert:alert_id}/resolve', [AlertApiController::class, 'resolve']);
+    Route::apiResource('alerts', AlertApiController::class)->parameters([
+        'alerts' => 'alert:alert_id'
+    ]);
 
     // Activity endpoints
     Route::get('/activities/meta', [ActivityApiController::class, 'meta']);
@@ -66,6 +70,11 @@ Route::middleware(['auth:sanctum', 'verified'])
     Route::post('/exports/farms', [ExportApiController::class, 'exportFarmData']);
     Route::post('/exports/activities', [ExportApiController::class, 'exportActivityData']);
     Route::get('/exports/{export:export_id}/download', [ExportApiController::class, 'download'])->name('exports.download');
+
+    // Settings endpoints
+    Route::get('/settings', [SettingsApiController::class, 'index']);
+    Route::put('/settings', [SettingsApiController::class, 'update']);
+    Route::post('/settings/reset', [SettingsApiController::class, 'reset']);
 
     // Admin endpoints (now accessible to all farmers)
     Route::prefix('admin')->group(function () {

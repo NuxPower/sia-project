@@ -3,10 +3,13 @@
 // app/Models/User.php
 namespace App\Models;
 
+use App\Notifications\QueuedResetPassword;
+use App\Notifications\QueuedVerifyEmail;
 use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Illuminate\Support\Facades\Log;
 use Laravel\Sanctum\HasApiTokens;
 
 class User extends Authenticatable implements MustVerifyEmail
@@ -45,9 +48,61 @@ class User extends Authenticatable implements MustVerifyEmail
         return $this->hasMany(Activity::class);
     }
 
+    public function userSettings()
+    {
+        return $this->hasOne(UserSettings::class);
+    }
+
     public function isFarmer(): bool
     {
         return $this->role === 'farmer';
+    }
+
+    /**
+     * Send the email verification notification.
+     * Override to queue the notification instead of sending synchronously.
+     * This prevents email connection timeouts from blocking HTTP requests.
+     *
+     * @return void
+     */
+    public function sendEmailVerificationNotification()
+    {
+        // Queue the notification - it implements ShouldQueue so it will be queued
+        // If QUEUE_CONNECTION=sync, it runs immediately but we catch errors
+        // If QUEUE_CONNECTION=database, it gets queued and processed by worker
+        try {
+            $this->notify(new QueuedVerifyEmail);
+        } catch (\Exception $e) {
+            // Log error but don't throw - registration should succeed even if email fails
+            Log::warning('Failed to queue email verification notification', [
+                'user_id' => $this->id,
+                'email' => $this->email,
+                'error' => $e->getMessage(),
+            ]);
+        }
+    }
+
+    /**
+     * Send the password reset notification.
+     * Override to use custom notification that generates frontend URL instead of Laravel route.
+     *
+     * @param  string  $token
+     * @return void
+     */
+    public function sendPasswordResetNotification($token)
+    {
+        try {
+            $this->notify(new QueuedResetPassword($token));
+        } catch (\Exception $e) {
+            // Log the error for debugging
+            Log::error('Failed to queue password reset notification', [
+                'user_id' => $this->id,
+                'email' => $this->email,
+                'error' => $e->getMessage(),
+            ]);
+            // Re-throw to let the PasswordBroker handle it appropriately
+            throw $e;
+        }
     }
 
     /**
